@@ -1,0 +1,17 @@
+appId: com.vbbb.app
+productName: VBBB
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**/*
+  - "!out/**/*.map"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
