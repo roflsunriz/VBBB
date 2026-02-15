@@ -1,0 +1,159 @@
+/* CSS Custom Properties for theming.
+ * All color values are defined here; components reference these variables.
+ * Theme files override these variables to change the appearance.
+ */
+
+/* Default: Dark theme (applied by default) */
+:root,
+[data-theme="dark"] {
+  /* Background layers */
+  --color-bg-primary: #171717;
+  --color-bg-secondary: #262626;
+  --color-bg-tertiary: #404040;
+  --color-bg-hover: rgba(64, 64, 64, 0.5);
+  --color-bg-active: #404040;
+
+  /* Text */
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+  --color-text-inverse: #171717;
+
+  /* Borders */
+  --color-border-primary: #404040;
+  --color-border-secondary: rgba(38, 38, 38, 0.5);
+
+  /* Accent */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #60a5fa;
+  --color-accent-muted: rgba(59, 130, 246, 0.2);
+
+  /* Response colors */
+  --color-res-number: #4ade80;
+  --color-res-name: #86efac;
+  --color-res-mail: #737373;
+  --color-res-datetime: #525252;
+  --color-res-body: #d4d4d4;
+  --color-res-abon: #525252;
+
+  /* Thread status badges */
+  --color-age: #ef4444;
+  --color-sage: #3b82f6;
+  --color-new: #eab308;
+  --color-archive: #737373;
+
+  /* Anchor links */
+  --color-anchor: #60a5fa;
+  --color-anchor-hover: #93bbfd;
+
+  /* NG / warning */
+  --color-warning: #eab308;
+  --color-error: #ef4444;
+  --color-success: #4ade80;
+
+  /* Popup */
+  --color-popup-bg: #262626;
+  --color-popup-border: #525252;
+  --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  /* Scrollbar */
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #404040;
+  --color-scrollbar-thumb-hover: #525252;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: #e5e5e5;
+  --color-bg-hover: rgba(229, 229, 229, 0.5);
+  --color-bg-active: #e5e5e5;
+
+  --color-text-primary: #171717;
+  --color-text-secondary: #525252;
+  --color-text-muted: #a3a3a3;
+  --color-text-inverse: #f5f5f5;
+
+  --color-border-primary: #d4d4d4;
+  --color-border-secondary: rgba(229, 229, 229, 0.5);
+
+  --color-accent: #2563eb;
+  --color-accent-hover: #3b82f6;
+  --color-accent-muted: rgba(37, 99, 235, 0.1);
+
+  --color-res-number: #16a34a;
+  --color-res-name: #15803d;
+  --color-res-mail: #737373;
+  --color-res-datetime: #a3a3a3;
+  --color-res-body: #262626;
+  --color-res-abon: #a3a3a3;
+
+  --color-age: #dc2626;
+  --color-sage: #2563eb;
+  --color-new: #ca8a04;
+  --color-archive: #a3a3a3;
+
+  --color-anchor: #2563eb;
+  --color-anchor-hover: #1d4ed8;
+
+  --color-warning: #ca8a04;
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+
+  --color-popup-bg: #ffffff;
+  --color-popup-border: #d4d4d4;
+  --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #d4d4d4;
+  --color-scrollbar-thumb-hover: #a3a3a3;
+}
+
+/* Classic theme (gikoNavi inspired) */
+[data-theme="classic"] {
+  --color-bg-primary: #f0e8d8;
+  --color-bg-secondary: #e8dcc8;
+  --color-bg-tertiary: #d8ccb0;
+  --color-bg-hover: rgba(216, 204, 176, 0.5);
+  --color-bg-active: #d8ccb0;
+
+  --color-text-primary: #333333;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-text-inverse: #f0e8d8;
+
+  --color-border-primary: #c8b898;
+  --color-border-secondary: rgba(200, 184, 152, 0.5);
+
+  --color-accent: #336699;
+  --color-accent-hover: #4477aa;
+  --color-accent-muted: rgba(51, 102, 153, 0.15);
+
+  --color-res-number: #008000;
+  --color-res-name: #006600;
+  --color-res-mail: #888888;
+  --color-res-datetime: #999999;
+  --color-res-body: #333333;
+  --color-res-abon: #999999;
+
+  --color-age: #cc0000;
+  --color-sage: #336699;
+  --color-new: #cc9900;
+  --color-archive: #999999;
+
+  --color-anchor: #0000cc;
+  --color-anchor-hover: #0000ff;
+
+  --color-warning: #cc9900;
+  --color-error: #cc0000;
+  --color-success: #008000;
+
+  --color-popup-bg: #f0e8d8;
+  --color-popup-border: #c8b898;
+  --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #c8b898;
+  --color-scrollbar-thumb-hover: #b0a080;
+}

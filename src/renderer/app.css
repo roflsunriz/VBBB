@@ -1,1 +1,29 @@
 @import 'tailwindcss';
+@import './themes/theme-vars.css';
+
+/* Anchor link styling for >>N references */
+.anchor-link {
+  color: var(--color-anchor);
+  text-decoration: none;
+  cursor: pointer;
+}
+.anchor-link:hover {
+  text-decoration: underline;
+  color: var(--color-anchor-hover);
+}
+
+/* Themed scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}

@@ -14,13 +14,13 @@ type SortDir = 'asc' | 'desc';
 function ageSageBadge(ageSage: number | undefined): React.JSX.Element | null {
   switch (ageSage) {
     case AgeSage.Age:
-      return <MdiIcon path={mdiArrowUp} size={12} className="text-red-400" />;
+      return <MdiIcon path={mdiArrowUp} size={12} className="text-[var(--color-age)]" />;
     case AgeSage.Sage:
-      return <MdiIcon path={mdiArrowDown} size={12} className="text-blue-400" />;
+      return <MdiIcon path={mdiArrowDown} size={12} className="text-[var(--color-sage)]" />;
     case AgeSage.New:
-      return <MdiIcon path={mdiNewBox} size={12} className="text-green-400" />;
+      return <MdiIcon path={mdiNewBox} size={12} className="text-[var(--color-success)]" />;
     case AgeSage.Archive:
-      return <MdiIcon path={mdiArchive} size={12} className="text-neutral-500" />;
+      return <MdiIcon path={mdiArchive} size={12} className="text-[var(--color-archive)]" />;
     default:
       return null;
   }
@@ -91,11 +91,11 @@ export function ThreadList(): React.JSX.Element {
       <button
         type="button"
         onClick={() => { handleSort(field); }}
-        className="flex items-center gap-0.5 text-left text-xs font-medium text-neutral-400 hover:text-neutral-200"
+        className="flex items-center gap-0.5 text-left text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
       >
         {label}
         {sortKey === field && (
-          <span className="text-blue-400">{sortDir === 'asc' ? '▲' : '▼'}</span>
+          <span className="text-[var(--color-accent)]">{sortDir === 'asc' ? '▲' : '▼'}</span>
         )}
       </button>
     ),
@@ -103,19 +103,19 @@ export function ThreadList(): React.JSX.Element {
   );
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col border-r border-neutral-700">
-      <div className="flex h-8 items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3">
-        <span className="text-xs text-neutral-400">
+    <section className="flex min-w-0 flex-1 flex-col border-r border-[var(--color-border-primary)]">
+      <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
+        <span className="text-xs text-[var(--color-text-muted)]">
           {selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}
         </span>
-        {subjectLoading && <MdiIcon path={mdiLoading} size={12} className="animate-spin text-blue-400" />}
+        {subjectLoading && <MdiIcon path={mdiLoading} size={12} className="animate-spin text-[var(--color-accent)]" />}
         {subjects.length > 0 && (
-          <span className="ml-auto text-xs text-neutral-600">{subjects.length} スレッド</span>
+          <span className="ml-auto text-xs text-[var(--color-text-muted)]">{subjects.length} スレッド</span>
         )}
       </div>
 
       {/* Table header */}
-      <div className="flex h-6 items-center gap-2 border-b border-neutral-700/50 bg-neutral-800/50 px-3">
+      <div className="flex h-6 items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-3">
         <div className="w-10">
           <SortHeader label="#" field="index" />
         </div>
@@ -131,19 +131,19 @@ export function ThreadList(): React.JSX.Element {
       {/* Thread rows */}
       <div className="flex-1 overflow-y-auto">
         {selectedBoard === null && (
-          <p className="p-4 text-center text-xs text-neutral-500">板を選択してください</p>
+          <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">板を選択してください</p>
         )}
         {sortedSubjects.map((subject, i) => (
           <button
             key={subject.fileName}
             type="button"
             onClick={() => { handleOpenThread(subject); }}
-            className="flex w-full items-center gap-2 border-b border-neutral-800/30 px-3 py-1 text-left text-xs hover:bg-neutral-800"
+            className="flex w-full items-center gap-2 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
           >
-            <span className="w-10 shrink-0 text-neutral-600">{String(i + 1)}</span>
+            <span className="w-10 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
             <span className="w-6 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
-            <span className="min-w-0 flex-1 truncate text-neutral-300">{subject.title}</span>
-            <span className="w-16 shrink-0 text-right text-neutral-500">{subject.count}</span>
+            <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]">{subject.title}</span>
+            <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">{subject.count}</span>
           </button>
         ))}
       </div>

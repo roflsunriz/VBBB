@@ -13,6 +13,10 @@ import { fetchDat } from '../services/dat';
 import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx } from '../services/subject';
 import { getBoardDir, ensureDir } from '../services/file-io';
+import { loadKotehan, saveKotehan } from '../services/kotehan';
+import { getSambaInfo, recordSambaTime } from '../services/samba';
+import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
+import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 
 const logger = createLogger('ipc');
 
@@ -120,6 +124,58 @@ export function registerIpcHandlers(): void {
     const board = lookupBoard(boardUrl);
     const boardDir = getBoardDir(dataDir, board.url);
     return Promise.resolve(loadFolderIdx(boardDir));
+  });
+
+  handle('bbs:get-kotehan', (boardUrl: string) => {
+    const board = lookupBoard(boardUrl);
+    const boardDir = getBoardDir(dataDir, board.url);
+    return Promise.resolve(loadKotehan(boardDir));
+  });
+
+  handle('bbs:set-kotehan', async (boardUrl: string, config) => {
+    const board = lookupBoard(boardUrl);
+    const boardDir = getBoardDir(dataDir, board.url);
+    await saveKotehan(boardDir, config);
+  });
+
+  handle('bbs:get-samba', (boardUrl: string) => {
+    return Promise.resolve(getSambaInfo(dataDir, boardUrl));
+  });
+
+  handle('bbs:record-samba', async (boardUrl: string) => {
+    await recordSambaTime(dataDir, boardUrl);
+  });
+
+  handle('ng:get-rules', () => {
+    return Promise.resolve(loadNgRules(dataDir));
+  });
+
+  handle('ng:set-rules', async (rules) => {
+    await saveNgRules(dataDir, rules);
+  });
+
+  handle('ng:add-rule', async (rule) => {
+    await addNgRule(dataDir, rule);
+  });
+
+  handle('ng:remove-rule', async (ruleId: string) => {
+    await removeNgRule(dataDir, ruleId);
+  });
+
+  handle('fav:load', () => {
+    return Promise.resolve(loadFavorites(dataDir));
+  });
+
+  handle('fav:save', async (tree) => {
+    await saveFavorites(dataDir, tree);
+  });
+
+  handle('fav:add', async (node) => {
+    await addFavorite(dataDir, node);
+  });
+
+  handle('fav:remove', async (nodeId: string) => {
+    await removeFavorite(dataDir, nodeId);
   });
 
   logger.info('IPC handlers registered');

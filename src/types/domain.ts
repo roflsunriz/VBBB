@@ -123,6 +123,20 @@ export interface Res {
   readonly title: string;
 }
 
+/** Board-specific default name/mail configuration (コテハン) */
+export interface KotehanConfig {
+  readonly name: string;
+  readonly mail: string;
+}
+
+/** Samba timer information for a board */
+export interface SambaInfo {
+  /** Posting interval in seconds (0 = no restriction) */
+  readonly interval: number;
+  /** Last post time as ISO string (null = never posted) */
+  readonly lastPostTime: string | null;
+}
+
 /** Parameters for posting a response */
 export interface PostParams {
   readonly boardUrl: string;

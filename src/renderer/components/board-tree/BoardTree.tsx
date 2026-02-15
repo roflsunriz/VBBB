@@ -34,11 +34,11 @@ function CategoryNode({
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs hover:bg-neutral-700"
+        className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
       >
-        <MdiIcon path={expanded ? mdiFolderOpen : mdiFolder} size={14} className="text-amber-400" />
-        <span className="truncate font-medium text-neutral-300">{category.name}</span>
-        <span className="ml-auto text-neutral-600">{category.boards.length}</span>
+        <MdiIcon path={expanded ? mdiFolderOpen : mdiFolder} size={14} className="text-[var(--color-warning)]" />
+        <span className="truncate font-medium text-[var(--color-text-secondary)]">{category.name}</span>
+        <span className="ml-auto text-[var(--color-text-muted)]">{category.boards.length}</span>
       </button>
       {expanded && (
         <div className="ml-3">
@@ -47,11 +47,13 @@ function CategoryNode({
               key={board.url}
               type="button"
               onClick={() => { onSelectBoard(board); }}
-              className={`flex w-full items-center gap-1 rounded px-2 py-0.5 text-left text-xs hover:bg-neutral-700 ${
-                selectedBoardUrl === board.url ? 'bg-neutral-700 text-blue-400' : 'text-neutral-400'
+              className={`flex w-full items-center gap-1 rounded px-2 py-0.5 text-left text-xs hover:bg-[var(--color-bg-hover)] ${
+                selectedBoardUrl === board.url
+                  ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                  : 'text-[var(--color-text-muted)]'
               }`}
             >
-              <MdiIcon path={mdiBulletinBoard} size={12} className="text-neutral-500" />
+              <MdiIcon path={mdiBulletinBoard} size={12} className="text-[var(--color-text-muted)]" />
               <span className="truncate">{board.title}</span>
             </button>
           ))}
@@ -80,15 +82,15 @@ export function BoardTree(): React.JSX.Element {
   }, [fetchMenu]);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-neutral-700 bg-neutral-850">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-8 items-center justify-between border-b border-neutral-700 bg-neutral-800 px-2">
-        <span className="text-xs font-medium text-neutral-400">板一覧</span>
+      <div className="flex h-8 items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2">
+        <span className="text-xs font-medium text-[var(--color-text-muted)]">板一覧</span>
         <button
           type="button"
           onClick={handleFetchMenu}
           disabled={menuLoading}
-          className="rounded p-0.5 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200 disabled:opacity-50"
+          className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
           title="板一覧を更新"
         >
           <MdiIcon
@@ -102,7 +104,7 @@ export function BoardTree(): React.JSX.Element {
       {/* Tree */}
       <div className="flex-1 overflow-y-auto p-1">
         {menu === null && !menuLoading && (
-          <p className="px-2 py-4 text-center text-xs text-neutral-500">
+          <p className="px-2 py-4 text-center text-xs text-[var(--color-text-muted)]">
             更新ボタンで板一覧を取得
           </p>
         )}
@@ -115,6 +117,6 @@ export function BoardTree(): React.JSX.Element {
           />
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

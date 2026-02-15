@@ -1,9 +1,11 @@
 /**
  * Post editor component.
  * Sends responses via IPC to the main process post service.
+ * Uses kotehan (per-board default name/mail) for initial values.
+ * Displays Samba timer countdown when posting interval is restricted.
  */
-import { useState, useCallback } from 'react';
-import { mdiSend, mdiLoading } from '@mdi/js';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { mdiSend, mdiLoading, mdiTimerSand } from '@mdi/js';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -12,17 +14,63 @@ interface PostEditorProps {
   readonly threadId: string;
 }
 
+/**
+ * Calculate remaining seconds until Samba restriction is cleared.
+ */
+function calcSambaRemaining(interval: number, lastPostTime: string | null): number {
+  if (interval <= 0 || lastPostTime === null) return 0;
+  const elapsed = (Date.now() - new Date(lastPostTime).getTime()) / 1000;
+  const remaining = interval - elapsed;
+  return remaining > 0 ? Math.ceil(remaining) : 0;
+}
+
 export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.Element {
-  const [name, setName] = useState('');
-  const [mail, setMail] = useState('sage');
+  const kotehan = useBBSStore((s) => s.kotehan);
+  const sambaInfo = useBBSStore((s) => s.sambaInfo);
+  const saveKotehan = useBBSStore((s) => s.saveKotehan);
+  const recordSambaTime = useBBSStore((s) => s.recordSambaTime);
+  const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
+
+  const [name, setName] = useState(kotehan.name);
+  const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
   const [message, setMessage] = useState('');
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
-  const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
+  const [sambaRemaining, setSambaRemaining] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setName(kotehan.name);
+    setMail(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
+  }, [kotehan]);
+
+  // Samba countdown timer
+  useEffect(() => {
+    const update = (): void => {
+      setSambaRemaining(calcSambaRemaining(sambaInfo.interval, sambaInfo.lastPostTime));
+    };
+    update();
+
+    if (sambaInfo.interval > 0) {
+      timerRef.current = setInterval(update, 1000);
+    }
+
+    return () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [sambaInfo.interval, sambaInfo.lastPostTime]);
 
   const handlePost = useCallback(async () => {
     if (message.trim().length === 0) {
       setResultMessage('本文を入力してください');
+      return;
+    }
+
+    if (sambaRemaining > 0) {
+      setResultMessage(`Samba規制中: あと ${String(sambaRemaining)} 秒お待ちください`);
       return;
     }
 
@@ -42,6 +90,8 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
         setMessage('');
         setResultMessage('投稿成功');
         setStatusMessage('投稿が完了しました');
+        void saveKotehan(boardUrl, { name, mail });
+        void recordSambaTime(boardUrl);
       } else {
         setResultMessage(`投稿失敗: ${result.resultType}`);
         setStatusMessage(`投稿失敗: ${result.resultType}`);
@@ -52,7 +102,7 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, setStatusMessage]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, setStatusMessage, saveKotehan, recordSambaTime]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -63,28 +113,36 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
     [handlePost],
   );
 
+  const isDisabled = posting || message.trim().length === 0;
+
   return (
-    <div className="border-t border-neutral-700 bg-neutral-800 p-3">
+    <div className="border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
       <div className="mb-2 flex gap-2">
         <input
           type="text"
           value={name}
           onChange={(e) => { setName(e.target.value); }}
           placeholder="名前"
-          className="w-32 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-blue-500 focus:outline-none"
+          className="w-32 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
         />
         <input
           type="text"
           value={mail}
           onChange={(e) => { setMail(e.target.value); }}
           placeholder="メール"
-          className="w-32 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-blue-500 focus:outline-none"
+          className="w-32 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
         />
+        {sambaRemaining > 0 && (
+          <span className="flex items-center gap-1 text-xs text-[var(--color-warning)]">
+            <MdiIcon path={mdiTimerSand} size={12} />
+            あと {sambaRemaining} 秒
+          </span>
+        )}
         <button
           type="button"
           onClick={() => { void handlePost(); }}
-          disabled={posting || message.trim().length === 0}
-          className="ml-auto flex items-center gap-1 rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500 disabled:opacity-50"
+          disabled={isDisabled}
+          className="ml-auto flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
         >
           <MdiIcon path={posting ? mdiLoading : mdiSend} size={12} className={posting ? 'animate-spin' : ''} />
           書き込む
@@ -96,10 +154,10 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
         onKeyDown={handleKeyDown}
         placeholder="本文を入力 (Ctrl+Enter で送信)"
         rows={4}
-        className="w-full resize-none rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-xs leading-relaxed text-neutral-200 placeholder:text-neutral-600 focus:border-blue-500 focus:outline-none"
+        className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
       />
       {resultMessage.length > 0 && (
-        <p className={`mt-1 text-xs ${resultMessage.includes('成功') ? 'text-green-400' : 'text-red-400'}`}>
+        <p className={`mt-1 text-xs ${resultMessage.includes('成功') ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>
           {resultMessage}
         </p>
       )}
