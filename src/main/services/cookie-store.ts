@@ -147,10 +147,12 @@ export function buildCookieHeader(url: string): string {
 /**
  * Parse Set-Cookie header(s) and add to the store.
  * Does NOT log cookie values for security.
+ *
+ * headersToRecord joins multiple Set-Cookie values with '\n'.
+ * We split on that first, then fall back to comma heuristic for
+ * legacy single-string values.
  */
 export function parseSetCookieHeaders(headers: Readonly<Record<string, string>>, requestUrl: string): void {
-  // Set-Cookie may be a single header or comma-separated (per HTTP spec)
-  // In practice, each Set-Cookie is a separate header, but our headersToRecord joins them
   const setCookieValue = headers['set-cookie'];
   if (setCookieValue === undefined) return;
 
@@ -164,9 +166,22 @@ export function parseSetCookieHeaders(headers: Readonly<Record<string, string>>,
     return;
   }
 
-  // Split on commas that are followed by a cookie name (rough heuristic)
-  // More robust: split on newlines if available, otherwise treat as single
-  const cookieStrings = setCookieValue.split(/,\s*(?=[A-Za-z_]+=)/);
+  // Primary split: newline (used by headersToRecord for set-cookie)
+  // Fallback: comma heuristic for any remaining multi-cookie strings
+  const rawLines = setCookieValue.split('\n');
+  const cookieStrings: string[] = [];
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    // If a single line still contains multiple cookies (comma-joined by proxy/CDN),
+    // split with the heuristic regex
+    const sub = trimmed.split(/,\s*(?=[A-Za-z_][\w]*=)/);
+    for (const s of sub) {
+      if (s.trim().length > 0) {
+        cookieStrings.push(s.trim());
+      }
+    }
+  }
 
   for (const cookieStr of cookieStrings) {
     const parts = cookieStr.split(';').map((p) => p.trim());

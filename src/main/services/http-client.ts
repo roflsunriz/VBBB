@@ -31,7 +31,10 @@ function headersToRecord(headers: IncomingHttpHeaders): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
     if (value !== undefined) {
-      result[key] = Array.isArray(value) ? value.join(', ') : value;
+      // RFC 7230: Set-Cookie MUST NOT be combined with comma.
+      // Use newline as separator so parseSetCookieHeaders can split reliably.
+      const separator = key.toLowerCase() === 'set-cookie' ? '\n' : ', ';
+      result[key] = Array.isArray(value) ? value.join(separator) : value;
     }
   }
   return result;

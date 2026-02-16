@@ -180,6 +180,63 @@ describe('parseSetCookieHeaders', () => {
     parseSetCookieHeaders(headers, 'https://5ch.net/');
     expect(getCookieCount()).toBe(0);
   });
+
+  it('parses newline-separated Set-Cookie headers (from headersToRecord)', () => {
+    // headersToRecord joins multiple Set-Cookie headers with \n
+    const headers: Record<string, string> = {
+      'set-cookie': 'SPID=abc; path=/; domain=.5ch.net\nPON=xyz; path=/; domain=.5ch.net',
+    };
+    parseSetCookieHeaders(headers, 'https://eagle.5ch.net/test/bbs.cgi');
+
+    const spid = getCookie('SPID', '5ch.net');
+    expect(spid).toBeDefined();
+    expect(spid?.value).toBe('abc');
+
+    const pon = getCookie('PON', '5ch.net');
+    expect(pon).toBeDefined();
+    expect(pon?.value).toBe('xyz');
+  });
+
+  it('parses newline-separated cookies with expires containing commas', () => {
+    const headers: Record<string, string> = {
+      'set-cookie': 'SPID=abc; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net\nPON=xyz; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net',
+    };
+    parseSetCookieHeaders(headers, 'https://eagle.5ch.net/test/bbs.cgi');
+
+    const spid = getCookie('SPID', '5ch.net');
+    expect(spid).toBeDefined();
+    expect(spid?.value).toBe('abc');
+    expect(spid?.expires).toBeDefined();
+
+    const pon = getCookie('PON', '5ch.net');
+    expect(pon).toBeDefined();
+    expect(pon?.value).toBe('xyz');
+  });
+
+  it('handles comma-separated Set-Cookie (legacy/proxy) within a single line', () => {
+    // Some proxies might join with comma instead of newline
+    const headers: Record<string, string> = {
+      'set-cookie': 'A=1; path=/, B=2; path=/',
+    };
+    parseSetCookieHeaders(headers, 'https://5ch.net/');
+
+    expect(getCookie('A', '5ch.net')).toBeDefined();
+    expect(getCookie('B', '5ch.net')).toBeDefined();
+  });
+
+  it('grtCookie flow: parses cookies returned during post retry', () => {
+    // Simulates: first POST returns grtCookie with Set-Cookie headers
+    // After parsing, the cookies should be available for the retry POST
+    const headers: Record<string, string> = {
+      'set-cookie': 'SPID=first_spid; path=/; domain=.5ch.net\nyuki=agree; path=/; domain=.5ch.net',
+    };
+    parseSetCookieHeaders(headers, 'https://eagle.5ch.net/test/bbs.cgi');
+
+    // Verify cookies are available via buildCookieHeader for the retry
+    const cookieHeader = buildCookieHeader('https://eagle.5ch.net/test/bbs.cgi');
+    expect(cookieHeader).toContain('SPID=first_spid');
+    expect(cookieHeader).toContain('yuki=agree');
+  });
 });
 
 describe('serialize / deserialize', () => {

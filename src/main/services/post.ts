@@ -232,10 +232,13 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     }
     lastPayloadHash = body;
 
-    logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)})`);
-
     // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
     const cookieHeader = buildCookieHeader(postUrl);
+    // Log cookie names (not values) for diagnostics
+    const cookieNames = cookieHeader.length > 0
+      ? cookieHeader.split('; ').map((c) => c.split('=')[0]).join(', ')
+      : '(none)';
+    logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
     const postHeaders: Record<string, string> = {
       'Content-Type': `application/x-www-form-urlencoded${charset}`,
       Referer: `${board.serverUrl}test/bbs.cgi`,
@@ -253,7 +256,15 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     });
 
     // Parse and store any cookies from the response
+    const hadSetCookie = response.headers['set-cookie'] !== undefined;
     parseSetCookieHeaders(response.headers, postUrl);
+    if (hadSetCookie) {
+      const updatedCookieHeader = buildCookieHeader(postUrl);
+      const updatedNames = updatedCookieHeader.length > 0
+        ? updatedCookieHeader.split('; ').map((c) => c.split('=')[0]).join(', ')
+        : '(none)';
+      logger.info(`Set-Cookie received; store now has: ${updatedNames}`);
+    }
 
     // Decode response: HTTP Content-Type header → HTML meta charset → request encoding
     const responseEncoding = detectEncodingFromHeader(response.headers)
@@ -279,7 +290,8 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     ) {
       // Extract hidden fields and retry
       hiddenFields = extractHiddenFields(html);
-      logger.info(`${resultType} response, retrying with hidden fields`);
+      const fieldNames = Object.keys(hiddenFields);
+      logger.info(`${resultType} response, retrying with ${String(fieldNames.length)} hidden fields: ${fieldNames.join(', ')}`);
       continue;
     }
 
