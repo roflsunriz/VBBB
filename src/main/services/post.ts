@@ -258,14 +258,16 @@ function buildPostBody(
     fields.push(['sid', sid]);
   }
 
-  // Apply NCR conversion to all user-supplied fields so that characters
+  // Parameter order matches Slevo's PostRemoteDataSourceImpl exactly:
+  // bbs, key, time, FROM, mail, MESSAGE, submit
+  // NCR conversion is applied to all user-supplied fields so that characters
   // outside CP932 (e.g. emoji) are safely transmitted as &#codepoint;
+  fields.push(['bbs', replaceWithNCR(board.bbsId)]);
+  fields.push(['key', replaceWithNCR(params.threadId)]);
+  fields.push(['time', replaceWithNCR(String(Math.floor(Date.now() / 1000)))]);
   fields.push(['FROM', replaceWithNCR(params.name)]);
   fields.push(['mail', replaceWithNCR(params.mail)]);
   fields.push(['MESSAGE', replaceWithNCR(params.message)]);
-  fields.push(['bbs', replaceWithNCR(board.bbsId)]);
-  fields.push(['time', String(Math.floor(Date.now() / 1000))]);
-  fields.push(['key', params.threadId]);
   fields.push(['submit', '\u66F8\u304D\u8FBC\u3080']); // 書き込む
 
   return fields
@@ -421,14 +423,10 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
   const charset = requestEncoding === 'UTF-8' ? '; charset=UTF-8' : '';
 
   // Referer: thread URL for replies, board URL for new threads (per protocol §3.1/3.2)
-  // Note: trailing slash on reply URL is accepted by the server (verified in diag logs).
+  // Slevo uses NO trailing slash on reply URLs; match that exactly.
   const referer = params.threadId.length > 0
-    ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}/`
+    ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}`
     : `${board.serverUrl}test/read.cgi/${board.bbsId}/`;
-
-  // Origin: required by some servers for POST CSRF validation
-  const postUrlObj = new URL(postUrl);
-  const origin = postUrlObj.origin;
 
   // Diagnostic: log the full post context
   logger.info(
@@ -502,11 +500,13 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     logger.info(`[DIAG] Cookie value previews: ${cookiePairs.length > 0 ? cookiePairs.join('; ') : '(none)'}`);
     logger.info(`[DIAG] Referer for this attempt: ${effectiveReferer}`);
 
+    // Match Slevo's minimal header set: only Content-Type, Referer, and Cookie.
+    // Slevo (OkHttp) does NOT send Origin, Accept-Language, Cache-Control, or
+    // Pragma.  Extra headers (especially Origin) may trigger 5ch's anti-bot
+    // detection, resulting in "9991 Banned" rejections.
     const postHeaders: Record<string, string> = {
       'Content-Type': `application/x-www-form-urlencoded${charset}`,
       Referer: effectiveReferer,
-      Origin: origin,
-      'Accept-Language': 'ja',
     };
     if (cookieHeader.length > 0) {
       postHeaders['Cookie'] = cookieHeader;

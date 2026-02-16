@@ -49,10 +49,20 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
 
     const headers: Record<string, string> = {
       'User-Agent': DEFAULT_USER_AGENT,
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
       ...config.headers,
     };
+
+    // Cache-busting headers are only relevant for GET/HEAD — POST responses
+    // are never cached.  Slevo (OkHttp) does not send these at all; sending
+    // them on POST to 5ch may trigger anti-bot detection.
+    if (config.method === 'GET') {
+      if (headers['Cache-Control'] === undefined) {
+        headers['Cache-Control'] = 'no-cache';
+      }
+      if (headers['Pragma'] === undefined) {
+        headers['Pragma'] = 'no-cache';
+      }
+    }
 
     if (config.ifModifiedSince !== undefined) {
       headers['If-Modified-Since'] = config.ifModifiedSince;
