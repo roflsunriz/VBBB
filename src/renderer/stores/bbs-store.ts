@@ -38,6 +38,7 @@ interface BBSState {
 
   // Post editor
   postEditorOpen: boolean;
+  postEditorInitialMessage: string;
 
   // Kotehan (per-board default name/mail)
   kotehan: KotehanConfig;
@@ -48,6 +49,9 @@ interface BBSState {
   // NG rules
   ngRules: readonly NgRule[];
   ngEditorOpen: boolean;
+  ngEditorInitialToken: string;
+  ngEditorInitialBoardId: string;
+  ngEditorInitialThreadId: string;
 
   // Favorites
   favorites: FavTree;
@@ -70,6 +74,7 @@ interface BBSState {
   addNgRule: (rule: NgRule) => Promise<void>;
   removeNgRule: (ruleId: string) => Promise<void>;
   toggleNgEditor: () => void;
+  openNgEditorWithToken: (token: string, boardId?: string, threadId?: string) => void;
   fetchFavorites: () => Promise<void>;
   addFavorite: (node: FavNode) => Promise<void>;
   removeFavorite: (nodeId: string) => Promise<void>;
@@ -83,8 +88,10 @@ interface BBSState {
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
   saveTabs: () => Promise<void>;
   restoreTabs: () => Promise<void>;
+  restoreSession: () => Promise<void>;
   loadBrowsingHistory: () => Promise<void>;
   togglePostEditor: () => void;
+  openPostEditorWithQuote: (resNumber: number) => void;
   setStatusMessage: (message: string) => void;
 }
 
@@ -110,6 +117,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   activeTabId: null,
 
   postEditorOpen: false,
+  postEditorInitialMessage: '',
 
   kotehan: { name: '', mail: '' },
 
@@ -117,6 +125,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   ngRules: [],
   ngEditorOpen: false,
+  ngEditorInitialToken: '',
+  ngEditorInitialBoardId: '',
+  ngEditorInitialThreadId: '',
 
   favorites: { children: [] },
   favoritesOpen: false,
@@ -143,6 +154,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       subjectError: null,
       statusMessage: `${board.title} のスレッド一覧を取得中...`,
     });
+    // Persist selected board for session restore
+    void getApi().invoke('session:save', { selectedBoardUrl: board.url });
     try {
       const [result, indices, kotehan, sambaInfo] = await Promise.all([
         getApi().invoke('bbs:fetch-subject', board.url),
@@ -231,7 +244,21 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   toggleNgEditor: () => {
-    set((state) => ({ ngEditorOpen: !state.ngEditorOpen }));
+    set((state) => ({
+      ngEditorOpen: !state.ngEditorOpen,
+      ngEditorInitialToken: '',
+      ngEditorInitialBoardId: '',
+      ngEditorInitialThreadId: '',
+    }));
+  },
+
+  openNgEditorWithToken: (token: string, boardId?: string, threadId?: string) => {
+    set({
+      ngEditorOpen: true,
+      ngEditorInitialToken: token,
+      ngEditorInitialBoardId: boardId ?? '',
+      ngEditorInitialThreadId: threadId ?? '',
+    });
   },
 
   fetchFavorites: async () => {
@@ -397,6 +424,26 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
   },
 
+  restoreSession: async () => {
+    try {
+      const session = await getApi().invoke('session:load');
+      if (session.selectedBoardUrl !== null) {
+        const { menu } = get();
+        if (menu !== null) {
+          for (const cat of menu.categories) {
+            const board = cat.boards.find((b) => b.url === session.selectedBoardUrl);
+            if (board !== undefined) {
+              await get().selectBoard(board);
+              return;
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently ignore session restore errors
+    }
+  },
+
   loadBrowsingHistory: async () => {
     try {
       const history = await getApi().invoke('history:load');
@@ -407,7 +454,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   togglePostEditor: () => {
-    set((state) => ({ postEditorOpen: !state.postEditorOpen }));
+    set((state) => ({ postEditorOpen: !state.postEditorOpen, postEditorInitialMessage: '' }));
+  },
+
+  openPostEditorWithQuote: (resNumber: number) => {
+    set({ postEditorOpen: true, postEditorInitialMessage: `>>${String(resNumber)}\n` });
   },
 
   setStatusMessage: (message: string) => {

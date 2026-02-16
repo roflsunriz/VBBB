@@ -12,6 +12,17 @@ export const AbonType = {
 } as const;
 export type AbonType = (typeof AbonType)[keyof typeof AbonType];
 
+/** Target scope: what entity the rule filters */
+export const NgTarget = {
+  /** Filter individual responses in thread view */
+  Response: 'response',
+  /** Filter threads in thread list */
+  Thread: 'thread',
+  /** Filter boards in board tree */
+  Board: 'board',
+} as const;
+export type NgTarget = (typeof NgTarget)[keyof typeof NgTarget];
+
 /** Match mode for NG rules */
 export const NgMatchMode = {
   /** Plain text AND matching (all tokens must be present) */
@@ -25,6 +36,8 @@ export type NgMatchMode = (typeof NgMatchMode)[keyof typeof NgMatchMode];
 export interface NgRule {
   /** Unique identifier */
   readonly id: string;
+  /** Target scope: what entity this rule filters (default: 'response') */
+  readonly target?: NgTarget | undefined;
   /** Type of abon to apply when matched */
   readonly abonType: AbonType;
   /** Matching mode */

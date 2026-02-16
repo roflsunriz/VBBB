@@ -1,21 +1,32 @@
 /**
  * Favorite tree panel.
  * Displays bookmarked boards and threads in a tree structure.
+ * Supports right-click context menu for deletion.
  */
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete } from '@mdi/js';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
+/** Context menu state for favorite tree */
+interface FavCtxMenu {
+  readonly x: number;
+  readonly y: number;
+  readonly nodeId: string;
+  readonly nodeTitle: string;
+}
+
 function FavItemRow({
   item,
   depth,
   onRemove,
+  onContextMenu,
 }: {
   readonly item: FavItem;
   readonly depth: number;
   readonly onRemove: (id: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
 }): React.JSX.Element {
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
@@ -55,6 +66,7 @@ function FavItemRow({
     <div
       className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
       style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
+      onContextMenu={(e) => { onContextMenu(e, item.id, item.title); }}
     >
       <button
         type="button"
@@ -81,17 +93,20 @@ function FavFolderRow({
   depth,
   onToggle,
   onRemove,
+  onContextMenu,
 }: {
   readonly folder: FavFolder;
   readonly depth: number;
   readonly onToggle: (id: string) => void;
   readonly onRemove: (id: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
 }): React.JSX.Element {
   return (
     <>
       <div
         className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
         style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
+        onContextMenu={(e) => { onContextMenu(e, folder.id, folder.title); }}
       >
         <button
           type="button"
@@ -115,7 +130,7 @@ function FavFolderRow({
         </button>
       </div>
       {folder.expanded && folder.children.map((child) => (
-        <FavNodeRow key={child.id} node={child} depth={depth + 1} onToggle={onToggle} onRemove={onRemove} />
+        <FavNodeRow key={child.id} node={child} depth={depth + 1} onToggle={onToggle} onRemove={onRemove} onContextMenu={onContextMenu} />
       ))}
     </>
   );
@@ -126,16 +141,18 @@ function FavNodeRow({
   depth,
   onToggle,
   onRemove,
+  onContextMenu,
 }: {
   readonly node: FavNode;
   readonly depth: number;
   readonly onToggle: (id: string) => void;
   readonly onRemove: (id: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
 }): React.JSX.Element {
   if (node.kind === 'folder') {
-    return <FavFolderRow folder={node} depth={depth} onToggle={onToggle} onRemove={onRemove} />;
+    return <FavFolderRow folder={node} depth={depth} onToggle={onToggle} onRemove={onRemove} onContextMenu={onContextMenu} />;
   }
-  return <FavItemRow item={node} depth={depth} onRemove={onRemove} />;
+  return <FavItemRow item={node} depth={depth} onRemove={onRemove} onContextMenu={onContextMenu} />;
 }
 
 function toggleFolderExpand(nodes: readonly FavNode[], folderId: string): readonly FavNode[] {
@@ -156,9 +173,19 @@ export function FavoriteTree(): React.JSX.Element {
   const saveFavorites = useBBSStore((s) => s.saveFavorites);
   const removeFavorite = useBBSStore((s) => s.removeFavorite);
 
+  const [ctxMenu, setCtxMenu] = useState<FavCtxMenu | null>(null);
+
   useEffect(() => {
     void fetchFavorites();
   }, [fetchFavorites]);
+
+  // Close context menu on click
+  useEffect(() => {
+    if (ctxMenu === null) return;
+    const handler = (): void => { setCtxMenu(null); };
+    document.addEventListener('click', handler);
+    return () => { document.removeEventListener('click', handler); };
+  }, [ctxMenu]);
 
   const handleToggle = useCallback((folderId: string) => {
     const updated = toggleFolderExpand(favorites.children, folderId);
@@ -168,6 +195,19 @@ export function FavoriteTree(): React.JSX.Element {
   const handleRemove = useCallback((nodeId: string) => {
     void removeFavorite(nodeId);
   }, [removeFavorite]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string, nodeTitle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, nodeId, nodeTitle });
+  }, []);
+
+  const handleCtxRemove = useCallback(() => {
+    if (ctxMenu !== null) {
+      void removeFavorite(ctxMenu.nodeId);
+    }
+    setCtxMenu(null);
+  }, [ctxMenu, removeFavorite]);
 
   return (
     <div className="flex flex-col">
@@ -185,10 +225,28 @@ export function FavoriteTree(): React.JSX.Element {
           </p>
         ) : (
           favorites.children.map((node) => (
-            <FavNodeRow key={node.id} node={node} depth={0} onToggle={handleToggle} onRemove={handleRemove} />
+            <FavNodeRow key={node.id} node={node} depth={0} onToggle={handleToggle} onRemove={handleRemove} onContextMenu={handleContextMenu} />
           ))
         )}
       </div>
+
+      {/* Context menu */}
+      {ctxMenu !== null && (
+        <div
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleCtxRemove}
+            role="menuitem"
+          >
+            &quot;{ctxMenu.nodeTitle.length > 15 ? `${ctxMenu.nodeTitle.slice(0, 15)}…` : ctxMenu.nodeTitle}&quot; を削除
+          </button>
+        </div>
+      )}
     </div>
   );
 }

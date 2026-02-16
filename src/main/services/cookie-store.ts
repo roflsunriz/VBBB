@@ -320,3 +320,10 @@ export function clearAllCookies(): void {
 export function getCookieCount(): number {
   return cookies.size;
 }
+
+/**
+ * Return all cookies in the store as an array.
+ */
+export function getAllCookies(): readonly StoredCookie[] {
+  return [...cookies.values()];
+}

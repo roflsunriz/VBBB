@@ -96,11 +96,17 @@ function ResItem({
   ngResult,
   onAnchorHover,
   onAnchorLeave,
+  onResNumberClick,
+  onSetKokomade,
+  onAddNgWord,
 }: {
   readonly res: Res;
   readonly ngResult: NgFilterResult;
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onAnchorLeave: () => void;
+  readonly onResNumberClick: (resNumber: number) => void;
+  readonly onSetKokomade: (resNumber: number) => void;
+  readonly onAddNgWord: (selectedText: string) => void;
 }): React.JSX.Element | null {
   // Transparent abon: completely hidden
   if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
@@ -117,6 +123,45 @@ function ResItem({
       </div>
     );
   }
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const [selectedText, setSelectedText] = useState('');
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const selection = window.getSelection();
+    setSelectedText(selection !== null ? selection.toString().trim() : '');
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleKokomade = useCallback(() => {
+    onSetKokomade(res.number);
+    setContextMenu(null);
+  }, [onSetKokomade, res.number]);
+
+  const handleQuoteClick = useCallback(() => {
+    onResNumberClick(res.number);
+  }, [onResNumberClick, res.number]);
+
+  const handleAddNg = useCallback(() => {
+    if (selectedText.length > 0) {
+      onAddNgWord(selectedText);
+    }
+    setContextMenu(null);
+  }, [selectedText, onAddNgWord]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (contextMenu === null) return;
+    const handler = (): void => { setContextMenu(null); };
+    document.addEventListener('click', handler);
+    return () => { document.removeEventListener('click', handler); };
+  }, [contextMenu]);
 
   const bodyHtml = convertAnchorsToLinks(sanitizeHtml(res.body));
 
@@ -156,9 +201,16 @@ function ResItem({
   }, []);
 
   return (
-    <div className="border-b border-[var(--color-border-secondary)] px-4 py-2" id={`res-${String(res.number)}`}>
+    <div className="border-b border-[var(--color-border-secondary)] px-4 py-2" id={`res-${String(res.number)}`} onContextMenu={handleContextMenu}>
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
-        <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
+        <button
+          type="button"
+          className="cursor-pointer border-none bg-transparent p-0 font-bold text-[var(--color-res-number)] hover:underline"
+          onClick={handleQuoteClick}
+          title={`>>${String(res.number)} を引用`}
+        >
+          {res.number}
+        </button>
         <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
         {res.mail.length > 0 && (
           <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
@@ -178,6 +230,46 @@ function ResItem({
           {images.map((img) => (
             <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} />
           ))}
+        </div>
+      )}
+
+      {/* Context menu */}
+      {contextMenu !== null && (
+        <div
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={handleCloseContextMenu}
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleKokomade}
+            role="menuitem"
+          >
+            ここまで読んだ
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleQuoteClick}
+            role="menuitem"
+          >
+            レスを引用 (&gt;&gt;{res.number})
+          </button>
+          {selectedText.length > 0 && (
+            <>
+              <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                onClick={handleAddNg}
+                role="menuitem"
+              >
+                &quot;{selectedText.length > 20 ? `${selectedText.slice(0, 20)}…` : selectedText}&quot; をNGワードに追加
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -202,11 +294,14 @@ export function ThreadView(): React.JSX.Element {
   const closeTab = useBBSStore((s) => s.closeTab);
   const setActiveTab = useBBSStore((s) => s.setActiveTab);
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
+  const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
   const togglePostEditor = useBBSStore((s) => s.togglePostEditor);
+  const openPostEditorWithQuote = useBBSStore((s) => s.openPostEditorWithQuote);
   const ngRules = useBBSStore((s) => s.ngRules);
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
+  const openNgEditorWithToken = useBBSStore((s) => s.openNgEditorWithToken);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<PopupState | null>(null);
 
@@ -288,6 +383,22 @@ export function ThreadView(): React.JSX.Element {
   const handlePopupClose = useCallback(() => {
     setPopup(null);
   }, []);
+
+  const handleResNumberClick = useCallback((resNumber: number) => {
+    openPostEditorWithQuote(resNumber);
+  }, [openPostEditorWithQuote]);
+
+  const handleSetKokomade = useCallback((resNumber: number) => {
+    if (activeTabId !== null) {
+      updateTabKokomade(activeTabId, resNumber);
+    }
+  }, [activeTabId, updateTabKokomade]);
+
+  const handleAddNgWord = useCallback((selectedText: string) => {
+    if (activeTab === undefined) return;
+    const boardId = extractBoardId(activeTab.boardUrl);
+    openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
+  }, [activeTab, openNgEditorWithToken]);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
@@ -374,6 +485,9 @@ export function ThreadView(): React.JSX.Element {
                     ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
                     onAnchorHover={handleAnchorHover}
                     onAnchorLeave={handleAnchorLeave}
+                    onResNumberClick={handleResNumberClick}
+                    onSetKokomade={handleSetKokomade}
+                    onAddNgWord={handleAddNgWord}
                   />
                 </div>
               ))}

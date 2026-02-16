@@ -31,3 +31,8 @@ export const DEFAULT_LAST_N = 50 as const;
 
 /** Maximum browsing history entries */
 export const MAX_HISTORY_ENTRIES = 200 as const;
+
+/** Session state persisted across restarts */
+export interface SessionState {
+  readonly selectedBoardUrl: string | null;
+}

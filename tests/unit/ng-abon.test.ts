@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseNgLine, parseNgFile, serializeNgRules, matchesNgRule, applyNgRules } from '../../src/main/services/ng-abon';
+import { parseNgLine, parseNgFile, serializeNgRules, matchesNgRule, applyNgRules, matchesThreadNgRule, matchesBoardNgRule } from '../../src/main/services/ng-abon';
 import type { Res } from '../../src/types/domain';
 import type { NgRule } from '../../src/types/ng';
-import { AbonType, NgMatchMode, NgFilterResult } from '../../src/types/ng';
+import { AbonType, NgMatchMode, NgFilterResult, NgTarget } from '../../src/types/ng';
 
 const makeRes = (overrides: Partial<Res> = {}): Res => ({
   number: 1,
@@ -174,6 +174,18 @@ describe('matchesNgRule', () => {
     expect(matchesNgRule(rule, res, 'newsplus', '123')).toBe(true);
     expect(matchesNgRule(rule, res, 'newsplus', '456')).toBe(false);
   });
+
+  it('skips thread-level NG rules', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['名無し'] });
+    const res = makeRes();
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(false);
+  });
+
+  it('skips board-level NG rules', () => {
+    const rule = makeRule({ target: NgTarget.Board, tokens: ['名無し'] });
+    const res = makeRes();
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(false);
+  });
 });
 
 describe('applyNgRules', () => {
@@ -209,5 +221,142 @@ describe('applyNgRules', () => {
     const rules = [makeRule({ enabled: false, tokens: ['名無し'] })];
     const res = makeRes();
     expect(applyNgRules(rules, res, 'board', 'thread')).toBe(NgFilterResult.None);
+  });
+
+  it('skips thread-level rules when applying to responses', () => {
+    const rules = [makeRule({ target: NgTarget.Thread, tokens: ['名無し'] })];
+    const res = makeRes();
+    expect(applyNgRules(rules, res, 'board', 'thread')).toBe(NgFilterResult.None);
+  });
+
+  it('skips board-level rules when applying to responses', () => {
+    const rules = [makeRule({ target: NgTarget.Board, tokens: ['名無し'] })];
+    const res = makeRes();
+    expect(applyNgRules(rules, res, 'board', 'thread')).toBe(NgFilterResult.None);
+  });
+});
+
+// ───────────── NgTarget: thread-level NG ─────────────
+
+describe('parseNgLine with target', () => {
+  it('parses thread target marker', () => {
+    const rule = parseNgLine('{{TARGET:thread}}\t荒らしスレ');
+    expect(rule).not.toBeNull();
+    expect(rule?.target).toBe(NgTarget.Thread);
+    expect(rule?.tokens).toEqual(['荒らしスレ']);
+  });
+
+  it('parses board target marker', () => {
+    const rule = parseNgLine('{{TARGET:board}}\t{{BOARD:news}}\tNG板');
+    expect(rule).not.toBeNull();
+    expect(rule?.target).toBe(NgTarget.Board);
+    expect(rule?.boardId).toBe('news');
+    expect(rule?.tokens).toEqual(['NG板']);
+  });
+
+  it('defaults to no target for response-level rules', () => {
+    const rule = parseNgLine('荒らし');
+    expect(rule).not.toBeNull();
+    expect(rule?.target).toBeUndefined();
+  });
+});
+
+describe('serializeNgRules with target', () => {
+  it('serializes thread target marker', () => {
+    const rules: NgRule[] = [makeRule({ target: NgTarget.Thread, tokens: ['荒らしスレ'] })];
+    const result = serializeNgRules(rules);
+    expect(result).toContain('{{TARGET:thread}}');
+    expect(result).toContain('荒らしスレ');
+  });
+
+  it('serializes board target marker', () => {
+    const rules: NgRule[] = [makeRule({ target: NgTarget.Board, boardId: 'news', tokens: ['NG板'] })];
+    const result = serializeNgRules(rules);
+    expect(result).toContain('{{TARGET:board}}');
+    expect(result).toContain('{{BOARD:news}}');
+    expect(result).toContain('NG板');
+  });
+
+  it('omits target marker for response rules', () => {
+    const rules: NgRule[] = [makeRule({ tokens: ['テスト'] })];
+    const result = serializeNgRules(rules);
+    expect(result).not.toContain('{{TARGET:');
+  });
+
+  it('round-trips thread target rules', () => {
+    const original: NgRule[] = [
+      makeRule({ target: NgTarget.Thread, abonType: AbonType.Transparent, boardId: 'news', threadId: '123', tokens: ['荒らし'] }),
+    ];
+    const serialized = serializeNgRules(original);
+    const parsed = parseNgFile(serialized);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.target).toBe(NgTarget.Thread);
+    expect(parsed[0]?.abonType).toBe(AbonType.Transparent);
+    expect(parsed[0]?.boardId).toBe('news');
+    expect(parsed[0]?.threadId).toBe('123');
+    expect(parsed[0]?.tokens).toEqual(['荒らし']);
+  });
+});
+
+describe('matchesThreadNgRule', () => {
+  it('matches thread title by token', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['荒らし'] });
+    expect(matchesThreadNgRule(rule, '荒らしスレッド', 'board', 'thread')).toBe(true);
+  });
+
+  it('does not match when token is absent', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['荒らし'] });
+    expect(matchesThreadNgRule(rule, '普通のスレッド', 'board', 'thread')).toBe(false);
+  });
+
+  it('matches by exact thread ID', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['dummy'], threadId: '123' });
+    expect(matchesThreadNgRule(rule, 'any title', 'board', '123')).toBe(true);
+    expect(matchesThreadNgRule(rule, 'any title', 'board', '456')).toBe(false);
+  });
+
+  it('respects board scope', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['荒らし'], boardId: 'news' });
+    expect(matchesThreadNgRule(rule, '荒らしスレ', 'news', 'thread')).toBe(true);
+    expect(matchesThreadNgRule(rule, '荒らしスレ', 'other', 'thread')).toBe(false);
+  });
+
+  it('ignores response-level rules', () => {
+    const rule = makeRule({ tokens: ['テスト'] });
+    expect(matchesThreadNgRule(rule, 'テストスレッド', 'board', 'thread')).toBe(false);
+  });
+
+  it('supports regex matching on thread titles', () => {
+    const rule = makeRule({ target: NgTarget.Thread, matchMode: NgMatchMode.Regexp, tokens: ['荒ら.*'] });
+    expect(matchesThreadNgRule(rule, '荒らしスレッド', 'board', 'thread')).toBe(true);
+    expect(matchesThreadNgRule(rule, '普通のスレッド', 'board', 'thread')).toBe(false);
+  });
+});
+
+describe('matchesBoardNgRule', () => {
+  it('matches board name by token', () => {
+    const rule = makeRule({ target: NgTarget.Board, tokens: ['ニュース'] });
+    expect(matchesBoardNgRule(rule, 'ニュース速報', 'news')).toBe(true);
+  });
+
+  it('does not match when token is absent', () => {
+    const rule = makeRule({ target: NgTarget.Board, tokens: ['ニュース'] });
+    expect(matchesBoardNgRule(rule, 'プログラミング', 'prog')).toBe(false);
+  });
+
+  it('matches by exact board ID', () => {
+    const rule = makeRule({ target: NgTarget.Board, tokens: ['dummy'], boardId: 'news' });
+    expect(matchesBoardNgRule(rule, 'any name', 'news')).toBe(true);
+    expect(matchesBoardNgRule(rule, 'any name', 'other')).toBe(false);
+  });
+
+  it('ignores response-level rules', () => {
+    const rule = makeRule({ tokens: ['テスト'] });
+    expect(matchesBoardNgRule(rule, 'テスト板', 'test')).toBe(false);
+  });
+
+  it('ignores thread-level rules', () => {
+    const rule = makeRule({ target: NgTarget.Thread, tokens: ['テスト'] });
+    expect(matchesBoardNgRule(rule, 'テスト板', 'test')).toBe(false);
   });
 });

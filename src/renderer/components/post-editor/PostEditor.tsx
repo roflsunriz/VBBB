@@ -32,9 +32,27 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
   const recordSambaTime = useBBSStore((s) => s.recordSambaTime);
   const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
 
+  const postEditorInitialMessage = useBBSStore((s) => s.postEditorInitialMessage);
+
   const [name, setName] = useState(kotehan.name);
   const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
   const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Apply initial message (e.g. >>N from res number click)
+  useEffect(() => {
+    if (postEditorInitialMessage.length > 0) {
+      setMessage((prev) => prev + postEditorInitialMessage);
+      // Focus textarea after inserting quote
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        if (textareaRef.current !== null) {
+          const len = textareaRef.current.value.length;
+          textareaRef.current.setSelectionRange(len, len);
+        }
+      });
+    }
+  }, [postEditorInitialMessage]);
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [sambaRemaining, setSambaRemaining] = useState(0);
@@ -210,6 +228,7 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
         </button>
       </div>
       <textarea
+        ref={textareaRef}
         value={message}
         onChange={(e) => { setMessage(e.target.value); }}
         onKeyDown={handleKeyDown}

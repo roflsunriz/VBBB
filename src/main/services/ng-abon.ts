@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { Res } from '@shared/domain';
-import { type NgRule, type NgFilterResult, AbonType, NgMatchMode, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
+import { type NgRule, type NgFilterResult, AbonType, NgMatchMode, NgTarget, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
 import { readFileSafe, atomicWriteFile, ensureDir } from './file-io';
 import { createLogger } from '../logger';
 
@@ -20,6 +20,7 @@ const REGEXP_MARKER = '{{REGEXP}}';
 const REGEX2_MARKER = '{{REGEX2}}';
 const BOARD_PREFIX = '{{BOARD:';
 const THREAD_PREFIX = '{{THREAD:';
+const TARGET_PREFIX = '{{TARGET:';
 const MARKER_SUFFIX = '}}';
 
 /**
@@ -37,6 +38,7 @@ export function parseNgLine(line: string): NgRule | null {
   if (parts.length === 0) return null;
 
   let matchMode: NgMatchMode = NgMatchMode.Plain;
+  let target: NgTarget = NgTarget.Response;
   let boardId: string | undefined;
   let threadId: string | undefined;
   const tokens: string[] = [];
@@ -45,6 +47,15 @@ export function parseNgLine(line: string): NgRule | null {
     // Check for regex markers
     if (part === REGEXP_MARKER || part === REGEX2_MARKER) {
       matchMode = NgMatchMode.Regexp;
+      continue;
+    }
+
+    // Check for target marker
+    if (part.startsWith(TARGET_PREFIX) && part.endsWith(MARKER_SUFFIX)) {
+      const val = part.slice(TARGET_PREFIX.length, -MARKER_SUFFIX.length);
+      if (val === NgTarget.Thread || val === NgTarget.Board) {
+        target = val;
+      }
       continue;
     }
 
@@ -73,6 +84,7 @@ export function parseNgLine(line: string): NgRule | null {
 
   return {
     id: randomUUID(),
+    target: target === NgTarget.Response ? undefined : target,
     abonType,
     matchMode,
     tokens,
@@ -115,6 +127,11 @@ export function serializeNgRules(rules: readonly NgRule[]): string {
     // Leading tab for transparent abon
     const prefix = rule.abonType === AbonType.Transparent ? '\t' : '';
 
+    // Target marker (omit for default 'response')
+    if (rule.target !== undefined && rule.target !== NgTarget.Response) {
+      parts.push(`${TARGET_PREFIX}${rule.target}${MARKER_SUFFIX}`);
+    }
+
     // Regex marker
     if (rule.matchMode === NgMatchMode.Regexp) {
       parts.push(REGEXP_MARKER);
@@ -139,10 +156,31 @@ export function serializeNgRules(rules: readonly NgRule[]): string {
 }
 
 /**
+ * Match tokens against a text string.
+ */
+function matchTokensAgainstText(rule: NgRule, text: string): boolean {
+  if (rule.matchMode === NgMatchMode.Regexp) {
+    const pattern = rule.tokens[0];
+    if (pattern === undefined) return false;
+    try {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(text);
+    } catch {
+      logger.warn(`Invalid regex pattern in NG rule ${rule.id}: ${pattern}`);
+      return false;
+    }
+  }
+  return rule.tokens.every((token) => text.includes(token));
+}
+
+/**
  * Check if a response matches an NG rule.
  * Matching is against the full DAT line (name + mail + dateTime + body).
  */
 export function matchesNgRule(rule: NgRule, res: Res, currentBoardId: string, currentThreadId: string): boolean {
+  // Only apply response-level rules (default target)
+  if (rule.target !== undefined && rule.target !== NgTarget.Response) return false;
+
   // Check board scope
   if (rule.boardId !== undefined && rule.boardId !== currentBoardId) {
     return false;
@@ -155,22 +193,31 @@ export function matchesNgRule(rule: NgRule, res: Res, currentBoardId: string, cu
 
   // Build the full text to match against (simulating DAT line)
   const fullText = `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
+  return matchTokensAgainstText(rule, fullText);
+}
 
-  if (rule.matchMode === NgMatchMode.Regexp) {
-    // Regex mode: first token is the pattern
-    const pattern = rule.tokens[0];
-    if (pattern === undefined) return false;
-    try {
-      const regex = new RegExp(pattern, 'i');
-      return regex.test(fullText);
-    } catch {
-      logger.warn(`Invalid regex pattern in NG rule ${rule.id}: ${pattern}`);
-      return false;
-    }
-  }
+/**
+ * Check if a thread title matches a thread-level NG rule.
+ */
+export function matchesThreadNgRule(rule: NgRule, threadTitle: string, boardId: string, threadId: string): boolean {
+  if (rule.target !== NgTarget.Thread) return false;
+  // Board scope check
+  if (rule.boardId !== undefined && rule.boardId !== boardId) return false;
+  // Exact thread ID match
+  if (rule.threadId !== undefined) return rule.threadId === threadId;
+  // Token match against title
+  return matchTokensAgainstText(rule, threadTitle);
+}
 
-  // Plain mode: all tokens must be present (AND)
-  return rule.tokens.every((token) => fullText.includes(token));
+/**
+ * Check if a board name matches a board-level NG rule.
+ */
+export function matchesBoardNgRule(rule: NgRule, boardName: string, boardId: string): boolean {
+  if (rule.target !== NgTarget.Board) return false;
+  // Exact board ID match
+  if (rule.boardId !== undefined) return rule.boardId === boardId;
+  // Token match against board name
+  return matchTokensAgainstText(rule, boardName);
 }
 
 /**

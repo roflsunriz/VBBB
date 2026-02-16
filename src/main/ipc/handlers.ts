@@ -2,8 +2,9 @@
  * IPC handler registration.
  * Connects renderer requests to main process services.
  */
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
 import type { Board } from '@shared/domain';
 import type { IpcChannelMap } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
@@ -24,7 +25,7 @@ import { savePostHistory } from '../services/post-history';
 import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory, loadBrowsingHistory, saveBrowsingHistory } from '../services/browsing-history';
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
-import { getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
+import { getAllCookies, getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
 import { getDonguriState } from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
 import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
@@ -34,8 +35,9 @@ import {
   saveRoundBoard, saveRoundItem, setTimerConfig,
 } from '../services/round-list';
 import { searchRemote } from '../services/remote-search';
-import { loadSavedTabs, saveTabs } from '../services/tab-persistence';
+import { loadSavedTabs, loadSessionState, saveSessionState, saveTabs } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
+import { DEFAULT_USER_AGENT } from '@shared/file-format';
 
 const logger = createLogger('ipc');
 
@@ -269,6 +271,14 @@ export function registerIpcHandlers(): void {
     await saveTabs(dataDir, tabs);
   });
 
+  handle('session:load', () => {
+    return Promise.resolve(loadSessionState(dataDir));
+  });
+
+  handle('session:save', async (state) => {
+    await saveSessionState(dataDir, state);
+  });
+
   // Browsing history
   loadBrowsingHistory(dataDir);
 
@@ -449,6 +459,49 @@ export function registerIpcHandlers(): void {
   handle('auth:be-logout', async () => {
     beLogout();
     await saveCookies(dataDir);
+  });
+
+  // Image save via dialog
+  handle('image:save', async (imageUrl: string, suggestedName: string) => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win === null) return { saved: false, path: '' };
+
+    const ext = suggestedName.split('.').pop() ?? 'jpg';
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: suggestedName,
+      filters: [{ name: 'Images', extensions: [ext] }],
+    });
+
+    if (result.canceled || result.filePath === undefined) {
+      return { saved: false, path: '' };
+    }
+
+    const response = await fetch(imageUrl);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await writeFile(result.filePath, buffer);
+    return { saved: true, path: result.filePath };
+  });
+
+  // Open URL in external browser
+  handle('shell:open-external', async (url: string) => {
+    await shell.openExternal(url);
+  });
+
+  // Get all cookies
+  handle('cookie:get-all', () => {
+    return Promise.resolve(getAllCookies());
+  });
+
+  // User-Agent management
+  let customUserAgent: string | null = null;
+
+  handle('config:get-user-agent', () => {
+    return Promise.resolve(customUserAgent ?? DEFAULT_USER_AGENT);
+  });
+
+  handle('config:set-user-agent', (userAgent: string) => {
+    customUserAgent = userAgent.trim().length > 0 ? userAgent.trim() : null;
+    return Promise.resolve();
   });
 
   logger.info('IPC handlers registered');

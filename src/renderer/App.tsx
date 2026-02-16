@@ -10,6 +10,7 @@ import {
   mdiLoading,
   mdiInformation,
   mdiClose,
+  mdiCookie,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
@@ -21,12 +22,35 @@ import { AuthPanel } from './components/auth/AuthPanel';
 import { ProxySettings } from './components/settings/ProxySettings';
 import { RoundPanel } from './components/round/RoundPanel';
 import { NgEditor } from './components/ng-editor/NgEditor';
+import { CookieManager } from './components/settings/CookieManager';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
+import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search';
-type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | null;
+type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | null;
+
+const LEFT_PANE_MIN = 160;
+const LEFT_PANE_MAX = 500;
+const LEFT_PANE_DEFAULT = 256;
+const CENTER_PANE_MIN = 200;
+const CENTER_PANE_DEFAULT = 400;
+const STORAGE_KEY_LEFT = 'vbbb-left-pane-width';
+const STORAGE_KEY_CENTER = 'vbbb-center-pane-width';
+
+function loadPaneWidth(key: string, defaultVal: number): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw !== null) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return defaultVal;
+}
 
 export function App(): React.JSX.Element {
   const statusMessage = useBBSStore((s) => s.statusMessage);
@@ -35,10 +59,15 @@ export function App(): React.JSX.Element {
   const fetchFavorites = useBBSStore((s) => s.fetchFavorites);
   const fetchNgRules = useBBSStore((s) => s.fetchNgRules);
   const restoreTabs = useBBSStore((s) => s.restoreTabs);
+  const restoreSession = useBBSStore((s) => s.restoreSession);
 
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  // Resizable pane widths
+  const [leftWidth, setLeftWidth] = useState(() => loadPaneWidth(STORAGE_KEY_LEFT, LEFT_PANE_DEFAULT));
+  const [centerWidth, setCenterWidth] = useState(() => loadPaneWidth(STORAGE_KEY_CENTER, CENTER_PANE_DEFAULT));
 
   // Refs to avoid stale closures in IPC listeners
   const setLeftTabRef = useRef(setLeftTab);
@@ -63,10 +92,11 @@ export function App(): React.JSX.Element {
         fetchFavorites(),
         fetchNgRules(),
       ]);
+      await restoreSession();
       await restoreTabs();
     };
     void init();
-  }, [fetchMenu, fetchFavorites, fetchNgRules, restoreTabs]);
+  }, [fetchMenu, fetchFavorites, fetchNgRules, restoreSession, restoreTabs]);
 
   // Subscribe to menu actions from main process via invoke-based long-poll.
   // No ref guard: each mount starts its own poll, cleanup cancels it.
@@ -93,7 +123,7 @@ export function App(): React.JSX.Element {
               }
               break;
             case 'open-modal':
-              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about') {
+              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager') {
                 setActiveModalRef.current(action.modal);
               }
               break;
@@ -133,7 +163,24 @@ export function App(): React.JSX.Element {
   const openAuth = useCallback(() => { setActiveModal('auth'); }, []);
   const openProxy = useCallback(() => { setActiveModal('proxy'); }, []);
   const openRound = useCallback(() => { setActiveModal('round'); }, []);
+  const openCookieManager = useCallback(() => { setActiveModal('cookie-manager'); }, []);
   const openAbout = useCallback(() => { setActiveModal('about'); }, []);
+
+  const handleLeftResize = useCallback((delta: number) => {
+    setLeftWidth((w) => Math.max(LEFT_PANE_MIN, Math.min(LEFT_PANE_MAX, w + delta)));
+  }, []);
+
+  const handleLeftResizeEnd = useCallback(() => {
+    setLeftWidth((w) => { localStorage.setItem(STORAGE_KEY_LEFT, String(w)); return w; });
+  }, []);
+
+  const handleCenterResize = useCallback((delta: number) => {
+    setCenterWidth((w) => Math.max(CENTER_PANE_MIN, w + delta));
+  }, []);
+
+  const handleCenterResizeEnd = useCallback(() => {
+    setCenterWidth((w) => { localStorage.setItem(STORAGE_KEY_CENTER, String(w)); return w; });
+  }, []);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
@@ -190,6 +237,17 @@ export function App(): React.JSX.Element {
           巡回
         </button>
 
+        {/* Cookie/UA Manager */}
+        <button
+          type="button"
+          onClick={openCookieManager}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          title="Cookie/UA管理"
+        >
+          <MdiIcon path={mdiCookie} size={14} />
+          Cookie/UA
+        </button>
+
         <div className="flex-1" />
 
         {/* About */}
@@ -206,7 +264,7 @@ export function App(): React.JSX.Element {
       {/* Main 3-pane layout */}
       <div className="flex min-h-0 flex-1">
         {/* Left pane: Board Tree / Favorites / Search */}
-        <aside className="flex h-full w-64 shrink-0 flex-col border-r border-[var(--color-border-primary)]">
+        <aside className="flex h-full shrink-0 flex-col" style={{ width: leftWidth }}>
           {/* Left pane tabs */}
           <div className="flex h-8 shrink-0 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
             <button
@@ -254,8 +312,14 @@ export function App(): React.JSX.Element {
           </div>
         </aside>
 
+        <ResizeHandle onResize={handleLeftResize} onResizeEnd={handleLeftResizeEnd} />
+
         {/* Center: Thread List */}
-        <ThreadList />
+        <div className="shrink-0" style={{ width: centerWidth }}>
+          <ThreadList />
+        </div>
+
+        <ResizeHandle onResize={handleCenterResize} onResizeEnd={handleCenterResizeEnd} />
 
         {/* Right: Thread View */}
         <ThreadView />
@@ -291,11 +355,22 @@ export function App(): React.JSX.Element {
         </div>
       </Modal>
 
+      {/* Modal: Cookie/UA Manager */}
+      <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} width="max-w-xl">
+        <CookieManager onClose={closeModal} />
+      </Modal>
+
       {/* Modal: About */}
       <Modal open={activeModal === 'about'} onClose={closeModal} width="max-w-sm">
         <div className="flex flex-col items-center gap-3 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-6">
           <MdiIcon path={mdiBulletinBoard} size={48} className="text-[var(--color-accent)]" />
           <h2 className="text-lg font-bold text-[var(--color-text-primary)]">VBBB</h2>
+          <p className="text-center text-sm font-medium text-[var(--color-text-secondary)]">
+            Versatile BBS Browser
+          </p>
+          <p className="text-center text-xs text-[var(--color-text-muted)]">
+            v{__APP_VERSION__}
+          </p>
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             2ch/5ch互換BBSブラウザ
           </p>

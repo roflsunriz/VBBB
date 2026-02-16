@@ -11,6 +11,7 @@ import {
   clearAllCookies,
   domainMatches,
   getCookieCount,
+  getAllCookies,
 } from '../../src/main/services/cookie-store';
 import type { StoredCookie } from '../../src/types/cookie';
 
@@ -223,5 +224,32 @@ describe('serialize / deserialize', () => {
 
     const serialized = serializeCookies();
     expect(serialized).not.toContain('old');
+  });
+});
+
+describe('getAllCookies', () => {
+  it('returns all cookies in the store', () => {
+    clearAllCookies();
+    setCookie({
+      name: 'a',
+      value: 'val_a',
+      domain: '5ch.net',
+      path: '/',
+      sessionOnly: true,
+      secure: false,
+    });
+    setCookie({
+      name: 'b',
+      value: 'val_b',
+      domain: 'example.com',
+      path: '/',
+      sessionOnly: true,
+      secure: false,
+    });
+    const all = getAllCookies();
+    expect(all).toHaveLength(2);
+    const names = all.map((c) => c.name);
+    expect(names).toContain('a');
+    expect(names).toContain('b');
   });
 });

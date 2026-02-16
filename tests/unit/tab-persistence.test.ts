@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseTabSav, serializeTabSav, replaceTabUrls } from '../../src/main/services/tab-persistence';
+import { parseTabSav, serializeTabSav, replaceTabUrls, loadSessionState, saveSessionState } from '../../src/main/services/tab-persistence';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('parseTabSav', () => {
   it('parses valid tab lines', () => {
@@ -58,5 +61,41 @@ describe('replaceTabUrls', () => {
     const result = replaceTabUrls(tabs, urlMap);
     expect(result[0]?.boardUrl).toBe('https://new.5ch.net/board/');
     expect(result[1]?.boardUrl).toBe('https://other.com/');
+  });
+});
+
+describe('loadSessionState', () => {
+  it('returns default when no file exists', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    const result = loadSessionState(dir);
+    expect(result).toStrictEqual({ selectedBoardUrl: null });
+  });
+
+  it('returns default for invalid JSON', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'session.json'), 'not-json');
+    const result = loadSessionState(dir);
+    expect(result).toStrictEqual({ selectedBoardUrl: null });
+  });
+});
+
+describe('saveSessionState', () => {
+  it('persists session to file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    await saveSessionState(dir, { selectedBoardUrl: 'https://example.5ch.net/board/' });
+    const content = readFileSync(join(dir, 'session.json'), 'utf-8');
+    const parsed = JSON.parse(content) as { selectedBoardUrl: string };
+    expect(parsed.selectedBoardUrl).toBe('https://example.5ch.net/board/');
+  });
+
+  it('round-trips correctly', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    const state = { selectedBoardUrl: 'https://news.5ch.net/newsplus/' };
+    await saveSessionState(dir, state);
+    const loaded = loadSessionState(dir);
+    expect(loaded).toStrictEqual(state);
   });
 });

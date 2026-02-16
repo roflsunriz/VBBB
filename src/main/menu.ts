@@ -110,6 +110,13 @@ export function buildAppMenu(): void {
             dispatchAction({ type: 'toggle-ng' });
           },
         },
+        {
+          label: 'Cookie/UA管理',
+          accelerator: 'CmdOrCtrl+Shift+C',
+          click: () => {
+            dispatchAction({ type: 'open-modal', modal: 'cookie-manager' });
+          },
+        },
       ],
     },
     {

@@ -7,7 +7,7 @@ import type { AuthState } from './auth';
 import type { StoredCookie } from './cookie';
 import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
 import type { FavNode, FavTree } from './favorite';
-import type { BrowsingHistoryEntry, SavedTab } from './history';
+import type { BrowsingHistoryEntry, SavedTab, SessionState } from './history';
 import type { NgRule } from './ng';
 import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
@@ -176,6 +176,16 @@ export interface IpcChannelMap {
     args: [tabs: readonly SavedTab[]];
     result: void;
   };
+  /** Load session state */
+  'session:load': {
+    args: [];
+    result: SessionState;
+  };
+  /** Save session state */
+  'session:save': {
+    args: [state: SessionState];
+    result: void;
+  };
   /** Load browsing history */
   'history:load': {
     args: [];
@@ -255,6 +265,31 @@ export interface IpcChannelMap {
   'menu:wait-action': {
     args: [];
     result: MenuAction;
+  };
+  /** Save image from URL to disk */
+  'image:save': {
+    args: [imageUrl: string, suggestedName: string];
+    result: { saved: boolean; path: string };
+  };
+  /** Open URL in external browser */
+  'shell:open-external': {
+    args: [url: string];
+    result: void;
+  };
+  /** Get all cookies grouped by domain */
+  'cookie:get-all': {
+    args: [];
+    result: readonly StoredCookie[];
+  };
+  /** Get current user agent */
+  'config:get-user-agent': {
+    args: [];
+    result: string;
+  };
+  /** Set custom user agent */
+  'config:set-user-agent': {
+    args: [userAgent: string];
+    result: void;
   };
 }
 

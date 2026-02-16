@@ -14,7 +14,7 @@ function createWindow(): BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     show: false,
-    title: 'VBBB',
+    title: `VBBB - Versatile BBS Browser v${app.getVersion()}`,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,
