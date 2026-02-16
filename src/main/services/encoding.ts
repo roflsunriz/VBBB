@@ -20,22 +20,74 @@ export function encodeString(text: string, encoding: EncodingType): Buffer {
 }
 
 /**
- * Perform HTTP percent-encoding compatible with 2ch/5ch.
+ * Perform HTTP percent-encoding compatible with 2ch/5ch
+ * (application/x-www-form-urlencoded format).
+ *
  * Characters 0-9, a-z, A-Z, *, -, ., @, _ are kept as-is.
+ * Space (0x20) is encoded as '+' (NOT '%20') per the
+ * application/x-www-form-urlencoded standard — this matches
+ * OkHttp's FormBody behaviour used by Slevo.
  * All other bytes are encoded as %XX (uppercase hex).
  */
 export function httpEncode(text: string, encoding: EncodingType): string {
   const encoded = encodeString(text, encoding);
   const parts: string[] = [];
   for (const byte of encoded) {
-    const char = String.fromCharCode(byte);
-    if (/[0-9a-zA-Z*\-.@_]/.test(char)) {
-      parts.push(char);
+    if (byte === 0x20) {
+      parts.push('+');
     } else {
-      parts.push(`%${byte.toString(16).toUpperCase().padStart(2, '0')}`);
+      const char = String.fromCharCode(byte);
+      if (/[0-9a-zA-Z*\-.@_]/.test(char)) {
+        parts.push(char);
+      } else {
+        parts.push(`%${byte.toString(16).toUpperCase().padStart(2, '0')}`);
+      }
     }
   }
   return parts.join('');
+}
+
+/**
+ * Replace characters that cannot be represented in CP932 (Windows-31J)
+ * with Numeric Character References (NCR: `&#codepoint;`).
+ *
+ * Processing is done per Unicode grapheme cluster (via Intl.Segmenter) so
+ * that multi-codepoint sequences like skin-tone emoji (👋🏾 = U+1F44B U+1F3FE)
+ * are correctly split into per-codepoint NCRs rather than being broken at
+ * surrogate pair boundaries.
+ *
+ * This must be applied to all form field values BEFORE Shift_JIS encoding.
+ */
+export function replaceWithNCR(input: string): string {
+  const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' });
+  const parts: string[] = [];
+
+  for (const { segment } of segmenter.segment(input)) {
+    if (canEncodeCP932(segment)) {
+      parts.push(segment);
+    } else {
+      // Convert each codepoint in the grapheme cluster to NCR
+      for (const char of segment) {
+        const cp = char.codePointAt(0);
+        if (cp !== undefined) {
+          parts.push(`&#${String(cp)};`);
+        }
+      }
+    }
+  }
+
+  return parts.join('');
+}
+
+/**
+ * Check whether a string segment can be fully encoded in CP932.
+ * iconv-lite replaces unencodable characters with '?' (0x3F), so we
+ * encode then decode and verify round-trip fidelity.
+ */
+function canEncodeCP932(segment: string): boolean {
+  const encoded = iconv.encode(segment, 'Shift_JIS');
+  const decoded = iconv.decode(encoded, 'Shift_JIS');
+  return decoded === segment;
 }
 
 /**

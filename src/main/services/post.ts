@@ -8,7 +8,7 @@ import { MAX_POST_RETRIES } from '@shared/file-format';
 import { createLogger } from '../logger';
 import { buildCookieHeader, getCookiesForUrl, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
 import { handleDonguriPostResult } from './donguri';
-import { decodeBuffer, httpEncode } from './encoding';
+import { decodeBuffer, httpEncode, replaceWithNCR } from './encoding';
 import { httpFetch } from './http-client';
 import { getUpliftSid } from './uplift-auth';
 
@@ -101,9 +101,11 @@ function detectEncodingFromHtmlMeta(body: Buffer): EncodingType | undefined {
 
 /**
  * Build POST URL for a board.
+ * Always includes ?guid=ON, which signals "post from a dedicated browser".
+ * Omitting it may cause the server to reject the submission.
  */
 function getPostUrl(board: Board): string {
-  return `${board.serverUrl}test/bbs.cgi`;
+  return `${board.serverUrl}test/bbs.cgi?guid=ON`;
 }
 
 /**
@@ -256,10 +258,12 @@ function buildPostBody(
     fields.push(['sid', sid]);
   }
 
-  fields.push(['FROM', params.name]);
-  fields.push(['mail', params.mail]);
-  fields.push(['MESSAGE', params.message]);
-  fields.push(['bbs', board.bbsId]);
+  // Apply NCR conversion to all user-supplied fields so that characters
+  // outside CP932 (e.g. emoji) are safely transmitted as &#codepoint;
+  fields.push(['FROM', replaceWithNCR(params.name)]);
+  fields.push(['mail', replaceWithNCR(params.mail)]);
+  fields.push(['MESSAGE', replaceWithNCR(params.message)]);
+  fields.push(['bbs', replaceWithNCR(board.bbsId)]);
   fields.push(['time', String(Math.floor(Date.now() / 1000))]);
   fields.push(['key', params.threadId]);
   fields.push(['submit', '\u66F8\u304D\u8FBC\u3080']); // 書き込む
@@ -287,7 +291,9 @@ function buildRetryBody(
   const fields: Array<[string, string]> = [];
 
   for (const [key, value] of Object.entries(hiddenFields)) {
-    fields.push([key, htmlDecode(value)]);
+    // Apply NCR conversion after HTML-decoding, matching Slevo's behaviour
+    // of running NCR conversion on all hidden field values (§4.3)
+    fields.push([key, replaceWithNCR(htmlDecode(value))]);
   }
 
   // Add UPLIFT sid if available and not already in hidden fields
@@ -414,10 +420,11 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
   const requestEncoding = getPostEncoding(board.boardType);
   const charset = requestEncoding === 'UTF-8' ? '; charset=UTF-8' : '';
 
-  // Referer: thread URL for replies, bbs.cgi for new threads (per protocol §5.2)
+  // Referer: thread URL for replies, board URL for new threads (per protocol §3.1/3.2)
+  // Note: trailing slash on reply URL is accepted by the server (verified in diag logs).
   const referer = params.threadId.length > 0
     ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}/`
-    : `${board.serverUrl}test/bbs.cgi`;
+    : `${board.serverUrl}test/read.cgi/${board.bbsId}/`;
 
   // Origin: required by some servers for POST CSRF validation
   const postUrlObj = new URL(postUrl);
@@ -466,12 +473,13 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     // otherwise use the original post URL for the initial attempt.
     const targetUrl = isRetry && retryUrl !== undefined ? retryUrl : postUrl;
 
-    // Referer: on the initial attempt, use the thread page URL (as a browser
-    // would when submitting the write form).  On retries, use the post URL
-    // (bbs.cgi) because the browser's current page is the confirmation page
-    // served by bbs.cgi — clicking "submit" on that form makes the browser
-    // send bbs.cgi as the Referer.
-    const effectiveReferer = isRetry ? postUrl : referer;
+    // Referer: always use the original thread page URL for both the initial
+    // attempt and retries.  5ch's bbs.cgi validates the Referer against the
+    // thread/board URL pattern — sending bbs.cgi as Referer on the retry
+    // causes the server to reject the request with "9991 Banned".
+    // Slevo (reference implementation) also keeps the same Referer across
+    // both phases.
+    const effectiveReferer = referer;
 
     // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
     const cookieHeader = buildCookieHeader(targetUrl);
