@@ -8,6 +8,7 @@ import { gunzipSync } from 'node:zlib';
 import { type HttpRequestConfig, type HttpResponse, type RetryConfig } from '@shared/api';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
 import { createLogger } from '../logger';
+import { parseSetCookieHeaders } from './cookie-store';
 
 const logger = createLogger('http-client');
 
@@ -124,6 +125,32 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
           logger.info(
             `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
           );
+
+          // Diagnostic: log raw header names when Set-Cookie is present or
+          // for POST requests, to detect headers lost in processing
+          const hasSetCookie = responseHeaders['set-cookie'] !== undefined;
+          if (config.method === 'POST' || hasSetCookie) {
+            const rawNames: string[] = [];
+            for (let i = 0; i < res.rawHeaders.length; i += 2) {
+              const name = res.rawHeaders[i];
+              if (name !== undefined) {
+                rawNames.push(name);
+              }
+            }
+            logger.info(
+              `[DIAG] ${config.method} rawHeaders names: ${rawNames.join(', ')}`,
+            );
+          }
+
+          // Automatically parse Set-Cookie headers from ALL responses
+          // (GET, POST, etc.) to match real browser behaviour.
+          // Browsers store cookies from every HTTP response; previously
+          // VBBB only parsed Set-Cookie from POST responses, missing
+          // cookies set during GET requests (subject.txt, dat, etc.).
+          if (hasSetCookie) {
+            logger.info(`[DIAG] Set-Cookie found in ${config.method} ${config.url} — parsing`);
+            parseSetCookieHeaders(responseHeaders, config.url);
+          }
 
           resolve({
             status: res.statusCode ?? 0,

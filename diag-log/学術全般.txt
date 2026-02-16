@@ -1,0 +1,106 @@
+[18:52:14.111] [browsing-history] INFO: Loaded 20 history entries
+[18:52:14.112] [round-list] INFO: Loaded 0 round board entries
+[18:52:14.112] [round-list] INFO: Loaded 0 round item entries
+[18:52:14.113] [cookie-store] INFO: Cookies loaded from disk
+[18:52:14.113] [ipc] INFO: IPC handlers registered
+[18:52:14.136] [menu] INFO: Application menu built
+[18:52:14.539] [bbs-menu] INFO: Fetching BBS menu from https://menu.5ch.net/bbsmenu.html
+[18:52:14.539] [http-client] INFO: [DIAG] GET https://menu.5ch.net/bbsmenu.html headers=[User-Agent, Cache-Control, Pragma, Accept-Encoding] body=none
+[18:52:15.004] [http-client] INFO: [DIAG] Response 200 from https://menu.5ch.net/bbsmenu.html body=66700 bytes
+[18:52:15.014] [bbs-menu] INFO: Parsed 48 categories
+[18:52:15.032] [subject] INFO: Fetching https://agree.5ch.net/operate/subject.txt
+[18:52:15.032] [http-client] INFO: [DIAG] GET https://agree.5ch.net/operate/subject.txt headers=[User-Agent, Cache-Control, Pragma, Accept-Encoding] body=none
+[18:52:15.552] [http-client] INFO: [DIAG] Response 200 from https://agree.5ch.net/operate/subject.txt body=40124 bytes
+[18:52:15.560] [subject] INFO: Parsed 654 threads from subject.txt
+[18:52:15.683] [tab-persistence] INFO: Loaded 0 saved tabs
+[18:52:27.736] [subject] INFO: Fetching https://rio2016.5ch.net/rikei/subject.txt
+[18:52:27.736] [http-client] INFO: [DIAG] GET https://rio2016.5ch.net/rikei/subject.txt headers=[User-Agent, Cache-Control, Pragma, Accept-Encoding] body=none
+[18:52:28.209] [http-client] INFO: [DIAG] Response 200 from https://rio2016.5ch.net/rikei/subject.txt body=25865 bytes
+[18:52:28.213] [subject] INFO: Parsed 405 threads from subject.txt
+[18:52:31.152] [http-client] INFO: [DIAG] GET https://rio2016.5ch.net/rikei/dat/1769929320.dat headers=[User-Agent, Cache-Control, Pragma, Accept-Encoding] body=none
+[18:52:31.341] [http-client] INFO: [DIAG] Response 200 from https://rio2016.5ch.net/rikei/dat/1769929320.dat body=13166 bytes
+[18:52:41.641] [http-client] INFO: [DIAG] GET https://rio2016.5ch.net/rikei/dat/1771076103.dat headers=[User-Agent, Cache-Control, Pragma, Accept-Encoding] body=none
+[18:52:41.906] [http-client] INFO: [DIAG] Response 200 from https://rio2016.5ch.net/rikei/dat/1771076103.dat body=3733 bytes
+[18:53:02.038] [post] INFO: [DIAG] Post context: boardType=2ch, encoding=Shift_JIS, bbsId=***MASKED*** threadId=1771076103, referer=https://rio2016.5ch.net/test/read.cgi/rikei/1771076103/
+[18:53:02.038] [post] INFO: [DIAG] Request body (attempt 1, initial): params=[FROM, mail, MESSAGE, bbs, time, key, submit], size=131 bytes
+[18:53:02.039] [cookie-store] INFO: [DIAG] buildCookieHeader(https://rio2016.5ch.net/test/bbs.cgi): matched 1 cookie(s): acorn@.5ch.net
+[18:53:02.039] [post] INFO: Posting to https://rio2016.5ch.net/test/bbs.cgi (attempt 1, cookies: acorn)
+[18:53:02.039] [post] INFO: [DIAG] Cookie value previews: acorn=***MASKED***
+[18:53:02.039] [post] INFO: [DIAG] Referer for this attempt: https://rio2016.5ch.net/test/read.cgi/rikei/1771076103/
+[18:53:02.039] [post] INFO: [DIAG] Request headers: Content-Type, Referer, Origin, Accept-Language, Cookie
+[18:53:02.039] [http-client] INFO: [DIAG] POST https://rio2016.5ch.net/test/bbs.cgi headers=[User-Agent, Cache-Control, Pragma, Content-Type, Referer, Origin, Accept-Language, Cookie, Accept-Encoding, Content-Length] body=131 bytes
+[18:53:03.150] [http-client] INFO: [DIAG] Response 200 from https://rio2016.5ch.net/test/bbs.cgi body=3452 bytes
+[18:53:03.150] [http-client] INFO: [DIAG] POST rawHeaders names: Date, Content-Type, Transfer-Encoding, Connection, Server, Nel, X-Chx-Error, X-PostPlace, X-RONIN-Stat, Vary, Report-To, cf-cache-status, Server-Timing, Server-Timing, Content-Encoding, CF-RAY
+[18:53:03.150] [post] INFO: [DIAG] Response HTTP 200, headers: date: Mon, 16 Feb 2026 09:53:01 GMT | content-type: text/html; charset=Shift_JIS | transfer-encoding: chunked | connection: keep-alive | server: cloudflare | nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800} | x-chx-error: 0000 Confirmation | x-postplace: rikei/1771076103 | x-ronin-stat: NONE | vary: Accept-Encoding | report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=%2FJeJNOeeh6BO8ROTGPFeUiwwn9qXvjSEutt6x%2FYV2mYqSCfY7XsD1vFQQGRQgRGdO1%2BpPgwk6WMX4SSZ5MJG4C5w34WsDEuu6loV85Sgy46L6MPIrDv9Q434"}]} | cf-cache-status: DYNAMIC | server-timing: cfCacheStatus;desc="DYNAMIC", cfEdge;dur=5,cfOrigin;dur=916 | content-encoding: gzip | cf-ray: 9cec27ca78e8d77d-NRT
+[18:53:03.150] [post] INFO: [DIAG] Response body size: 3452 bytes
+[18:53:03.151] [post] INFO: Post result: grtCookie (HTTP 200, decoded as Shift_JIS)
+[18:53:03.151] [post] INFO: [DIAG] grtCookie full response:
+<html><!-- _X:cookie --><head><title>■ 書き込み確認 ■</title><meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS"><meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.6,user-scalable=yes" /></head><body bgcolor=#EEEEEE><font size=+1 color=#FF0000><b>書きこみ＆クッキー確認</b></font><ul><br><br><b> </b><br>名前： <br>E-mail： sage<br>内容：<br>エプスタイン島<br><br></ul><b>投稿確認<br><b style="color: #F00; font-size: larger;">この書き込みで本当にいいですか？<br>犯罪予告や犯罪示唆、誹謗中傷、性的な出会いを目的とした書き込みでないか今一度確認してくださいね。</b><br>・投稿者は、投稿に関して発生する責任が全て投稿者に帰すことを承諾します。<br>・投稿者は、話題と無関係な広告の投稿に関して、相応の費用を支払うことを承諾します。<br>・投稿者は、投稿された内容及びこれに含まれる知的財産権、（著作権法第21条ないし第27条及び第28条に規定される権利も含む）その他の権利につき（第三者に対して再許諾する権利を含みます。）、掲示板運営者(Loki Technology, Inc.)に対し、無償で譲渡することを承諾します。ただし、投稿が別に定める削除ガイドラインに該当する場合、投稿に関する知的財産権その他の権利、義務は一定期間投稿者に留保されます。<br>頒布及び翻訳する権利を投稿者に許諾します。また、投稿者は掲示板運営者(Loki Technology, Inc.)が指定する第三者に対して、一切の権利（第三者に対して再許諾する権利を含みます）を許諾しないことを承諾します。<br>・投稿者は、掲示板運営者(Loki Technology, Inc.)あるいはその指定する者に対して、著作者人格権を一切行使しないことを承諾します。<br></b><pre>Cookie:***MASKED*** = 63578b501Z723h422R084T060T801c519y045G534I9945h76u632O845L601A842j266e697U651R866Z9893a6747n4250H5227K2336J7421m1483N7049I0562R2536E1030t320M179N7858G984Z8590o5551r084q9753b311O265b713b067X819M8772a783A747Y024c8699N631M4158G121L568E442W959z1619c713H995f3286Z654I439T723e11s348w0002y599z917W73r962Q075L8208O202O275r0576d8982t207b4004y695o43C1185S6005M351H045M362T5645k766g974S2729A8325F812D3031r905w4700v269w98h2134Z</pre><form method="POST" action="../test/bbs.cgi?guid=ON" accept-charset="Shift_JIS"><input type=hidden name=FROM value=""><input type=hidden name=mail value="sage"><input type=hidden name=MESSAGE value="エプスタイン島"><input type=hidden name=bbs value="rikei"><input type=hidden name=time value="1771235582"><input type=hidden name=key value="1771076103"><input type=hidden name="feature" value="confirmed:4078c66289392d85c1e690061c589eefe2e447bd"><br><input type=submit value="上記全てを承諾して書き込む" name="submit"><br></form>変更する場合は戻るボタンで戻って書き直してください。<br><br>現在、荒らし対策でクッキーを設定していないと書きこみできないようにしています。<br><font size=-1>(cookieを設定するとこの画面はでなくなります。)</font><br><b style="color: #F00; font-size: larger;">この画面が繰り返し出る場合はcookieを削除してみてください。</b><br><b style="color: #F00; font-size: larger;">専ブラの場合はCookieの扱いが正しくありません。専ブラの要修正が必要です。</b><br><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"e4c5c0d5c04c433485715e1034f8da46","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body></html>
+[18:53:03.151] [post] INFO: grtCookie form: action=../test/bbs.cgi?guid=ON, resolved retryUrl=https://rio2016.5ch.net/test/bbs.cgi?guid=ON, submit name=submit value="上記全てを承諾して書き込む"
+[18:53:03.151] [post] INFO: [DIAG] Hidden fields: FROM=(user-input), mail=sage, MESSAGE=(user-input), bbs=rikei, time=1771235582, key=1771076103, feature=confirmed:4078c66289392d85c1e690061c589eefe2e447bd [non-std]
+[18:53:03.151] [post] INFO: [DIAG] Setting cookie from <pre> tag: acorn=***MASKED*** for rio2016.5ch.net
+[18:53:03.152] [post] INFO: [DIAG] Storing hidden field as cookie (no <pre> match): feature for rio2016.5ch.net
+[18:53:03.152] [post] INFO: Retrying with form submission (fields: FROM, mail, MESSAGE, bbs, time, key, feature)
+[18:53:03.152] [post] INFO: [DIAG] Waiting 3000ms before retry (anti-bot timing)
+[18:53:06.166] [post] INFO: [DIAG] Request body (attempt 2, retry): params=[FROM, mail, MESSAGE, bbs, time, key, feature, submit], size=242 bytes
+[18:53:06.166] [cookie-store] INFO: [DIAG] buildCookieHeader(https://rio2016.5ch.net/test/bbs.cgi?guid=ON): matched 3 cookie(s): acorn@.5ch.net, acorn@rio2016.5ch.net, feature@rio2016.5ch.net
+[18:53:06.166] [post] INFO: Posting to https://rio2016.5ch.net/test/bbs.cgi?guid=ON (attempt 2, cookies: acorn, acorn, feature)
+[18:53:06.167] [post] INFO: [DIAG] Cookie value previews: acorn=***MASKED***; acorn=***MASKED***; feature=confirmed:4078c66289...
+[18:53:06.167] [post] INFO: [DIAG] Referer for this attempt: https://rio2016.5ch.net/test/bbs.cgi
+[18:53:06.167] [post] INFO: [DIAG] Request headers: Content-Type, Referer, Origin, Accept-Language, Cookie
+[18:53:06.167] [http-client] INFO: [DIAG] POST https://rio2016.5ch.net/test/bbs.cgi?guid=ON headers=[User-Agent, Cache-Control, Pragma, Content-Type, Referer, Origin, Accept-Language, Cookie, Accept-Encoding, Content-Length] body=242 bytes
+[18:53:07.528] [http-client] INFO: [DIAG] Response 200 from https://rio2016.5ch.net/test/bbs.cgi?guid=ON body=2167 bytes
+[18:53:07.528] [http-client] INFO: [DIAG] POST rawHeaders names: Date, Content-Type, Transfer-Encoding, Connection, Server, Nel, X-InqID, X-Robots-Tag, X-Chx-Error, X-PostPlace, X-UPLIFT-Stat, X-Proc-Time, Vary, Report-To, cf-cache-status, Server-Timing, Server-Timing, Content-Encoding, CF-RAY
+[18:53:07.529] [post] INFO: [DIAG] Response HTTP 200, headers: date: Mon, 16 Feb 2026 09:53:05 GMT | content-type: text/html; charset=Shift_JIS | transfer-encoding: chunked | connection: keep-alive | server: cloudflare | nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800} | x-inqid: rio/9cec27e37873d77d; | x-robots-tag: noindex; | x-chx-error: 9991 Banned; | x-postplace: rikei/1771076103 | x-uplift-stat: NONE | x-proc-time: 0.574704 sec. | vary: Accept-Encoding | report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=x3R4rthbA6sv5ivi%2FpEkSNdc6%2FuygZYXbI%2BYBwnsM0mLjokF9hK3Fv8EaLhGh9vIpExkkfaimCoN2s5%2BqgjcaBrMENYK%2FI%2BNfZfxbvVm2787qUmlpxRkJtyd"}]} | cf-cache-status: DYNAMIC | server-timing: cfCacheStatus;desc="DYNAMIC", cfEdge;dur=6,cfOrigin;dur=1298 | content-encoding: gzip | cf-ray: 9cec27e37873d77d-NRT
+[18:53:07.529] [post] INFO: [DIAG] Response body size: 2167 bytes
+[18:53:07.529] [post] INFO: Post result: grtError (HTTP 200, decoded as Shift_JIS)
+[18:53:07.529] [post] WARN: [DIAG] grtError response body:
+<html>
+<head>
+<title>ERROR!!</title>
+<meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">
+</head>
+<body bgcolor="#EFEFEF"><!-- _X:error -->
+<font size="+1" color="#FF0000"><b>ERROR: このスレッドにはもう書けません。</b></font>
+<ul>
+問い合わせID：<b> rio/9cec27e37873d77d</b><br>ホスト：<b>2001:268:9964:5837:5412:e100:5882:779f</b><br>
+<ul>
+名前： <b>Nanashi_et_al.</b><br>E-mail： sage<br>
+内容：<br>エプスタイン島<br>
+</ul>
+</ul>
+<hr>
+<ul>
+<font size=+1 color=#00AA00><b>エラーの原因が分からない？</b></font>
+<ul style="line-height:1.5;">
+まず確認しよう！<br>
+<b>
+《<a href="//info.5ch.net/?curid=686">書き込めない時の早見表</a>》<br>
+《<a href="../rikei/">掲示板へ戻る</a>》<br>
+《<a href="../rikei/subback.html">スレッド一覧へ戻る</a>》<br>
+《<a href="../test/read.cgi/rikei/1771076103">スレッドへ戻る</a>》<br>
+</b>
+</ul><br>
+<font size=+1 color=#DD00DD><b>もしかしてアクセス規制ですか？</b></font>
+<ul style="line-height:1.5;">
+お使いのプロバイダさんが、<b>原因となった人に対応</b>するまで規制は続きます。<br>
+個別の対応・進展については、プロバイダさんへお尋ねください。<br>
+<small>その他、５ちゃんねるについては、
+<a href="//5ch.net/qa/">初心者の質問</a> 
+<a href="//5ch.net/accuse/">批判要望</a> 
+<a href="//5ch.net/operate/">運用情報</a> 
+<a href="//5ch.net/operatex/">運用臨時</a> 
+などへどうぞ。</small>
+</ul><br>
+<font size=+1 color=#DD3300><b>○●○ UPLIFTについて</b></font>
+<ul style="line-height:1.5;">
+UPLIFTを導入することで規制が緩和されます。<br>
+UPLIFTの購入は <a href="//uplift.5ch.net/">こちら</a> から<br>
+既にUPLIFTをお持ちなら <a href="//uplift.5ch.net/login">ログイン</a> することで有効になります。 <br>
+</ul><script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"e4c5c0d5c04c433485715e1034f8da46","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
+[18:53:07.531] [cookie-store] INFO: Cookies saved to disk
+[18:53:15.040] [menu] INFO: Menu action: open-modal

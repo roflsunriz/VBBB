@@ -6,7 +6,7 @@ import type { EncodingType } from '@shared/api';
 import { type Board, BoardType, type PostParams, type PostResult, PostResultType } from '@shared/domain';
 import { MAX_POST_RETRIES } from '@shared/file-format';
 import { createLogger } from '../logger';
-import { buildCookieHeader, parseSetCookieHeaders, setCookie } from './cookie-store';
+import { buildCookieHeader, getCookiesForUrl, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
 import { handleDonguriPostResult } from './donguri';
 import { decodeBuffer, httpEncode } from './encoding';
 import { httpFetch } from './http-client';
@@ -166,6 +166,78 @@ export function extractSubmitButton(html: string): SubmitButton | undefined {
 function extractFormAction(html: string): string | undefined {
   const match = /<form\b[^>]*action\s*=\s*["']?([^"'\s>]+)["']?/i.exec(html);
   return match !== null && match[1] !== undefined ? htmlDecode(match[1]) : undefined;
+}
+
+/**
+ * Extract cookie name/value pairs from `<pre>Cookie:NAME = VALUE</pre>` tags
+ * in the confirmation HTML.
+ *
+ * 5ch's confirmation page embeds the cookie the client must set in a `<pre>`
+ * tag. This value is DIFFERENT from the hidden field of the same name — the
+ * cookie goes in the Cookie header, while the hidden field goes in the POST
+ * body. Both are validated server-side as a matching pair.
+ */
+function extractPreCookies(html: string): ReadonlyArray<{ name: string; value: string }> {
+  const results: Array<{ name: string; value: string }> = [];
+
+  // 5ch's confirmation page embeds cookies in a <pre> block.  The format
+  // changed over time and varies per board — we must handle all variants:
+  //
+  //   Single cookie (some boards):
+  //     <pre>Cookie:feature = confirmed:XXXX</pre>
+  //     <pre>Cookie:feature=confirmed:XXXX</pre>
+  //
+  //   Multiple cookies (5ch with acorn):
+  //     <pre>Cookie:acorn = LONG_RANDOM_STRING
+  //     feature = confirmed:XXXX</pre>
+  //
+  // Strategy: extract the full <pre>Cookie:...</pre> block, then parse
+  // each NAME = VALUE pair line-by-line.
+
+  const preRegex = /<pre>\s*Cookie:\s*([\s\S]*?)<\/pre>/gi;
+  let preMatch: RegExpExecArray | null;
+
+  while ((preMatch = preRegex.exec(html)) !== null) {
+    const block = preMatch[1];
+    if (block === undefined) continue;
+
+    // The first line starts after "Cookie:" so the first name=value is
+    // already captured.  Subsequent lines are just "NAME = VALUE".
+    // Split on newlines and also handle the first entry which might be
+    // directly after "Cookie:" without a preceding newline.
+    const lineRegex = /([^=\s]+)\s*=\s*(\S+)/g;
+    let lineMatch: RegExpExecArray | null;
+    while ((lineMatch = lineRegex.exec(block)) !== null) {
+      const name = lineMatch[1];
+      const value = lineMatch[2];
+      if (name !== undefined && value !== undefined) {
+        results.push({ name: htmlDecode(name), value: htmlDecode(value) });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Resolve the confirmation form's action URL against the original POST URL.
+ *
+ * 5ch's confirmation page typically returns a relative action like
+ * `../test/bbs.cgi?guid=ON`. The `?guid=ON` query parameter is required
+ * for the retry to be accepted by the server.
+ *
+ * If the form action is absent or invalid, falls back to the original URL.
+ */
+function resolveRetryUrl(formAction: string | undefined, originalUrl: string): string {
+  if (formAction === undefined || formAction.length === 0) {
+    return originalUrl;
+  }
+  try {
+    const resolved = new URL(formAction, originalUrl);
+    return resolved.href;
+  } catch {
+    return originalUrl;
+  }
 }
 
 /**
@@ -359,6 +431,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
   let hiddenFields: Record<string, string> | undefined;
   let retrySubmitBtn: SubmitButton | undefined;
+  let retryUrl: string | undefined;
   let lastPayloadHash = '';
 
   for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
@@ -389,17 +462,41 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       `params=[${bodyParamKeys}], size=${String(bodyBytes)} bytes`,
     );
 
+    // Use the confirmation form's action URL for retries (e.g. includes ?guid=ON),
+    // otherwise use the original post URL for the initial attempt.
+    const targetUrl = isRetry && retryUrl !== undefined ? retryUrl : postUrl;
+
+    // Referer: on the initial attempt, use the thread page URL (as a browser
+    // would when submitting the write form).  On retries, use the post URL
+    // (bbs.cgi) because the browser's current page is the confirmation page
+    // served by bbs.cgi — clicking "submit" on that form makes the browser
+    // send bbs.cgi as the Referer.
+    const effectiveReferer = isRetry ? postUrl : referer;
+
     // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
-    const cookieHeader = buildCookieHeader(postUrl);
-    // Log cookie names (not values) for diagnostics
-    const cookieNames = cookieHeader.length > 0
-      ? cookieHeader.split('; ').map((c) => c.split('=')[0]).join(', ')
+    const cookieHeader = buildCookieHeader(targetUrl);
+    // Log cookie names and partial values for diagnostics
+    const cookiePairs = cookieHeader.length > 0
+      ? cookieHeader.split('; ').map((c) => {
+          const eqIdx = c.indexOf('=');
+          if (eqIdx < 0) return c;
+          const name = c.substring(0, eqIdx);
+          const val = c.substring(eqIdx + 1);
+          // Show first 20 chars of value to verify correctness
+          const preview = val.length > 20 ? val.substring(0, 20) + '...' : val;
+          return `${name}=${preview}`;
+        })
+      : [];
+    const cookieNames = cookiePairs.length > 0
+      ? cookiePairs.map((p) => p.split('=')[0]).join(', ')
       : '(none)';
-    logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
+    logger.info(`Posting to ${targetUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
+    logger.info(`[DIAG] Cookie value previews: ${cookiePairs.length > 0 ? cookiePairs.join('; ') : '(none)'}`);
+    logger.info(`[DIAG] Referer for this attempt: ${effectiveReferer}`);
 
     const postHeaders: Record<string, string> = {
       'Content-Type': `application/x-www-form-urlencoded${charset}`,
-      Referer: referer,
+      Referer: effectiveReferer,
       Origin: origin,
       'Accept-Language': 'ja',
     };
@@ -413,7 +510,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     );
 
     const response = await httpFetch({
-      url: postUrl,
+      url: targetUrl,
       method: 'POST',
       headers: postHeaders,
       body,
@@ -472,10 +569,14 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       const submitBtn = extractSubmitButton(html);
       retrySubmitBtn = submitBtn ?? { name: 'submit', value: '\u66F8\u304D\u8FBC\u3080' }; // fallback
 
-      // Diagnostic: log form structure to help debug server rejections
+      // Resolve the confirmation form's action URL for the retry request.
+      // 5ch returns relative URLs like "../test/bbs.cgi?guid=ON" — the
+      // ?guid=ON parameter is required for the server to accept the retry.
       const formAction = extractFormAction(html);
+      retryUrl = resolveRetryUrl(formAction, postUrl);
       logger.info(
         `${resultType} form: action=${formAction ?? '(none)'}, ` +
+        `resolved retryUrl=${retryUrl}, ` +
         `submit name=${retrySubmitBtn.name ?? '(none)'} value="${retrySubmitBtn.value}"`,
       );
 
@@ -492,12 +593,72 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
         .join(', ');
       logger.info(`[DIAG] Hidden fields: ${hiddenSummary}`);
 
-      // Per protocol §5.7: also store confirmation tokens as cookies
-      // so they appear in the Cookie header on the retry request.
-      const confirmUrlObj = new URL(postUrl);
+      // Extract cookies from <pre>Cookie:NAME = VALUE</pre> in the HTML.
+      //
+      // 5ch's confirmation page embeds the cookie value to set in a <pre>
+      // tag. This value is INTENTIONALLY DIFFERENT from the hidden field of
+      // the same name (e.g. "feature"). The server validates the pair:
+      //   Cookie header  -> value from <pre> tag
+      //   POST body      -> value from hidden field
+      // If the client uses the hidden field value for both, the server
+      // rejects the request with "9991 Banned".
+      const confirmUrlObj = new URL(retryUrl);
+      const preCookies = extractPreCookies(html);
+      const preCookieNames = new Set<string>();
+
+      for (const pc of preCookies) {
+        preCookieNames.add(pc.name);
+        // Log value preview so we can verify cookie vs hidden field differ
+        const cookiePreview = pc.value.length > 30
+          ? pc.value.substring(0, 30) + '...'
+          : pc.value;
+        logger.info(
+          `[DIAG] Setting cookie from <pre> tag: ${pc.name}=${cookiePreview} for ${confirmUrlObj.hostname}`,
+        );
+        // Also log the hidden field value for comparison
+        const hiddenVal = hiddenFields[pc.name];
+        if (hiddenVal !== undefined) {
+          const hiddenPreview = hiddenVal.length > 30
+            ? hiddenVal.substring(0, 30) + '...'
+            : hiddenVal;
+          logger.info(
+            `[DIAG] Corresponding hidden field: ${pc.name}=${hiddenPreview} (DIFFERENT=${String(pc.value !== htmlDecode(hiddenVal))})`,
+          );
+        }
+
+        // Prevent duplicate cookies: if a cookie with the same name already
+        // exists at a parent domain (e.g. acorn@.5ch.net set via Set-Cookie),
+        // storing a second copy at the subdomain (acorn@rio2016.5ch.net) would
+        // cause TWO cookies with the same name to be sent.  To avoid this,
+        // check for an existing match and reuse its domain.
+        const existingMatches = getCookiesForUrl(retryUrl).filter(
+          (c) => c.name === pc.name,
+        );
+        let cookieDomain = confirmUrlObj.hostname;
+        if (existingMatches.length > 0 && existingMatches[0] !== undefined) {
+          // Reuse the domain of the existing cookie and remove the old entry
+          cookieDomain = existingMatches[0].domain;
+          removeCookie(pc.name, existingMatches[0].domain);
+          logger.info(
+            `[DIAG] Replaced existing ${pc.name}@${existingMatches[0].domain} with <pre> value`,
+          );
+        }
+        setCookie({
+          name: pc.name,
+          value: pc.value,
+          domain: cookieDomain,
+          path: '/',
+          sessionOnly: false,
+          secure: confirmUrlObj.protocol === 'https:',
+        });
+      }
+
+      // For any non-standard hidden fields that do NOT have a corresponding
+      // <pre> cookie (e.g. SPID, PON from older 5ch versions), fall back to
+      // storing them as cookies so they appear in the Cookie header.
       for (const [fieldName, fieldValue] of Object.entries(hiddenFields)) {
-        if (!standardParamNames.has(fieldName)) {
-          logger.info(`[DIAG] Storing hidden field as cookie: ${fieldName} for ${confirmUrlObj.hostname}`);
+        if (!standardParamNames.has(fieldName) && !preCookieNames.has(fieldName)) {
+          logger.info(`[DIAG] Storing hidden field as cookie (no <pre> match): ${fieldName} for ${confirmUrlObj.hostname}`);
           setCookie({
             name: fieldName,
             value: htmlDecode(fieldValue),
@@ -513,6 +674,17 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       logger.info(
         `Retrying with form submission (fields: ${fieldNames.join(', ')})`,
       );
+
+      // Wait before retrying: a real browser shows the confirmation page to
+      // the user, who reads and clicks the submit button after a few seconds.
+      // Instant retries (< 1 second) may be flagged as bot behaviour by the
+      // 5ch server, resulting in a "9991 Banned" rejection.
+      const CONFIRMATION_DELAY_MS = 3000;
+      logger.info(`[DIAG] Waiting ${String(CONFIRMATION_DELAY_MS)}ms before retry (anti-bot timing)`);
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, CONFIRMATION_DELAY_MS);
+      });
+
       continue;
     }
 
