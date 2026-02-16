@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
-import { mdiBulletinBoard, mdiStar } from '@mdi/js';
+import { mdiBulletinBoard, mdiStar, mdiMagnify } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
 import { FavoriteTree } from './components/favorite-tree/FavoriteTree';
+import { SearchPanel } from './components/search/SearchPanel';
 import { ThreadList } from './components/thread-list/ThreadList';
 import { ThreadView } from './components/thread-view/ThreadView';
 import { MdiIcon } from './components/common/MdiIcon';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
-type LeftPaneTab = 'boards' | 'favorites';
+type LeftPaneTab = 'boards' | 'favorites' | 'search';
 
 export function App(): React.JSX.Element {
   const statusMessage = useBBSStore((s) => s.statusMessage);
@@ -26,6 +27,8 @@ export function App(): React.JSX.Element {
 
   const switchToBoards = useCallback(() => { setLeftTab('boards'); }, []);
   const switchToFavorites = useCallback(() => { setLeftTab('favorites'); }, []);
+  const switchToSearch = useCallback(() => { setLeftTab('search'); }, []);
+  const closeSearch = useCallback(() => { setLeftTab('boards'); }, []);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
@@ -59,10 +62,24 @@ export function App(): React.JSX.Element {
               <MdiIcon path={mdiStar} size={12} />
               お気に入り
             </button>
+            <button
+              type="button"
+              onClick={switchToSearch}
+              className={`flex flex-1 items-center justify-center gap-1 text-xs ${
+                leftTab === 'search'
+                  ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+              }`}
+            >
+              <MdiIcon path={mdiMagnify} size={12} />
+              検索
+            </button>
           </div>
           {/* Tab content */}
           <div className="flex-1 overflow-hidden">
-            {leftTab === 'boards' ? <BoardTree /> : <FavoriteTree />}
+            {leftTab === 'boards' && <BoardTree />}
+            {leftTab === 'favorites' && <FavoriteTree />}
+            {leftTab === 'search' && <SearchPanel onClose={closeSearch} />}
           </div>
         </aside>
 

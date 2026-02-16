@@ -88,6 +88,21 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
       return;
     }
 
+    // Misfire check: compare active tab with post target
+    const { tabs, activeTabId } = useBBSStore.getState();
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab !== undefined) {
+      const isTargetMatch = activeTab.boardUrl === boardUrl && activeTab.threadId === threadId;
+      if (!isTargetMatch) {
+        const confirmed = window.confirm(
+          `投稿先が現在のタブと異なります。\n` +
+          `投稿先: ${boardUrl} / ${threadId}\n` +
+          `このまま投稿しますか？`,
+        );
+        if (!confirmed) return;
+      }
+    }
+
     setPosting(true);
     setResultMessage('');
 
@@ -106,6 +121,16 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
         setStatusMessage('投稿が完了しました');
         void saveKotehan(boardUrl, { name, mail });
         void recordSambaTime(boardUrl);
+
+        // Save post history
+        void window.electronApi.invoke('post:save-history', {
+          timestamp: new Date().toISOString(),
+          boardUrl,
+          threadId,
+          name,
+          mail,
+          message,
+        });
       } else {
         // Update donguri state on relevant result types
         if (result.resultType === 'grtDonguri' || result.resultType === 'grtDngBroken') {

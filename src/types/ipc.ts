@@ -7,8 +7,12 @@ import type { AuthState } from './auth';
 import type { StoredCookie } from './cookie';
 import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
 import type { FavNode, FavTree } from './favorite';
+import type { BrowsingHistoryEntry, SavedTab } from './history';
 import type { NgRule } from './ng';
+import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
+import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
+import type { LocalSearchQuery, RemoteSearchQuery, RemoteSearchResult, SearchResult } from './search';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -154,6 +158,96 @@ export interface IpcChannelMap {
   /** Be logout */
   'auth:be-logout': {
     args: [];
+    result: void;
+  };
+  /** Update a single thread's index entry (kokomade, scrollTop, etc.) */
+  'bbs:update-thread-index': {
+    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number }];
+    result: void;
+  };
+  /** Load saved tabs */
+  'tab:load': {
+    args: [];
+    result: readonly SavedTab[];
+  };
+  /** Save tabs */
+  'tab:save': {
+    args: [tabs: readonly SavedTab[]];
+    result: void;
+  };
+  /** Load browsing history */
+  'history:load': {
+    args: [];
+    result: readonly BrowsingHistoryEntry[];
+  };
+  /** Add a history entry */
+  'history:add': {
+    args: [boardUrl: string, threadId: string, title: string];
+    result: void;
+  };
+  /** Clear browsing history */
+  'history:clear': {
+    args: [];
+    result: void;
+  };
+  /** Local DAT search */
+  'search:local': {
+    args: [query: LocalSearchQuery];
+    result: readonly SearchResult[];
+  };
+  /** Remote search via dig.2ch.net */
+  'search:remote': {
+    args: [query: RemoteSearchQuery];
+    result: readonly RemoteSearchResult[];
+  };
+  /** Get round board list */
+  'round:get-boards': {
+    args: [];
+    result: readonly RoundBoardEntry[];
+  };
+  /** Get round item list */
+  'round:get-items': {
+    args: [];
+    result: readonly RoundItemEntry[];
+  };
+  /** Add round board entry */
+  'round:add-board': {
+    args: [entry: RoundBoardEntry];
+    result: void;
+  };
+  /** Remove round board entry */
+  'round:remove-board': {
+    args: [url: string];
+    result: void;
+  };
+  /** Add round item entry */
+  'round:add-item': {
+    args: [entry: RoundItemEntry];
+    result: void;
+  };
+  /** Remove round item entry */
+  'round:remove-item': {
+    args: [url: string, fileName: string];
+    result: void;
+  };
+  /** Get round timer config */
+  'round:get-timer': {
+    args: [];
+    result: RoundTimerConfig;
+  };
+  /** Set round timer config */
+  'round:set-timer': {
+    args: [config: RoundTimerConfig];
+    result: void;
+  };
+  /** Execute round (manual trigger) */
+  'round:execute': {
+    args: [];
+    result: void;
+  };
+  /** Save a post to history */
+  'post:save-history': {
+    args: [entry: PostHistoryEntry];
     result: void;
   };
 }

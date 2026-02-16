@@ -11,8 +11,10 @@ import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
 import { convertAnchorsToLinks } from '../../utils/anchor-parser';
+import { detectImageUrls } from '../../utils/image-detect';
 import { PostEditor } from '../post-editor/PostEditor';
 import { ResPopup } from './ResPopup';
+import { ImageThumbnail } from './ImageThumbnail';
 import { NgEditor } from '../ng-editor/NgEditor';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
@@ -118,6 +120,9 @@ function ResItem({
 
   const bodyHtml = convertAnchorsToLinks(sanitizeHtml(res.body));
 
+  // Detect image URLs in the body for inline thumbnails
+  const images = useMemo(() => detectImageUrls(res.body), [res.body]);
+
   const handleMouseOver = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const target = e.target;
@@ -168,6 +173,13 @@ function ResItem({
         onClick={handleClick}
         role="presentation"
       />
+      {images.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {images.map((img) => (
+            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -189,6 +201,7 @@ export function ThreadView(): React.JSX.Element {
   const activeTabId = useBBSStore((s) => s.activeTabId);
   const closeTab = useBBSStore((s) => s.closeTab);
   const setActiveTab = useBBSStore((s) => s.setActiveTab);
+  const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
   const togglePostEditor = useBBSStore((s) => s.togglePostEditor);
   const ngRules = useBBSStore((s) => s.ngRules);
@@ -213,10 +226,41 @@ export function ThreadView(): React.JSX.Element {
     return results;
   }, [activeTab, ngRules]);
 
-  // Scroll to top when tab changes
+  // Restore scroll position when tab changes
+  const activeTabScrollTop = activeTab?.scrollTop ?? 0;
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, 0);
-  }, [activeTabId]);
+    if (scrollRef.current !== null) {
+      if (activeTabScrollTop > 0) {
+        const container = scrollRef.current;
+        requestAnimationFrame(() => {
+          container.scrollTo(0, activeTabScrollTop);
+        });
+      } else {
+        scrollRef.current.scrollTo(0, 0);
+      }
+    }
+  }, [activeTabId, activeTabScrollTop]);
+
+  // Save scroll position on scroll (debounced)
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (container === null || activeTabId === null) return;
+
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const handleScroll = (): void => {
+      if (timeout !== null) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (activeTabId !== null) {
+          updateTabScroll(activeTabId, container.scrollTop);
+        }
+      }, 300);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (timeout !== null) clearTimeout(timeout);
+    };
+  }, [activeTabId, updateTabScroll]);
 
   // Close popup on tab change
   useEffect(() => {
@@ -316,13 +360,19 @@ export function ThreadView(): React.JSX.Element {
             {/* Responses */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto">
               {activeTab.responses.map((res) => (
-                <ResItem
-                  key={res.number}
-                  res={res}
-                  ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
-                  onAnchorHover={handleAnchorHover}
-                  onAnchorLeave={handleAnchorLeave}
-                />
+                <div key={res.number}>
+                  {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
+                    <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
+                      <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
+                    </div>
+                  )}
+                  <ResItem
+                    res={res}
+                    ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
+                    onAnchorHover={handleAnchorHover}
+                    onAnchorLeave={handleAnchorLeave}
+                  />
+                </div>
               ))}
             </div>
 

@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type { BBSMenu, Board, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
+import type { BrowsingHistoryEntry, DisplayRange } from '@shared/history';
 import type { NgRule } from '@shared/ng';
 
 /** Tab state for viewing threads */
@@ -13,6 +14,9 @@ interface ThreadTab {
   readonly threadId: string;
   readonly title: string;
   readonly responses: readonly Res[];
+  readonly scrollTop: number;
+  readonly kokomade: number;
+  readonly displayRange: DisplayRange;
 }
 
 interface BBSState {
@@ -49,6 +53,9 @@ interface BBSState {
   favorites: FavTree;
   favoritesOpen: boolean;
 
+  // Browsing history
+  browsingHistory: readonly BrowsingHistoryEntry[];
+
   // Status
   statusMessage: string;
 
@@ -71,6 +78,12 @@ interface BBSState {
   openThread: (boardUrl: string, threadId: string, title: string) => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
+  updateTabScroll: (tabId: string, scrollTop: number) => void;
+  updateTabKokomade: (tabId: string, kokomade: number) => void;
+  updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
+  saveTabs: () => Promise<void>;
+  restoreTabs: () => Promise<void>;
+  loadBrowsingHistory: () => Promise<void>;
   togglePostEditor: () => void;
   setStatusMessage: (message: string) => void;
 }
@@ -104,6 +117,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   favorites: { children: [] },
   favoritesOpen: false,
+
+  browsingHistory: [],
 
   statusMessage: 'Ready',
 
@@ -273,18 +288,31 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
     try {
       const result: DatFetchResult = await getApi().invoke('bbs:fetch-dat', boardUrl, threadId);
+
+      // Get kokomade/scrollTop from thread index if available
+      const { threadIndices } = get();
+      const idx = threadIndices.find((i) => i.fileName === `${threadId}.dat`);
+      const kokomade = idx?.kokomade ?? -1;
+      const scrollTop = idx?.scrollTop ?? 0;
+
       const newTab: ThreadTab = {
         id: tabId,
         boardUrl,
         threadId,
         title,
         responses: result.responses,
+        scrollTop,
+        kokomade,
+        displayRange: 'all',
       };
       set((state) => ({
         tabs: [...state.tabs, newTab],
         activeTabId: tabId,
         statusMessage: `${title}: ${String(result.responses.length)} レス`,
       }));
+
+      // Record browsing history
+      void getApi().invoke('history:add', boardUrl, threadId, title);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `読み込み失敗: ${message}` });
@@ -292,6 +320,16 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   closeTab: (tabId: string) => {
+    const { tabs } = get();
+    const closingTab = tabs.find((t) => t.id === tabId);
+
+    // Persist scrollTop before closing
+    if (closingTab !== undefined) {
+      void getApi().invoke('bbs:update-thread-index', closingTab.boardUrl, closingTab.threadId, {
+        scrollTop: closingTab.scrollTop,
+      });
+    }
+
     set((state) => {
       const newTabs = state.tabs.filter((t) => t.id !== tabId);
       let newActiveId = state.activeTabId;
@@ -304,6 +342,59 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   setActiveTab: (tabId: string) => {
     set({ activeTabId: tabId });
+  },
+
+  updateTabScroll: (tabId: string, scrollTop: number) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, scrollTop } : t)),
+    }));
+  },
+
+  updateTabKokomade: (tabId: string, kokomade: number) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, kokomade } : t)),
+    }));
+    // Also persist to Folder.idx
+    const tab = get().tabs.find((t) => t.id === tabId);
+    if (tab !== undefined) {
+      void getApi().invoke('bbs:update-thread-index', tab.boardUrl, tab.threadId, { kokomade });
+    }
+  },
+
+  updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, displayRange } : t)),
+    }));
+  },
+
+  saveTabs: async () => {
+    const { tabs } = get();
+    const savedTabs = tabs.map((t) => ({
+      boardUrl: t.boardUrl,
+      threadId: t.threadId,
+      title: t.title,
+    }));
+    await getApi().invoke('tab:save', savedTabs);
+  },
+
+  restoreTabs: async () => {
+    try {
+      const savedTabs = await getApi().invoke('tab:load');
+      for (const tab of savedTabs) {
+        await get().openThread(tab.boardUrl, tab.threadId, tab.title);
+      }
+    } catch {
+      // Silently ignore restore errors
+    }
+  },
+
+  loadBrowsingHistory: async () => {
+    try {
+      const history = await getApi().invoke('history:load');
+      set({ browsingHistory: history });
+    } catch {
+      // Silently ignore
+    }
   },
 
   togglePostEditor: () => {

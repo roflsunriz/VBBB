@@ -170,6 +170,12 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
   const text = decodeBuffer(response.body, encoding);
   const threads = parseSubjectTxt(text);
 
+  // Build and save updated Folder.idx
+  const existingIndex = loadFolderIdx(boardDir);
+  const ageSageMap = determineAgeSage(threads, existingIndex);
+  const updatedIndex = buildUpdatedIndex(threads, existingIndex, ageSageMap);
+  await saveFolderIdx(boardDir, updatedIndex);
+
   logger.info(`Parsed ${String(threads.length)} threads from subject.txt`);
 
   return { threads, notModified: false };

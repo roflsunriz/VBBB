@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { type Board, BoardType, DatFetchStatus, type DatFetchResult, type Res } from '@shared/domain';
 import { DAT_ADJUST_MARGIN } from '@shared/file-format';
 import { createLogger } from '../logger';
+import { applyDatReplace, loadReplaceRules } from './dat-replace';
 import { decodeBuffer } from './encoding';
 import { atomicAppendFile, atomicWriteFile, getBoardDir, readFileLastBytes, readFileSafe } from './file-io';
 import { httpFetch } from './http-client';
@@ -148,7 +149,10 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
       acceptGzip: false, // MUST NOT send gzip with Range
     });
 
-    if (response.status === 206) {
+    // Load replacement rules
+  const replaceRules = loadReplaceRules(dataDir);
+
+  if (response.status === 206) {
       // Differential response — verify 16-byte overlap
       const localTail = readFileLastBytes(localPath, DAT_ADJUST_MARGIN);
       if (localTail !== null) {
@@ -169,7 +173,7 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
           if (fullContent === null) {
             return { status: DatFetchStatus.Error, responses: [], lastModified: null, size: 0, errorMessage: 'Failed to read merged DAT' };
           }
-          const text = decodeBuffer(fullContent, encoding);
+          const text = applyDatReplace(decodeBuffer(fullContent, encoding), replaceRules);
           return {
             status: DatFetchStatus.Partial,
             responses: parseDat(text),
@@ -231,6 +235,7 @@ async function fetchDatFull(board: Board, threadId: string, dataDir: string): Pr
   const localPath = join(boardDir, `${threadId}.dat`);
   const datUrl = getDatUrl(board, threadId);
   const encoding = board.boardType === BoardType.JBBS ? 'EUC-JP' : 'Shift_JIS';
+  const replaceRules = loadReplaceRules(dataDir);
 
   const response = await httpFetch({
     url: datUrl,
@@ -252,7 +257,7 @@ async function fetchDatFull(board: Board, threadId: string, dataDir: string): Pr
   }
 
   await atomicWriteFile(localPath, response.body);
-  const text = decodeBuffer(response.body, encoding);
+  const text = applyDatReplace(decodeBuffer(response.body, encoding), replaceRules);
   return {
     status: DatFetchStatus.Full,
     responses: parseDat(text),

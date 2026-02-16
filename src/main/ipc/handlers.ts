@@ -9,19 +9,30 @@ import type { IpcChannelMap } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
+import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
 import { fetchDat } from '../services/dat';
 import { postResponse } from '../services/post';
-import { fetchSubject, loadFolderIdx } from '../services/subject';
+import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
 import { getBoardDir, ensureDir } from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
+import { searchLocal } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
+import { savePostHistory } from '../services/post-history';
+import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory, loadBrowsingHistory, saveBrowsingHistory } from '../services/browsing-history';
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
 import { getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
 import { getDonguriState } from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
 import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
+import {
+  addRoundBoard, addRoundItem, getRoundBoards, getRoundItems,
+  getTimerConfig, loadRoundLists, removeRoundBoard, removeRoundItem,
+  saveRoundBoard, saveRoundItem, setTimerConfig,
+} from '../services/round-list';
+import { searchRemote } from '../services/remote-search';
+import { loadSavedTabs, saveTabs } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 
 const logger = createLogger('ipc');
@@ -94,14 +105,30 @@ export function registerIpcHandlers(): void {
 
   handle('bbs:fetch-menu', async () => {
     try {
+      // Collect old boards for transfer detection
+      const oldBoards: Board[] = [];
+      for (const b of boardCache.values()) {
+        oldBoards.push(b);
+      }
+
       const menu = await fetchBBSMenu();
       await saveBBSMenuCache(dataDir, menu);
 
-      // Populate board cache
+      // Collect new boards and populate cache
+      const newBoards: Board[] = [];
       boardCache.clear();
       for (const cat of menu.categories) {
         for (const board of cat.boards) {
           boardCache.set(board.url, board);
+          newBoards.push(board);
+        }
+      }
+
+      // Detect and apply board transfers if we had old data
+      if (oldBoards.length > 0) {
+        const transfers = detectTransfers(oldBoards, newBoards);
+        if (transfers.size > 0) {
+          await applyBoardTransfers(transfers, dataDir);
         }
       }
 
@@ -163,6 +190,22 @@ export function registerIpcHandlers(): void {
     return Promise.resolve(loadFolderIdx(boardDir));
   });
 
+  handle('bbs:update-thread-index', async (boardUrl: string, threadId: string, updates) => {
+    const board = lookupBoard(boardUrl);
+    const boardDir = getBoardDir(dataDir, board.url);
+    const indices = loadFolderIdx(boardDir);
+    const datFileName = `${threadId}.dat`;
+    const updated = indices.map((idx) => {
+      if (idx.fileName !== datFileName) return idx;
+      return {
+        ...idx,
+        ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
+        ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
+      };
+    });
+    await saveFolderIdx(boardDir, updated);
+  });
+
   handle('bbs:get-kotehan', (boardUrl: string) => {
     const board = lookupBoard(boardUrl);
     const boardDir = getBoardDir(dataDir, board.url);
@@ -213,6 +256,118 @@ export function registerIpcHandlers(): void {
 
   handle('fav:remove', async (nodeId: string) => {
     await removeFavorite(dataDir, nodeId);
+  });
+
+  // Tab persistence
+  handle('tab:load', () => {
+    return Promise.resolve(loadSavedTabs(dataDir));
+  });
+
+  handle('tab:save', async (tabs) => {
+    await saveTabs(dataDir, tabs);
+  });
+
+  // Browsing history
+  loadBrowsingHistory(dataDir);
+
+  handle('history:load', () => {
+    return Promise.resolve(getBrowsingHistory());
+  });
+
+  handle('history:add', async (boardUrl: string, threadId: string, title: string) => {
+    addHistoryEntry(boardUrl, threadId, title);
+    await saveBrowsingHistory(dataDir);
+  });
+
+  handle('history:clear', async () => {
+    clearBrowsingHistory();
+    await saveBrowsingHistory(dataDir);
+  });
+
+  // Search handlers
+  handle('search:local', (query) => {
+    return Promise.resolve(searchLocal(query, dataDir));
+  });
+
+  handle('search:remote', async (query) => {
+    return searchRemote(query);
+  });
+
+  // Round list
+  loadRoundLists(dataDir);
+
+  handle('round:get-boards', () => {
+    return Promise.resolve(getRoundBoards());
+  });
+
+  handle('round:get-items', () => {
+    return Promise.resolve(getRoundItems());
+  });
+
+  handle('round:add-board', async (entry) => {
+    addRoundBoard(entry);
+    await saveRoundBoard(dataDir);
+  });
+
+  handle('round:remove-board', async (url: string) => {
+    removeRoundBoard(url);
+    await saveRoundBoard(dataDir);
+  });
+
+  handle('round:add-item', async (entry) => {
+    addRoundItem(entry);
+    await saveRoundItem(dataDir);
+  });
+
+  handle('round:remove-item', async (url: string, fileName: string) => {
+    removeRoundItem(url, fileName);
+    await saveRoundItem(dataDir);
+  });
+
+  handle('round:get-timer', () => {
+    return Promise.resolve(getTimerConfig());
+  });
+
+  handle('round:set-timer', async (config) => {
+    await setTimerConfig(dataDir, config);
+  });
+
+  handle('round:execute', async () => {
+    // Execute round fetching for all board and item entries
+    const boards = getRoundBoards();
+    const items = getRoundItems();
+    for (const board of boards) {
+      try {
+        const boardObj = lookupBoard(board.url);
+        const plugin = getBoardPlugin(boardObj.boardType);
+        if (plugin !== undefined) {
+          await plugin.fetchSubject(boardObj, dataDir);
+        } else {
+          await fetchSubject(boardObj, dataDir);
+        }
+      } catch {
+        logger.warn(`Round: failed to fetch subject for ${board.url}`);
+      }
+    }
+    for (const item of items) {
+      try {
+        const boardObj = lookupBoard(item.url);
+        const threadId = item.fileName.replace('.dat', '');
+        const plugin = getBoardPlugin(boardObj.boardType);
+        if (plugin !== undefined) {
+          await plugin.fetchDat(boardObj, threadId, dataDir);
+        } else {
+          await fetchDat(boardObj, threadId, dataDir);
+        }
+      } catch {
+        logger.warn(`Round: failed to fetch dat for ${item.url}/${item.fileName}`);
+      }
+    }
+  });
+
+  // Post history
+  handle('post:save-history', async (entry) => {
+    await savePostHistory(dataDir, entry);
   });
 
   // Initialize board plugins
