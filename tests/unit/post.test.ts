@@ -15,12 +15,24 @@ describe('detectResultType', () => {
   it('detects grtCookie', () => {
     expect(detectResultType('クッキーがないか期限切れです')).toBe(PostResultType.Cookie);
     expect(detectResultType('クッキー確認！')).toBe(PostResultType.Cookie);
+    // Broader patterns: without trailing punctuation / HTML comment marker
+    expect(detectResultType('クッキー確認')).toBe(PostResultType.Cookie);
+    expect(detectResultType('<html><!-- _X:cookie --><body>some content</body></html>')).toBe(PostResultType.Cookie);
+    // Real server response: combined cookie+check page
+    expect(detectResultType(
+      '<html><!-- _X:cookie --><head><title>■ 書き込み確認 ■</title></head>' +
+      '<body><b>書きこみ＆クッキー確認</b></body></html>',
+    )).toBe(PostResultType.Cookie);
   });
 
   it('detects grtCheck', () => {
     expect(detectResultType('書き込み確認します')).toBe(PostResultType.Check);
     expect(detectResultType('内容確認')).toBe(PostResultType.Check);
     expect(detectResultType('書き込みチェック！')).toBe(PostResultType.Check);
+    // Broader patterns: without trailing text / 投稿確認
+    expect(detectResultType('書き込み確認')).toBe(PostResultType.Check);
+    expect(detectResultType('書き込みチェック')).toBe(PostResultType.Check);
+    expect(detectResultType('<b>投稿確認</b>')).toBe(PostResultType.Check);
   });
 
   it('detects grtDonguri', () => {
