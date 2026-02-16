@@ -39,3 +39,6 @@ release/
 # Temporary
 *.tmp
 *.bak
+
+# Slevo-sources
+Slevo/
