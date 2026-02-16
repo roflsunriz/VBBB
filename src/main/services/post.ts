@@ -81,26 +81,76 @@ function getPostUrl(board: Board): string {
 }
 
 /**
- * Build POST body parameters.
+ * Decode common HTML entities found in hidden field values.
+ */
+function htmlDecode(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match, hex: string) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_match, dec: string) =>
+      String.fromCharCode(parseInt(dec, 10)),
+    );
+}
+
+/**
+ * Extracted submit button metadata.
+ */
+interface SubmitButton {
+  /** Button name attribute (undefined if absent) */
+  readonly name: string | undefined;
+  /** Button value (display text) */
+  readonly value: string;
+}
+
+/**
+ * Extract the submit button name and value from HTML.
+ * Returns undefined if no submit input is found.
+ */
+export function extractSubmitButton(html: string): SubmitButton | undefined {
+  const inputRegex = /<input\b[^>]*>/gi;
+  const typeRegex = /type\s*=\s*["']?submit["']?/i;
+  const nameRegex = /name\s*=\s*["']?([^"'\s>]+)["']?/i;
+  const valueRegex = /value\s*=\s*["']?([^"'>]*)["']?/i;
+
+  let match: RegExpExecArray | null;
+  while ((match = inputRegex.exec(html)) !== null) {
+    const tag = match[0];
+    if (!typeRegex.test(tag)) continue;
+    const vm = valueRegex.exec(tag);
+    if (vm !== null && vm[1] !== undefined) {
+      const nm = nameRegex.exec(tag);
+      return {
+        name: nm !== null && nm[1] !== undefined ? nm[1] : undefined,
+        value: htmlDecode(vm[1]),
+      };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Extract the form action URL from HTML.
+ */
+function extractFormAction(html: string): string | undefined {
+  const match = /<form\b[^>]*action\s*=\s*["']?([^"'\s>]+)["']?/i.exec(html);
+  return match !== null && match[1] !== undefined ? htmlDecode(match[1]) : undefined;
+}
+
+/**
+ * Build POST body for the initial attempt.
  */
 function buildPostBody(
   params: PostParams,
   board: Board,
-  hiddenFields?: Readonly<Record<string, string>>,
 ): string {
   const encoding = getPostEncoding(board.boardType);
-
   const fields: Array<[string, string]> = [];
-
-  // Add hidden fields from cookie/check response first
-  if (hiddenFields !== undefined) {
-    for (const [key, value] of Object.entries(hiddenFields)) {
-      // Skip fields that we'll set explicitly
-      if (!['FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject'].includes(key)) {
-        fields.push([key, value]);
-      }
-    }
-  }
 
   // Add UPLIFT sid if available
   const sid = getUpliftSid();
@@ -115,6 +165,46 @@ function buildPostBody(
   fields.push(['time', String(Math.floor(Date.now() / 1000))]);
   fields.push(['key', params.threadId]);
   fields.push(['submit', '\u66F8\u304D\u8FBC\u3080']); // 書き込む
+
+  return fields
+    .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
+    .join('&');
+}
+
+/**
+ * Build POST body for a confirmation retry (grtCookie / grtCheck).
+ *
+ * Submits the server's confirmation form directly: all hidden field values
+ * are HTML-decoded and then percent-encoded, exactly as a browser would do
+ * when the user clicks the confirmation button.
+ *
+ * This preserves the original `time` value (used as a server-side token)
+ * and uses the confirmation submit button text.
+ */
+function buildRetryBody(
+  hiddenFields: Readonly<Record<string, string>>,
+  submitBtn: SubmitButton,
+  encoding: EncodingType,
+): string {
+  const fields: Array<[string, string]> = [];
+
+  for (const [key, value] of Object.entries(hiddenFields)) {
+    fields.push([key, htmlDecode(value)]);
+  }
+
+  // Add UPLIFT sid if available and not already in hidden fields
+  if (!Object.hasOwn(hiddenFields, 'sid')) {
+    const sid = getUpliftSid();
+    if (sid.length > 0) {
+      fields.push(['sid', sid]);
+    }
+  }
+
+  // Include the submit button only if it has a name attribute
+  // (browsers omit nameless submit buttons from form data)
+  if (submitBtn.name !== undefined) {
+    fields.push([submitBtn.name, submitBtn.value]);
+  }
 
   return fields
     .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
@@ -226,11 +316,25 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
   const requestEncoding = getPostEncoding(board.boardType);
   const charset = requestEncoding === 'UTF-8' ? '; charset=UTF-8' : '';
 
+  // Referer: thread URL for replies, bbs.cgi for new threads (per protocol §5.2)
+  const referer = params.threadId.length > 0
+    ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}/`
+    : `${board.serverUrl}test/bbs.cgi`;
+
+  // Origin: required by some servers for POST CSRF validation
+  const postUrlObj = new URL(postUrl);
+  const origin = postUrlObj.origin;
+
   let hiddenFields: Record<string, string> | undefined;
+  let retrySubmitBtn: SubmitButton | undefined;
   let lastPayloadHash = '';
 
   for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
-    const body = buildPostBody(params, board, hiddenFields);
+    // On retry after grtCookie/grtCheck, submit the server's confirmation
+    // form directly (preserving its `time` value, submit button text, etc.)
+    const body = hiddenFields !== undefined && retrySubmitBtn !== undefined
+      ? buildRetryBody(hiddenFields, retrySubmitBtn, requestEncoding)
+      : buildPostBody(params, board);
 
     // Infinite loop prevention: check if payload is identical to previous
     if (body === lastPayloadHash && attempt > 0) {
@@ -252,7 +356,8 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
     const postHeaders: Record<string, string> = {
       'Content-Type': `application/x-www-form-urlencoded${charset}`,
-      Referer: `${board.serverUrl}test/bbs.cgi`,
+      Referer: referer,
+      Origin: origin,
       'Accept-Language': 'ja',
     };
     if (cookieHeader.length > 0) {
@@ -299,29 +404,41 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       (resultType === PostResultType.Cookie || resultType === PostResultType.Check) &&
       attempt < MAX_POST_RETRIES
     ) {
-      // Extract hidden fields and retry
+      // Extract form data from the confirmation page
       hiddenFields = extractHiddenFields(html);
+      const submitBtn = extractSubmitButton(html);
+      retrySubmitBtn = submitBtn ?? { name: 'submit', value: '\u66F8\u304D\u8FBC\u3080' }; // fallback
 
-      // Per protocol §5.7: store confirmation tokens as cookies so they
-      // appear in the Cookie header on the retry request.
-      // Standard POST parameters are excluded — only tokens like "yuki" are set.
-      const postUrlObj = new URL(postUrl);
-      const excludedNames = new Set(['FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject', 'submit']);
+      // Diagnostic: log form structure to help debug server rejections
+      const formAction = extractFormAction(html);
+      logger.info(
+        `${resultType} form: action=${formAction ?? '(none)'}, ` +
+        `submit name=${retrySubmitBtn.name ?? '(none)'} value="${retrySubmitBtn.value}"`,
+      );
+
+      // Per protocol §5.7: also store confirmation tokens as cookies
+      // so they appear in the Cookie header on the retry request.
+      const confirmUrlObj = new URL(postUrl);
+      const standardParamNames = new Set([
+        'FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject', 'submit',
+      ]);
       for (const [fieldName, fieldValue] of Object.entries(hiddenFields)) {
-        if (!excludedNames.has(fieldName)) {
+        if (!standardParamNames.has(fieldName)) {
           setCookie({
             name: fieldName,
-            value: fieldValue,
-            domain: postUrlObj.hostname,
+            value: htmlDecode(fieldValue),
+            domain: confirmUrlObj.hostname,
             path: '/',
             sessionOnly: false,
-            secure: postUrlObj.protocol === 'https:',
+            secure: confirmUrlObj.protocol === 'https:',
           });
         }
       }
 
       const fieldNames = Object.keys(hiddenFields);
-      logger.info(`${resultType} response, retrying with ${String(fieldNames.length)} hidden fields: ${fieldNames.join(', ')}`);
+      logger.info(
+        `Retrying with form submission (fields: ${fieldNames.join(', ')})`,
+      );
       continue;
     }
 
