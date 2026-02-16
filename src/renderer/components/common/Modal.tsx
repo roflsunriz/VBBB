@@ -37,6 +37,8 @@ export function Modal({
   const [modalH, setModalH] = useState(initialHeight ?? 400);
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  /** Timestamp of last resize mouseUp — used to suppress backdrop close right after resize. */
+  const resizeEndTime = useRef(0);
 
   // Reset dimensions when modal re-opens with new initial values
   useEffect(() => {
@@ -48,12 +50,19 @@ export function Modal({
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      if (dragging.current) return;
+      if (resizable === true && Date.now() - resizeEndTime.current < 300) return;
       if (e.target === backdropRef.current) {
         onClose();
       }
     },
-    [onClose],
+    [onClose, resizable],
   );
+
+  /** Prevent mouseDown inside modal content from contributing to a backdrop click event. */
+  const stopMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +104,7 @@ export function Modal({
     const handleMouseUp = (): void => {
       if (dragging.current) {
         dragging.current = false;
+        resizeEndTime.current = Date.now();
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       }
@@ -122,6 +132,7 @@ export function Modal({
         <div
           className="relative animate-[fadeIn_0.15s_ease-out]"
           style={{ width: modalW, height: modalH }}
+          onMouseDown={stopMouseDown}
         >
           <div className="flex h-full w-full flex-col overflow-hidden">
             {children}
@@ -129,7 +140,7 @@ export function Modal({
           {/* Corner resize handle */}
           <div
             onMouseDown={handleResizeMouseDown}
-            className="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-se-resize"
+            className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-se-resize"
             aria-label="リサイズ"
             role="separator"
           >
@@ -139,7 +150,7 @@ export function Modal({
           </div>
         </div>
       ) : (
-        <div className={`${width} mx-4 w-full animate-[fadeIn_0.15s_ease-out]`}>
+        <div className={`${width} mx-4 w-full animate-[fadeIn_0.15s_ease-out]`} onMouseDown={stopMouseDown}>
           {children}
         </div>
       )}

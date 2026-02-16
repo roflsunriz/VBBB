@@ -4,7 +4,7 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight } from '@mdi/js';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
@@ -13,21 +13,66 @@ import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
 import { convertAnchorsToLinks } from '../../utils/anchor-parser';
 import { detectImageUrls } from '../../utils/image-detect';
+import { linkifyUrls } from '../../utils/url-linkify';
 import { PostEditor } from '../post-editor/PostEditor';
+import { ProgrammaticPost } from '../post-editor/ProgrammaticPost';
 import { ResPopup } from './ResPopup';
 import { ImageThumbnail } from './ImageThumbnail';
+import { ThreadAnalysis } from './ThreadAnalysis';
 import { NgEditor } from '../ng-editor/NgEditor';
+import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
+import type { WatchoiInfo } from '../../utils/thread-analysis';
+import { extractIps, threadHasExposedIps, fetchIpInfo } from '../../utils/ip-detect';
+import type { IpInfo } from '../../utils/ip-detect';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
 
+/** Parse a Japanese datetime like "2024/01/01(月) 12:34:56.78" into a Date */
+const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2}):(\d{2})/;
+
+function parseResDateTime(dateTime: string): Date | null {
+  const m = DATE_PATTERN.exec(dateTime);
+  if (m === null) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const h = Number(m[4]);
+  const mi = Number(m[5]);
+  const s = Number(m[6]);
+  return new Date(y, mo, d, h, mi, s);
+}
+
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return '';
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `${String(diffSec)}秒前`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${String(diffMin)}分前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${String(diffHour)}時間前`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 365) return `${String(diffDay)}日前`;
+  return `${String(Math.floor(diffDay / 365))}年前`;
+}
+
 /**
  * Render datetime text, converting Be IDs into clickable profile links.
+ * Optionally shows relative time.
  */
-function renderDateTimeWithBe(dateTime: string, resNumber: number): React.ReactNode {
+function renderDateTimeWithBe(dateTime: string, resNumber: number, showRelative: boolean): React.ReactNode {
   const match = BE_PATTERN.exec(dateTime);
+  const relativeNode = showRelative ? (() => {
+    const parsed = parseResDateTime(dateTime);
+    if (parsed === null) return null;
+    return (
+      <span className="ml-1 text-[var(--color-text-muted)] opacity-70">({formatRelativeTime(parsed)})</span>
+    );
+  })() : null;
+
   if (match?.[1] === undefined || match[2] === undefined) {
-    return dateTime;
+    return <>{dateTime}{relativeNode}</>;
   }
 
   const beId = match[1];
@@ -48,6 +93,7 @@ function renderDateTimeWithBe(dateTime: string, resNumber: number): React.ReactN
         {match[0]}
       </a>
       {after}
+      {relativeNode}
     </>
   );
 }
@@ -95,24 +141,148 @@ function applyNgFilter(rules: readonly NgRule[], res: Res, boardId: string, thre
 /** Highlight type for a response */
 type HighlightType = 'none' | 'own' | 'reply';
 
+/** F31: Count badge component */
+function CountBadge({ count, onClick }: { readonly count: number; readonly onClick: () => void }): React.JSX.Element | null {
+  if (count <= 1) return null;
+  const color = count >= 10 ? 'text-[var(--color-error)]' : count >= 5 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-muted)]';
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className={`ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] font-bold ${color} hover:opacity-80`}
+      title={`${String(count)}回書き込み — クリックで一覧`}
+    >
+      ({count})
+    </button>
+  );
+}
+
+/** F29: ワッチョイ estimation popup */
+function WatchoiPopup({ info, x, y, onClose }: {
+  readonly info: WatchoiInfo;
+  readonly x: number;
+  readonly y: number;
+  readonly onClose: () => void;
+}): React.JSX.Element {
+  const estimation = estimateFromWatchoi(info);
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        role="button"
+        tabIndex={-1}
+        aria-label="閉じる"
+      />
+      <div
+        className="fixed z-50 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 shadow-lg"
+        style={{ left: x, top: y }}
+      >
+        <h4 className="mb-2 text-xs font-bold text-[var(--color-text-primary)]">ワッチョイ分析</h4>
+        <table className="w-full text-xs text-[var(--color-text-secondary)]">
+          <tbody>
+            <tr><td className="pr-2 font-semibold">ラベル</td><td>{info.label}</td></tr>
+            <tr><td className="pr-2 font-semibold">回線種別</td><td>{estimation.connectionType}</td></tr>
+            <tr><td className="pr-2 font-semibold">UA推定</td><td>{estimation.uaHint}</td></tr>
+            <tr><td className="pr-2 font-semibold">IPハッシュ</td><td>{info.ipHash}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/** F28: IP info popup */
+function IpPopup({ ip, x, y, onClose }: {
+  readonly ip: string;
+  readonly x: number;
+  readonly y: number;
+  readonly onClose: () => void;
+}): React.JSX.Element {
+  const [info, setInfo] = useState<IpInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await fetchIpInfo(ip);
+        if (!cancelled) { setInfo(result); setLoading(false); }
+      } catch (err) {
+        if (!cancelled) { setError(err instanceof Error ? err.message : String(err)); setLoading(false); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ip]);
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40"
+        onClick={onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        role="button"
+        tabIndex={-1}
+        aria-label="閉じる"
+      />
+      <div
+        className="fixed z-50 min-w-52 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 shadow-lg"
+        style={{ left: x, top: y }}
+      >
+        <h4 className="mb-2 text-xs font-bold text-[var(--color-text-primary)]">IP情報: {ip}</h4>
+        {loading && <p className="text-xs text-[var(--color-text-muted)]">読み込み中...</p>}
+        {error !== null && <p className="text-xs text-[var(--color-error)]">{error}</p>}
+        {info !== null && (
+          <table className="w-full text-xs text-[var(--color-text-secondary)]">
+            <tbody>
+              <tr><td className="pr-2 font-semibold">国</td><td>{info.country}</td></tr>
+              <tr><td className="pr-2 font-semibold">地域</td><td>{info.region}</td></tr>
+              <tr><td className="pr-2 font-semibold">都市</td><td>{info.city}</td></tr>
+              <tr><td className="pr-2 font-semibold">ISP</td><td>{info.isp}</td></tr>
+              <tr><td className="pr-2 font-semibold">組織</td><td>{info.org}</td></tr>
+              <tr><td className="pr-2 font-semibold">AS</td><td>{info.as}</td></tr>
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  );
+}
+
 function ResItem({
   res,
   ngResult,
   highlightType,
+  showRelativeTime,
+  idCount,
+  watchoiCount,
+  kotehanCount,
   onAnchorHover,
   onAnchorLeave,
   onResNumberClick,
   onSetKokomade,
   onAddNgWord,
+  onFilterById,
+  onFilterByWatchoi,
+  onFilterByKotehan,
 }: {
   readonly res: Res;
   readonly ngResult: NgFilterResult;
   readonly highlightType: HighlightType;
+  readonly showRelativeTime: boolean;
+  readonly idCount: number;
+  readonly watchoiCount: number;
+  readonly kotehanCount: number;
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onAnchorLeave: () => void;
   readonly onResNumberClick: (resNumber: number) => void;
   readonly onSetKokomade: (resNumber: number) => void;
   readonly onAddNgWord: (selectedText: string) => void;
+  readonly onFilterById: (id: string) => void;
+  readonly onFilterByWatchoi: (label: string) => void;
+  readonly onFilterByKotehan: (name: string) => void;
 }): React.JSX.Element | null {
   // Transparent abon: completely hidden
   if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
@@ -131,8 +301,25 @@ function ResItem({
   }
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [watchoiPopup, setWatchoiPopup] = useState<{ info: WatchoiInfo; x: number; y: number } | null>(null);
+  const [ipPopup, setIpPopup] = useState<{ ip: string; x: number; y: number } | null>(null);
 
   const [selectedText, setSelectedText] = useState('');
+
+  // F31: extracted values for this res
+  const resId = useMemo(() => extractId(res), [res]);
+  const resWatchoi = useMemo(() => extractWatchoi(res), [res]);
+  const resKotehan = useMemo(() => extractKotehan(res), [res]);
+
+  // F28: Extract IPs
+  const resIps = useMemo(() => extractIps(res), [res]);
+
+  // F29: handle ワッチョイ click
+  const handleWatchoiClick = useCallback((e: React.MouseEvent) => {
+    if (resWatchoi === null) return;
+    e.stopPropagation();
+    setWatchoiPopup({ info: resWatchoi, x: e.clientX, y: e.clientY });
+  }, [resWatchoi]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -169,7 +356,7 @@ function ResItem({
     return () => { document.removeEventListener('click', handler); };
   }, [contextMenu]);
 
-  const bodyHtml = convertAnchorsToLinks(sanitizeHtml(res.body));
+  const bodyHtml = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
 
   // Detect image URLs in the body for inline thumbnails
   const images = useMemo(() => detectImageUrls(res.body), [res.body]);
@@ -194,6 +381,18 @@ function ResItem({
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target;
     if (!(target instanceof HTMLAnchorElement)) return;
+
+    // Handle external URL links
+    if (target.classList.contains('external-url')) {
+      e.preventDefault();
+      const url = target.dataset['url'];
+      if (url !== undefined && url.length > 0) {
+        void window.electronApi.invoke('shell:open-external', url);
+      }
+      return;
+    }
+
+    // Handle anchor links (>>N)
     if (!target.classList.contains('anchor-link')) return;
 
     e.preventDefault();
@@ -224,11 +423,43 @@ function ResItem({
         >
           {res.number}
         </button>
-        <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
+        <span className="inline-flex items-baseline gap-0.5">
+          <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
+          {resKotehan !== null && (
+            <CountBadge count={kotehanCount} onClick={() => { onFilterByKotehan(resKotehan); }} />
+          )}
+          {resWatchoi !== null && (
+            <button
+              type="button"
+              onClick={handleWatchoiClick}
+              className="ml-0.5 cursor-pointer text-[var(--color-link)] hover:underline"
+              title="ワッチョイ分析"
+            >
+              <CountBadge count={watchoiCount} onClick={() => { onFilterByWatchoi(resWatchoi.label); }} />
+            </button>
+          )}
+        </span>
         {res.mail.length > 0 && (
           <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
         )}
-        <span className="text-[var(--color-res-datetime)]">{renderDateTimeWithBe(res.dateTime, res.number)}</span>
+        <span className="inline-flex items-baseline gap-0.5 text-[var(--color-res-datetime)]">
+          {renderDateTimeWithBe(res.dateTime, res.number, showRelativeTime)}
+          {resId !== null && (
+            <CountBadge count={idCount} onClick={() => { onFilterById(resId); }} />
+          )}
+        </span>
+        {/* F28: Clickable IP addresses */}
+        {resIps.length > 0 && resIps.map((ip) => (
+          <button
+            key={ip}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIpPopup({ ip, x: e.clientX, y: e.clientY }); }}
+            className="rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-warning)] hover:underline"
+            title={`IP情報: ${ip}`}
+          >
+            {ip}
+          </button>
+        ))}
       </div>
       <div
         className="res-body text-sm leading-relaxed text-[var(--color-res-body)]"
@@ -241,7 +472,7 @@ function ResItem({
       {images.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {images.map((img) => (
-            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} />
+            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={images.map((i) => i.url)} />
           ))}
         </div>
       )}
@@ -270,6 +501,25 @@ function ResItem({
           >
             レスを引用 (&gt;&gt;{res.number})
           </button>
+          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+          {/* F18: Copy options */}
+          {([
+            { label: '名前をコピー', value: res.name.replace(/<[^>]+>/g, '') },
+            { label: '本文をコピー', value: res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&') },
+            { label: 'URLをコピー', value: (() => { const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return urls.join('\n'); })() },
+            { label: '名前+本文+URL', value: (() => { const n = res.name.replace(/<[^>]+>/g, ''); const b = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&'); const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return `${n}\n${b}${urls.length > 0 ? `\n${urls.join('\n')}` : ''}`; })() },
+            { label: '本文+URL', value: (() => { const b = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&'); const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return `${b}${urls.length > 0 ? `\n${urls.join('\n')}` : ''}`; })() },
+          ] as const).map((opt) => (
+            <button
+              key={opt.label}
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onClick={() => { void navigator.clipboard.writeText(opt.value.trim()); setContextMenu(null); }}
+              role="menuitem"
+            >
+              {opt.label}
+            </button>
+          ))}
           {selectedText.length > 0 && (
             <>
               <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
@@ -284,6 +534,26 @@ function ResItem({
             </>
           )}
         </div>
+      )}
+
+      {/* F29: ワッチョイ popup */}
+      {watchoiPopup !== null && (
+        <WatchoiPopup
+          info={watchoiPopup.info}
+          x={watchoiPopup.x}
+          y={watchoiPopup.y}
+          onClose={() => { setWatchoiPopup(null); }}
+        />
+      )}
+
+      {/* F28: IP info popup */}
+      {ipPopup !== null && (
+        <IpPopup
+          ip={ipPopup.ip}
+          x={ipPopup.x}
+          y={ipPopup.y}
+          onClose={() => { setIpPopup(null); }}
+        />
       )}
     </div>
   );
@@ -376,6 +646,8 @@ export function ThreadView(): React.JSX.Element {
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
   const togglePostEditor = useBBSStore((s) => s.togglePostEditor);
+  const [progPostOpen, setProgPostOpen] = useState(false);
+  const handleToggleProgPost = useCallback(() => { setProgPostOpen((p) => !p); }, []);
   const openPostEditorWithQuote = useBBSStore((s) => s.openPostEditorWithQuote);
   const ngRules = useBBSStore((s) => s.ngRules);
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
@@ -386,8 +658,111 @@ export function ThreadView(): React.JSX.Element {
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+
+  // Close tab context menu on click
+  useEffect(() => {
+    if (tabCtxMenu === null) return;
+    const handler = (): void => { setTabCtxMenu(null); };
+    document.addEventListener('click', handler);
+    return () => { document.removeEventListener('click', handler); };
+  }, [tabCtxMenu]);
+
+  const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
+  }, []);
+
+  const handleAddTabToRound = useCallback(() => {
+    if (tabCtxMenu === null) return;
+    const tab = tabs.find((t) => t.id === tabCtxMenu.tabId);
+    if (tab === undefined) return;
+    void window.electronApi.invoke('round:add-item', {
+      url: tab.boardUrl,
+      boardTitle: '',
+      fileName: `${tab.threadId}.dat`,
+      threadTitle: tab.title,
+      roundName: '',
+    });
+    setTabCtxMenu(null);
+  }, [tabCtxMenu, tabs]);
+
+  const RELATIVE_TIME_KEY = 'vbbb-relative-time';
+  const [showRelativeTime, setShowRelativeTime] = useState(() => {
+    try { return localStorage.getItem(RELATIVE_TIME_KEY) === 'true'; } catch { return false; }
+  });
+  const handleToggleRelativeTime = useCallback(() => {
+    setShowRelativeTime((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(RELATIVE_TIME_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  // F16: Analysis panel toggle
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const handleToggleAnalysis = useCallback(() => { setAnalysisOpen((p) => !p); }, []);
+
+  // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
+  const [filterKey, setFilterKey] = useState<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
+
+  const handleFilterById = useCallback((id: string) => {
+    setFilterKey((prev) => (prev?.type === 'id' && prev.value === id) ? null : { type: 'id', value: id });
+  }, []);
+  const handleFilterByWatchoi = useCallback((label: string) => {
+    setFilterKey((prev) => (prev?.type === 'watchoi' && prev.value === label) ? null : { type: 'watchoi', value: label });
+  }, []);
+  const handleFilterByKotehan = useCallback((name: string) => {
+    setFilterKey((prev) => (prev?.type === 'kotehan' && prev.value === name) ? null : { type: 'kotehan', value: name });
+  }, []);
+  const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // F31: Pre-compute ID/ワッチョイ/コテハン count maps
+  const idCountMap = useMemo(() => {
+    if (activeTab === undefined) return new Map<string, { count: number; resNumbers: number[] }>();
+    return buildCountMap(activeTab.responses, extractId);
+  }, [activeTab]);
+
+  const watchoiCountMap = useMemo(() => {
+    if (activeTab === undefined) return new Map<string, { count: number; resNumbers: number[] }>();
+    return buildCountMap(activeTab.responses, (r) => {
+      const info = extractWatchoi(r);
+      return info !== null ? info.label : null;
+    });
+  }, [activeTab]);
+
+  const kotehanCountMap = useMemo(() => {
+    if (activeTab === undefined) return new Map<string, { count: number; resNumbers: number[] }>();
+    return buildCountMap(activeTab.responses, extractKotehan);
+  }, [activeTab]);
+
+  // F35: Check if thread has exposed IPs (for privacy warning in PostEditor)
+  const hasExposedIps = useMemo(() => {
+    if (activeTab === undefined) return false;
+    return threadHasExposedIps(activeTab.responses);
+  }, [activeTab]);
+
+  // F31: Filter responses if filter is active
+  const filteredResNumbers = useMemo<ReadonlySet<number> | null>(() => {
+    if (filterKey === null || activeTab === undefined) return null;
+    const set = new Set<number>();
+    for (const res of activeTab.responses) {
+      if (filterKey.type === 'id') {
+        const id = extractId(res);
+        if (id === filterKey.value) set.add(res.number);
+      } else if (filterKey.type === 'watchoi') {
+        const w = extractWatchoi(res);
+        if (w !== null && w.label === filterKey.value) set.add(res.number);
+      } else if (filterKey.type === 'kotehan') {
+        const k = extractKotehan(res);
+        if (k === filterKey.value) set.add(res.number);
+      }
+    }
+    return set;
+  }, [filterKey, activeTab]);
 
   // Pre-compute NG results for all responses in active tab
   const ngResults = useMemo(() => {
@@ -506,6 +881,14 @@ export function ThreadView(): React.JSX.Element {
     }
   }, [activeTabId, updateTabKokomade]);
 
+  // F16: Scroll to a specific response number
+  const handleScrollToRes = useCallback((resNumber: number) => {
+    const el = document.getElementById(`res-${String(resNumber)}`);
+    if (el !== null) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
   const handleAddNgWord = useCallback((selectedText: string) => {
     if (activeTab === undefined) return;
     const boardId = extractBoardId(activeTab.boardUrl);
@@ -524,6 +907,7 @@ export function ThreadView(): React.JSX.Element {
               tabIndex={0}
               onClick={() => { setActiveTab(tab.id); }}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
+              onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
               className={`group flex max-w-48 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-1 text-xs ${
                 tab.id === activeTabId
                   ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
@@ -547,6 +931,16 @@ export function ThreadView(): React.JSX.Element {
           <div className="mr-2 flex items-center gap-1">
             <button
               type="button"
+              onClick={handleToggleRelativeTime}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+              }`}
+              title={showRelativeTime ? '相対時刻: ON' : '相対時刻: OFF'}
+            >
+              <MdiIcon path={mdiClockOutline} size={14} />
+            </button>
+            <button
+              type="button"
               onClick={handleToggleHighlight}
               className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
                 highlightSettings.highlightOwnPosts ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]' : ''
@@ -554,6 +948,16 @@ export function ThreadView(): React.JSX.Element {
               title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
             >
               <MdiIcon path={mdiFormatColorHighlight} size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleAnalysis}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                analysisOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+              }`}
+              title="スレッド分析"
+            >
+              <MdiIcon path={mdiChartBar} size={14} />
             </button>
             <button
               type="button"
@@ -575,6 +979,16 @@ export function ThreadView(): React.JSX.Element {
             >
               <MdiIcon path={mdiPencil} size={14} />
             </button>
+            <button
+              type="button"
+              onClick={handleToggleProgPost}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+              }`}
+              title="プログラマティック書き込み"
+            >
+              <MdiIcon path={mdiRobot} size={14} />
+            </button>
           </div>
         )}
       </div>
@@ -593,39 +1007,103 @@ export function ThreadView(): React.JSX.Element {
               <p className="text-xs text-[var(--color-text-muted)]">{activeTab.responses.length} レス</p>
             </div>
 
+            {/* F31: Filter banner */}
+            {filterKey !== null && (
+              <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-4 py-1">
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  フィルタ: {filterKey.type === 'id' ? 'ID' : filterKey.type === 'watchoi' ? 'ワッチョイ' : 'コテハン'} = {filterKey.value}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearFilter}
+                  className="rounded px-1.5 py-0.5 text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"
+                >
+                  解除
+                </button>
+              </div>
+            )}
+
             {/* Responses */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              {activeTab.responses.map((res) => (
-                <div key={res.number}>
-                  {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
-                    <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
-                      <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
-                    </div>
-                  )}
-                  <ResItem
-                    res={res}
-                    ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
-                    highlightType={getHighlightType(res.number)}
-                    onAnchorHover={handleAnchorHover}
-                    onAnchorLeave={handleAnchorLeave}
-                    onResNumberClick={handleResNumberClick}
-                    onSetKokomade={handleSetKokomade}
-                    onAddNgWord={handleAddNgWord}
-                  />
-                </div>
-              ))}
+              {activeTab.responses.map((res) => {
+                // F31: skip non-matching responses when filter is active
+                if (filteredResNumbers !== null && !filteredResNumbers.has(res.number)) return null;
+
+                const resIdVal = extractId(res);
+                const resWatchoiVal = extractWatchoi(res);
+                const resKotehanVal = extractKotehan(res);
+
+                return (
+                  <div key={res.number}>
+                    {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
+                      <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
+                        <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
+                      </div>
+                    )}
+                    <ResItem
+                      res={res}
+                      ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
+                      highlightType={getHighlightType(res.number)}
+                      showRelativeTime={showRelativeTime}
+                      idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
+                      watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
+                      kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
+                      onAnchorHover={handleAnchorHover}
+                      onAnchorLeave={handleAnchorLeave}
+                      onResNumberClick={handleResNumberClick}
+                      onSetKokomade={handleSetKokomade}
+                      onAddNgWord={handleAddNgWord}
+                      onFilterById={handleFilterById}
+                      onFilterByWatchoi={handleFilterByWatchoi}
+                      onFilterByKotehan={handleFilterByKotehan}
+                    />
+                  </div>
+                );
+              })}
             </div>
+
+            {/* F16: Thread Analysis Panel */}
+            {analysisOpen && (
+              <ThreadAnalysis
+                responses={activeTab.responses}
+                onClose={handleToggleAnalysis}
+                onScrollToRes={handleScrollToRes}
+              />
+            )}
 
             {/* NG Editor */}
             {ngEditorOpen && <NgEditor />}
 
             {/* Post editor */}
             {postEditorOpen && (
-              <PostEditor boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} />
+              <PostEditor boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} hasExposedIps={hasExposedIps} />
+            )}
+
+            {/* F26: Programmatic post editor */}
+            {progPostOpen && (
+              <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} />
             )}
           </>
         )}
       </div>
+
+      {/* Thread tab context menu (F12) */}
+      {tabCtxMenu !== null && (
+        <div
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          style={{ left: tabCtxMenu.x, top: tabCtxMenu.y }}
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleAddTabToRound}
+            role="menuitem"
+          >
+            巡回に追加
+          </button>
+        </div>
+      )}
 
       {/* Anchor popup */}
       {popup !== null && activeTab !== undefined && (

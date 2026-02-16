@@ -72,7 +72,13 @@ export function loadSessionState(dataDir: string): SessionState {
   try {
     const parsed = JSON.parse(content.toString('utf-8')) as Record<string, unknown>;
     const boardUrl = typeof parsed['selectedBoardUrl'] === 'string' ? parsed['selectedBoardUrl'] : null;
-    return { selectedBoardUrl: boardUrl };
+    const activeThreadTabId = typeof parsed['activeThreadTabId'] === 'string' ? parsed['activeThreadTabId'] : undefined;
+    const rawBoardTabUrls = parsed['boardTabUrls'];
+    const boardTabUrls = Array.isArray(rawBoardTabUrls)
+      ? (rawBoardTabUrls as unknown[]).filter((u): u is string => typeof u === 'string')
+      : undefined;
+    const activeBoardTabId = typeof parsed['activeBoardTabId'] === 'string' ? parsed['activeBoardTabId'] : undefined;
+    return { selectedBoardUrl: boardUrl, activeThreadTabId, boardTabUrls, activeBoardTabId };
   } catch {
     return { selectedBoardUrl: null };
   }

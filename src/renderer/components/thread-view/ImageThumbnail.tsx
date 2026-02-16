@@ -9,12 +9,14 @@ import { ImageModal } from './ImageModal';
 interface ImageThumbnailProps {
   readonly url: string;
   readonly displayUrl: string;
+  /** All image URLs in the context (for keyboard navigation in modal) */
+  readonly allImageUrls?: readonly string[] | undefined;
 }
 
 const THUMBNAIL_MAX_WIDTH = 200;
 const THUMBNAIL_MAX_HEIGHT = 200;
 
-export function ImageThumbnail({ url, displayUrl }: ImageThumbnailProps): React.JSX.Element {
+export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnailProps): React.JSX.Element {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -70,7 +72,7 @@ export function ImageThumbnail({ url, displayUrl }: ImageThumbnailProps): React.
         </button>
       </span>
 
-      {modalOpen && <ImageModal url={url} onClose={handleCloseModal} />}
+      {modalOpen && <ImageModal url={url} allImageUrls={allImageUrls} onClose={handleCloseModal} />}
     </>
   );
 }

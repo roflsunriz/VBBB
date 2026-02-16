@@ -15,6 +15,7 @@ interface FavCtxMenu {
   readonly y: number;
   readonly nodeId: string;
   readonly nodeTitle: string;
+  readonly node: FavNode;
 }
 
 function FavItemRow({
@@ -26,7 +27,7 @@ function FavItemRow({
   readonly item: FavItem;
   readonly depth: number;
   readonly onRemove: (id: string) => void;
-  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, node: FavNode) => void;
 }): React.JSX.Element {
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
@@ -66,7 +67,7 @@ function FavItemRow({
     <div
       className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
       style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
-      onContextMenu={(e) => { onContextMenu(e, item.id, item.title); }}
+      onContextMenu={(e) => { onContextMenu(e, item); }}
     >
       <button
         type="button"
@@ -99,14 +100,14 @@ function FavFolderRow({
   readonly depth: number;
   readonly onToggle: (id: string) => void;
   readonly onRemove: (id: string) => void;
-  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, node: FavNode) => void;
 }): React.JSX.Element {
   return (
     <>
       <div
         className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
         style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
-        onContextMenu={(e) => { onContextMenu(e, folder.id, folder.title); }}
+        onContextMenu={(e) => { onContextMenu(e, folder); }}
       >
         <button
           type="button"
@@ -147,7 +148,7 @@ function FavNodeRow({
   readonly depth: number;
   readonly onToggle: (id: string) => void;
   readonly onRemove: (id: string) => void;
-  readonly onContextMenu: (e: React.MouseEvent, id: string, title: string) => void;
+  readonly onContextMenu: (e: React.MouseEvent, node: FavNode) => void;
 }): React.JSX.Element {
   if (node.kind === 'folder') {
     return <FavFolderRow folder={node} depth={depth} onToggle={onToggle} onRemove={onRemove} onContextMenu={onContextMenu} />;
@@ -196,10 +197,11 @@ export function FavoriteTree(): React.JSX.Element {
     void removeFavorite(nodeId);
   }, [removeFavorite]);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string, nodeTitle: string) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: FavNode) => {
     e.preventDefault();
     e.stopPropagation();
-    setCtxMenu({ x: e.clientX, y: e.clientY, nodeId, nodeTitle });
+    const title = node.kind === 'folder' ? node.title : node.title;
+    setCtxMenu({ x: e.clientX, y: e.clientY, nodeId: node.id, nodeTitle: title, node });
   }, []);
 
   const handleCtxRemove = useCallback(() => {
@@ -208,6 +210,29 @@ export function FavoriteTree(): React.JSX.Element {
     }
     setCtxMenu(null);
   }, [ctxMenu, removeFavorite]);
+
+  const handleCtxAddToRound = useCallback(() => {
+    if (ctxMenu === null) return;
+    const node = ctxMenu.node;
+    if (node.kind === 'item') {
+      if (node.type === 'board') {
+        void window.electronApi.invoke('round:add-board', {
+          url: node.url,
+          boardTitle: node.title,
+          roundName: '',
+        });
+      } else {
+        void window.electronApi.invoke('round:add-item', {
+          url: node.url,
+          boardTitle: '',
+          fileName: '',
+          threadTitle: node.title,
+          roundName: '',
+        });
+      }
+    }
+    setCtxMenu(null);
+  }, [ctxMenu]);
 
   return (
     <div className="flex flex-col">
@@ -237,6 +262,16 @@ export function FavoriteTree(): React.JSX.Element {
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           role="menu"
         >
+          {ctxMenu.node.kind === 'item' && (
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onClick={handleCtxAddToRound}
+              role="menuitem"
+            >
+              巡回に追加
+            </button>
+          )}
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"

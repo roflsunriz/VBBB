@@ -14,8 +14,28 @@ import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
-type SortKey = 'index' | 'title' | 'count';
+type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate' | 'newCount';
 type SortDir = 'asc' | 'desc';
+
+/** Compute thread momentum (勢い): posts per day */
+function computeIkioi(fileName: string, count: number): number {
+  const threadTs = parseInt(fileName.replace('.dat', ''), 10);
+  if (Number.isNaN(threadTs) || threadTs <= 0) return 0;
+  const elapsedDays = (Date.now() / 1000 - threadTs) / 86400;
+  if (elapsedDays <= 0) return 0;
+  return count / elapsedDays;
+}
+
+/** Format a Unix timestamp to locale date string */
+function formatTimestamp(ts: number): string {
+  if (ts <= 0) return '';
+  const d = new Date(ts * 1000);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${month}/${day} ${hours}:${mins}`;
+}
 
 function ageSageBadge(ageSage: number | undefined): React.JSX.Element | null {
   switch (ageSage) {
@@ -75,6 +95,15 @@ export function ThreadList(): React.JSX.Element {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filter, setFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
+  const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+
+  // Close board tab context menu on click
+  useEffect(() => {
+    if (boardTabCtxMenu === null) return;
+    const handler = (): void => { setBoardTabCtxMenu(null); };
+    document.addEventListener('click', handler);
+    return () => { document.removeEventListener('click', handler); };
+  }, [boardTabCtxMenu]);
 
   // Close context menu on click
   useEffect(() => {
@@ -136,8 +165,18 @@ export function ThreadList(): React.JSX.Element {
     }
   }, [selectedBoard]);
 
+  // Deduplicate subjects by fileName to prevent duplicate threads from appearing
+  const uniqueSubjects = useMemo(() => {
+    const seen = new Set<string>();
+    return subjects.filter((s) => {
+      if (seen.has(s.fileName)) return false;
+      seen.add(s.fileName);
+      return true;
+    });
+  }, [subjects]);
+
   const filteredSubjects = useMemo(() => {
-    let result = subjects;
+    let result = uniqueSubjects;
 
     // Text filter
     if (filter.trim().length > 0) {
@@ -160,7 +199,7 @@ export function ThreadList(): React.JSX.Element {
     }
 
     return result;
-  }, [subjects, filter, threadNgRules, currentBoardId]);
+  }, [uniqueSubjects, filter, threadNgRules, currentBoardId]);
 
   // Check if a thread is NG'd (normal abon - show as placeholder)
   const normalAbonThreads = useMemo(() => {
@@ -179,7 +218,13 @@ export function ThreadList(): React.JSX.Element {
   }, [subjects, threadNgRules, currentBoardId]);
 
   const sortedSubjects = useMemo(() => {
-    const items = filteredSubjects.map((s, i) => ({ ...s, originalIndex: i }));
+    const items = filteredSubjects.map((s, i) => ({
+      ...s,
+      originalIndex: i,
+      ikioi: computeIkioi(s.fileName, s.count),
+      completionRate: (s.count / 1000) * 100,
+      firstPostTs: parseInt(s.fileName.replace('.dat', ''), 10) || 0,
+    }));
     items.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -192,11 +237,26 @@ export function ThreadList(): React.JSX.Element {
         case 'count':
           cmp = a.count - b.count;
           break;
+        case 'ikioi':
+          cmp = a.ikioi - b.ikioi;
+          break;
+        case 'completionRate':
+          cmp = a.completionRate - b.completionRate;
+          break;
+        case 'firstPostDate':
+          cmp = a.firstPostTs - b.firstPostTs;
+          break;
+        case 'newCount': {
+          const na = newCountMap.get(a.fileName) ?? 0;
+          const nb = newCountMap.get(b.fileName) ?? 0;
+          cmp = na - nb;
+          break;
+        }
       }
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return items;
-  }, [filteredSubjects, sortKey, sortDir]);
+  }, [filteredSubjects, sortKey, sortDir, newCountMap]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -354,10 +414,48 @@ export function ThreadList(): React.JSX.Element {
     [closeBoardTab],
   );
 
+  const handleBoardTabContextMenu = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setBoardTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
+    },
+    [],
+  );
+
+  const handleAddBoardToRound = useCallback(() => {
+    if (boardTabCtxMenu === null) return;
+    const bt = boardTabs.find((t) => t.id === boardTabCtxMenu.tabId);
+    if (bt === undefined) return;
+    void window.electronApi.invoke('round:add-board', {
+      url: bt.board.url,
+      boardTitle: bt.board.title,
+      roundName: '',
+    });
+    setBoardTabCtxMenu(null);
+  }, [boardTabCtxMenu, boardTabs]);
+
+  // F24: Add board tab to favorites
+  const handleAddBoardToFavorite = useCallback(() => {
+    if (boardTabCtxMenu === null) return;
+    const bt = boardTabs.find((t) => t.id === boardTabCtxMenu.tabId);
+    if (bt === undefined) return;
+    const node: FavItem = {
+      id: `fav-board-${String(Date.now())}`,
+      kind: 'item',
+      type: 'board',
+      boardType: bt.board.boardType ?? BoardType.Type2ch,
+      url: bt.board.url,
+      title: bt.board.title,
+    };
+    void addFavorite(node);
+    setBoardTabCtxMenu(null);
+  }, [boardTabCtxMenu, boardTabs, addFavorite]);
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col">
       {/* Board tabs */}
-      {boardTabs.length > 1 && (
+      {boardTabs.length > 0 && (
         <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
           <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
             {boardTabs.map((bt) => (
@@ -367,6 +465,7 @@ export function ThreadList(): React.JSX.Element {
                 tabIndex={0}
                 onClick={() => { setActiveBoardTab(bt.id); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
+                onContextMenu={(e) => { handleBoardTabContextMenu(e, bt.id); }}
                 className={`group flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-0.5 text-xs ${
                   bt.id === activeBoardTabId
                     ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
@@ -428,18 +527,27 @@ export function ThreadList(): React.JSX.Element {
       )}
 
       {/* Table header */}
-      <div className="flex h-6 items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-3">
-        <div className="w-10">
+      <div className="flex h-6 items-center gap-1 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-3">
+        <div className="w-8">
           <SortHeader label="#" field="index" />
         </div>
-        <div className="w-6" />
+        <div className="w-5" />
         <div className="min-w-0 flex-1">
           <SortHeader label="タイトル" field="title" />
         </div>
-        <div className="w-10 text-right">
-          <span className="text-xs text-[var(--color-text-muted)]">新着</span>
+        <div className="w-12 text-right">
+          <SortHeader label="勢い" field="ikioi" />
         </div>
-        <div className="w-14 text-right">
+        <div className="w-10 text-right">
+          <SortHeader label="完走" field="completionRate" />
+        </div>
+        <div className="w-16 text-right">
+          <SortHeader label="作成日" field="firstPostDate" />
+        </div>
+        <div className="w-10 text-right">
+          <SortHeader label="新着" field="newCount" />
+        </div>
+        <div className="w-12 text-right">
           <SortHeader label="レス" field="count" />
         </div>
         <div className="w-6" />
@@ -461,10 +569,10 @@ export function ThreadList(): React.JSX.Element {
             return (
               <div
                 key={subject.fileName}
-                className="flex w-full items-center gap-2 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
+                className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
                 onContextMenu={(e) => { handleContextMenu(e, subject); }}
               >
-                <span className="w-10 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
+                <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
                 <span className="min-w-0 flex-1 truncate text-[var(--color-res-abon)]">あぼーん</span>
               </div>
             );
@@ -476,11 +584,22 @@ export function ThreadList(): React.JSX.Element {
               type="button"
               onClick={() => { handleOpenThread(subject); }}
               onContextMenu={(e) => { handleContextMenu(e, subject); }}
-              className="flex w-full items-center gap-2 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
+              className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
             >
-              <span className="w-10 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
-              <span className="w-6 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
+              <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
+              <span className="w-5 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
               <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]">{subject.title}</span>
+              <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                {subject.ikioi >= 1 ? String(Math.round(subject.ikioi)) : subject.ikioi.toFixed(1)}
+              </span>
+              <span className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
+                {subject.completionRate >= 100
+                  ? '100%'
+                  : `${subject.completionRate.toFixed(0)}%`}
+              </span>
+              <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
+                {formatTimestamp(subject.firstPostTs)}
+              </span>
               <span className="w-10 shrink-0 text-right">
                 {newCount !== undefined && newCount > 0 && (
                   <span className="rounded bg-[var(--color-accent)] px-1 py-0.5 text-[10px] font-bold text-white">
@@ -488,7 +607,7 @@ export function ThreadList(): React.JSX.Element {
                   </span>
                 )}
               </span>
-              <span className="w-14 shrink-0 text-right text-[var(--color-text-muted)]">{subject.count}</span>
+              <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">{subject.count}</span>
               <span
                 className="w-6 shrink-0 cursor-pointer text-center"
                 onClick={(e) => { handleAddFavorite(e, subject); }}
@@ -506,6 +625,32 @@ export function ThreadList(): React.JSX.Element {
           );
         })}
       </div>
+
+      {/* Board tab context menu (F13 + F24) */}
+      {boardTabCtxMenu !== null && (
+        <div
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          style={{ left: boardTabCtxMenu.x, top: boardTabCtxMenu.y }}
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleAddBoardToFavorite}
+            role="menuitem"
+          >
+            お気に入りに追加
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleAddBoardToRound}
+            role="menuitem"
+          >
+            巡回に追加
+          </button>
+        </div>
+      )}
 
       {/* Context menu */}
       {ctxMenu !== null && (

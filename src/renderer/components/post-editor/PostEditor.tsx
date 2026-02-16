@@ -5,7 +5,7 @@
  * Displays Samba timer countdown when posting interval is restricted.
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { mdiSend, mdiLoading, mdiTimerSand, mdiTree } from '@mdi/js';
+import { mdiSend, mdiLoading, mdiTimerSand, mdiTree, mdiHelpCircleOutline } from '@mdi/js';
 import type { DonguriState } from '@shared/auth';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -13,6 +13,18 @@ import { MdiIcon } from '../common/MdiIcon';
 interface PostEditorProps {
   readonly boardUrl: string;
   readonly threadId: string;
+  readonly hasExposedIps?: boolean | undefined;
+}
+
+const AUTO_CLOSE_KEY = 'vbbb-post-auto-close';
+
+function loadAutoClose(): boolean {
+  try {
+    const raw = localStorage.getItem(AUTO_CLOSE_KEY);
+    return raw !== 'false';
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -25,7 +37,7 @@ function calcSambaRemaining(interval: number, lastPostTime: string | null): numb
   return remaining > 0 ? Math.ceil(remaining) : 0;
 }
 
-export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.Element {
+export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProps): React.JSX.Element {
   const kotehan = useBBSStore((s) => s.kotehan);
   const sambaInfo = useBBSStore((s) => s.sambaInfo);
   const saveKotehan = useBBSStore((s) => s.saveKotehan);
@@ -59,6 +71,9 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
   const [resultMessage, setResultMessage] = useState('');
   const [sambaRemaining, setSambaRemaining] = useState(0);
   const [donguriState, setDonguriState] = useState<DonguriState>({ status: 'none', message: '' });
+  const [autoClose, setAutoClose] = useState(loadAutoClose);
+  const [tripHelpOpen, setTripHelpOpen] = useState(false);
+  const [donguriPopupOpen, setDonguriPopupOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -152,11 +167,13 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
           message,
         });
 
-        // Auto-refresh thread and close editor after brief delay
+        // Auto-refresh thread and conditionally close editor
         void refreshActiveThread();
-        setTimeout(() => {
-          closePostEditor();
-        }, 800);
+        if (autoClose) {
+          setTimeout(() => {
+            closePostEditor();
+          }, 800);
+        }
       } else {
         // Update donguri state on relevant result types
         if (result.resultType === 'grtDonguri' || result.resultType === 'grtDngBroken') {
@@ -176,7 +193,7 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, sambaRemaining, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -191,14 +208,56 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
 
   return (
     <div className="border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
-      <div className="mb-2 flex gap-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => { setName(e.target.value); }}
-          placeholder="名前"
-          className="w-32 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
-        />
+      {/* F35: IP privacy warning */}
+      {hasExposedIps === true && (
+        <div className="mb-2 flex items-center gap-2 rounded border border-[var(--color-error)] bg-[var(--color-error)]/10 px-3 py-1.5">
+          <span className="text-xs font-bold text-[var(--color-error)]">⚠ プライバシー警告</span>
+          <span className="text-xs text-[var(--color-text-secondary)]">
+            このスレッドではIPアドレスが表示されています。書き込むとあなたのIPアドレスも公開される可能性があります。
+          </span>
+        </div>
+      )}
+      <div className="mb-2 flex flex-wrap gap-2">
+        <div className="relative flex items-center gap-0.5">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => { setName(e.target.value); }}
+            placeholder="名前"
+            className="w-32 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+          />
+          {/* F30: Trip help button */}
+          <button
+            type="button"
+            onClick={() => { setTripHelpOpen((p) => !p); }}
+            className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-accent)]"
+            title="トリップについて"
+          >
+            <MdiIcon path={mdiHelpCircleOutline} size={12} />
+          </button>
+          {tripHelpOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg">
+              <h4 className="mb-1 font-bold text-[var(--color-text-primary)]">トリップの使い方</h4>
+              <p className="mb-1 text-[var(--color-text-secondary)]">
+                名前欄に <code className="rounded bg-[var(--color-bg-tertiary)] px-1">名前#パスワード</code> と入力すると、
+                パスワードからトリップ（固有ID）が生成されます。
+              </p>
+              <ul className="ml-3 list-disc space-y-0.5 text-[var(--color-text-muted)]">
+                <li><code>#</code> の後に好きな文字列を入力</li>
+                <li>8文字以下は10桁トリップ</li>
+                <li>12文字以上で <code>##</code> を使うと新方式トリップ</li>
+                <li>同じパスワードなら常に同じトリップになります</li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => { setTripHelpOpen(false); }}
+                className="mt-2 w-full rounded bg-[var(--color-bg-hover)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+              >
+                閉じる
+              </button>
+            </div>
+          )}
+        </div>
         <input
           type="text"
           value={mail}
@@ -212,24 +271,82 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
             あと {sambaRemaining} 秒
           </span>
         )}
-        {donguriState.status !== 'none' && (
-          <span className={`flex items-center gap-1 text-xs ${
-            donguriState.status === 'active' ? 'text-green-400' :
-            donguriState.status === 'broken' ? 'text-[var(--color-error)]' :
-            donguriState.status === 'consumed' ? 'text-[var(--color-warning)]' :
-            'text-[var(--color-text-muted)]'
-          }`}>
+        {/* F34: Donguri status (clickable for popup) */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => { setDonguriPopupOpen((p) => !p); }}
+            className={`flex items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-[var(--color-bg-hover)] ${
+              donguriState.status === 'active' ? 'text-green-400' :
+              donguriState.status === 'broken' ? 'text-[var(--color-error)]' :
+              donguriState.status === 'consumed' ? 'text-[var(--color-warning)]' :
+              'text-[var(--color-text-muted)]'
+            }`}
+            title="どんぐりステータス"
+          >
             <MdiIcon path={mdiTree} size={12} />
             {donguriState.status === 'active' ? 'どんぐり' :
              donguriState.status === 'broken' ? 'どんぐり破損' :
-             donguriState.status === 'consumed' ? 'どんぐり消費済み' : ''}
-          </span>
-        )}
+             donguriState.status === 'consumed' ? 'どんぐり消費済み' :
+             donguriState.status === 'none' ? 'どんぐり未取得' : ''}
+          </button>
+          {donguriPopupOpen && (
+            <div className="absolute bottom-full left-0 z-50 mb-1 w-64 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg">
+              <h4 className="mb-1 font-bold text-[var(--color-text-primary)]">どんぐりステータス</h4>
+              <table className="w-full text-[var(--color-text-secondary)]">
+                <tbody>
+                  <tr>
+                    <td className="pr-2 font-semibold">状態</td>
+                    <td className={
+                      donguriState.status === 'active' ? 'text-green-400' :
+                      donguriState.status === 'broken' ? 'text-[var(--color-error)]' :
+                      donguriState.status === 'consumed' ? 'text-[var(--color-warning)]' :
+                      'text-[var(--color-text-muted)]'
+                    }>
+                      {donguriState.status === 'active' ? 'アクティブ' :
+                       donguriState.status === 'broken' ? '破損' :
+                       donguriState.status === 'consumed' ? '消費済み' :
+                       '未取得'}
+                    </td>
+                  </tr>
+                  {donguriState.message.length > 0 && (
+                    <tr>
+                      <td className="pr-2 font-semibold">メッセージ</td>
+                      <td>{donguriState.message}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[var(--color-text-muted)]">
+                どんぐりはCookieベースの投稿認証です。5chが発行するacorn Cookieが有効な場合に「アクティブ」になります。
+              </p>
+              <button
+                type="button"
+                onClick={() => { setDonguriPopupOpen(false); }}
+                className="mt-2 w-full rounded bg-[var(--color-bg-hover)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+              >
+                閉じる
+              </button>
+            </div>
+          )}
+        </div>
+        <label className="ml-auto flex cursor-pointer items-center gap-1 text-xs text-[var(--color-text-muted)]">
+          <input
+            type="checkbox"
+            checked={autoClose}
+            onChange={(e) => {
+              setAutoClose(e.target.checked);
+              try { localStorage.setItem(AUTO_CLOSE_KEY, String(e.target.checked)); } catch { /* ignore */ }
+            }}
+            className="accent-[var(--color-accent)]"
+          />
+          自動で閉じる
+        </label>
         <button
           type="button"
           onClick={() => { void handlePost(); }}
           disabled={isDisabled}
-          className="ml-auto flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
+          className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
         >
           <MdiIcon path={posting ? mdiLoading : mdiSend} size={12} className={posting ? 'animate-spin' : ''} />
           書き込む

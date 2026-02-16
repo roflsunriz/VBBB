@@ -13,11 +13,13 @@ import {
   mdiCookie,
   mdiConsoleLine,
   mdiLinkPlus,
+  mdiHistory,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
 import { FavoriteTree } from './components/favorite-tree/FavoriteTree';
 import { SearchPanel } from './components/search/SearchPanel';
+import { HistoryPanel } from './components/history/HistoryPanel';
 import { ThreadList } from './components/thread-list/ThreadList';
 import { ThreadView } from './components/thread-view/ThreadView';
 import { AuthPanel } from './components/auth/AuthPanel';
@@ -32,7 +34,7 @@ import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
-type LeftPaneTab = 'boards' | 'favorites' | 'search';
+type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
 type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | null;
 
 const LEFT_PANE_MIN = 160;
@@ -90,10 +92,12 @@ export function App(): React.JSX.Element {
     const handleBeforeUnload = (): void => {
       const state = useBBSStore.getState();
       void state.saveTabs();
-      // Save active thread tab ID in session state
+      // Save session state including board tabs for F27 restore
       void window.electronApi.invoke('session:save', {
         selectedBoardUrl: state.selectedBoard?.url ?? null,
         activeThreadTabId: state.activeTabId ?? undefined,
+        boardTabUrls: state.boardTabs.map((t) => t.board.url),
+        activeBoardTabId: state.activeBoardTabId ?? undefined,
       });
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -141,7 +145,7 @@ export function App(): React.JSX.Element {
               void useBBSStore.getState().fetchMenu();
               break;
             case 'switch-tab':
-              if (action.tab === 'boards' || action.tab === 'favorites' || action.tab === 'search') {
+              if (action.tab === 'boards' || action.tab === 'favorites' || action.tab === 'search' || action.tab === 'history') {
                 setLeftTabRef.current(action.tab);
               }
               break;
@@ -176,6 +180,7 @@ export function App(): React.JSX.Element {
   const switchToBoards = useCallback(() => { setLeftTab('boards'); }, []);
   const switchToFavorites = useCallback(() => { setLeftTab('favorites'); }, []);
   const switchToSearch = useCallback(() => { setLeftTab('search'); }, []);
+  const switchToHistory = useCallback(() => { setLeftTab('history'); }, []);
   const closeSearch = useCallback(() => { setLeftTab('boards'); }, []);
   const closeModal = useCallback(() => { setActiveModal(null); }, []);
 
@@ -350,12 +355,25 @@ export function App(): React.JSX.Element {
               <MdiIcon path={mdiMagnify} size={12} />
               検索
             </button>
+            <button
+              type="button"
+              onClick={switchToHistory}
+              className={`flex flex-1 items-center justify-center gap-1 text-xs ${
+                leftTab === 'history'
+                  ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+              }`}
+            >
+              <MdiIcon path={mdiHistory} size={12} />
+              履歴
+            </button>
           </div>
           {/* Tab content */}
           <div className="flex-1 overflow-hidden">
             {leftTab === 'boards' && <BoardTree />}
             {leftTab === 'favorites' && <FavoriteTree />}
             {leftTab === 'search' && <SearchPanel onClose={closeSearch} />}
+            {leftTab === 'history' && <HistoryPanel />}
           </div>
         </aside>
 

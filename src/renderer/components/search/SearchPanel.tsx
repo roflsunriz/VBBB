@@ -3,14 +3,37 @@
  * Supports local DAT search and remote ff5ch.syoboi.jp search.
  * Remote search renders results in a webview.
  */
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { mdiMagnify, mdiClose } from '@mdi/js';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { mdiMagnify, mdiClose, mdiShieldCheck } from '@mdi/js';
 import type { SearchResult, SearchTarget } from '@shared/search';
 import { parseThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
 type SearchMode = 'local' | 'remote';
+
+/** F6: Default ad block CSS rules for ff5ch.syoboi.jp */
+const AD_BLOCK_KEY = 'vbbb-adblock-enabled';
+const AD_BLOCK_RULES_KEY = 'vbbb-adblock-rules';
+const DEFAULT_AD_RULES = [
+  'iframe[src*="ad"]',
+  'div[class*="ad"]',
+  'div[id*="ad"]',
+  'ins.adsbygoogle',
+  '.advertisement',
+  '.ad-banner',
+  '[data-ad]',
+  'div[class*="sponsor"]',
+  'div[class*="promo"]',
+].join('\n');
+
+function loadAdBlockEnabled(): boolean {
+  try { return localStorage.getItem(AD_BLOCK_KEY) !== 'false'; } catch { return true; }
+}
+
+function loadAdBlockRules(): string {
+  try { return localStorage.getItem(AD_BLOCK_RULES_KEY) ?? DEFAULT_AD_RULES; } catch { return DEFAULT_AD_RULES; }
+}
 
 export function SearchPanel({ onClose }: { readonly onClose: () => void }): React.JSX.Element {
   const [mode, setMode] = useState<SearchMode>('local');
@@ -25,27 +48,66 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
   const selectedBoard = useBBSStore((s) => s.selectedBoard);
   const openThread = useBBSStore((s) => s.openThread);
   const webviewRef = useRef<HTMLElement>(null);
+  const [adBlockEnabled, setAdBlockEnabled] = useState(loadAdBlockEnabled);
+  const [adBlockRules, setAdBlockRules] = useState(loadAdBlockRules);
+  const [adBlockEditorOpen, setAdBlockEditorOpen] = useState(false);
 
-  // Intercept navigation in webview to open 5ch threads in VBBB
+  // F6: Build CSS from ad block rules
+  const adBlockCss = useMemo(() => {
+    if (!adBlockEnabled) return '';
+    return adBlockRules
+      .split('\n')
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0)
+      .map((r) => `${r} { display: none !important; }`)
+      .join('\n');
+  }, [adBlockEnabled, adBlockRules]);
+
+  // F6: Inject ad block CSS into webview
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (wv === null || remoteUrl === null || adBlockCss.length === 0) return;
+
+    const handleDomReady = (): void => {
+      const webviewEl = wv as unknown as { executeJavaScript: (code: string) => void };
+      if (typeof webviewEl.executeJavaScript === 'function') {
+        const escaped = adBlockCss.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        webviewEl.executeJavaScript(
+          `(() => { const s = document.createElement('style'); s.textContent = '${escaped}'; document.head.appendChild(s); })()`,
+        );
+      }
+    };
+    wv.addEventListener('dom-ready', handleDomReady);
+    return () => { wv.removeEventListener('dom-ready', handleDomReady); };
+  }, [remoteUrl, adBlockCss]);
+
+  // F7: Intercept navigation in webview to open 5ch threads natively (blocking webView)
   useEffect(() => {
     const wv = webviewRef.current;
     if (wv === null || remoteUrl === null) return;
 
+    const tryOpenThread = (url: string): boolean => {
+      const parsed = parseThreadUrl(url);
+      if (parsed !== null) {
+        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
+        return true;
+      }
+      return false;
+    };
+
     const handleNavigation = (e: Event): void => {
       const navEvent = e as CustomEvent & { url: string };
-      const parsed = parseThreadUrl(navEvent.url);
-      if (parsed !== null) {
+      if (tryOpenThread(navEvent.url)) {
         e.preventDefault();
-        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
       }
     };
 
     const handleNewWindow = (e: Event): void => {
-      const newWinEvent = e as CustomEvent & { url: string };
       e.preventDefault();
-      const parsed = parseThreadUrl(newWinEvent.url);
-      if (parsed !== null) {
-        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
+      const newWinEvent = e as CustomEvent & { url: string };
+      if (!tryOpenThread(newWinEvent.url)) {
+        // Open non-thread URLs externally
+        void window.electronApi.invoke('shell:open-external', newWinEvent.url);
       }
     };
 
@@ -124,6 +186,60 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
           リモート検索
         </button>
       </div>
+
+      {/* F6: Ad block toggle (remote mode only) */}
+      {mode === 'remote' && (
+        <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-2 py-1">
+          <label className="flex cursor-pointer items-center gap-1 text-xs text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={adBlockEnabled}
+              onChange={(e) => {
+                setAdBlockEnabled(e.target.checked);
+                try { localStorage.setItem(AD_BLOCK_KEY, String(e.target.checked)); } catch { /* ignore */ }
+              }}
+              className="accent-[var(--color-accent)]"
+            />
+            <MdiIcon path={mdiShieldCheck} size={11} />
+            広告ブロック
+          </label>
+          <button
+            type="button"
+            onClick={() => { setAdBlockEditorOpen((p) => !p); }}
+            className="rounded px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
+          >
+            ルール編集
+          </button>
+        </div>
+      )}
+
+      {/* F6: Ad block rules editor */}
+      {adBlockEditorOpen && mode === 'remote' && (
+        <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] p-2">
+          <p className="mb-1 text-[10px] text-[var(--color-text-muted)]">
+            CSSセレクタを1行に1つ入力してください。マッチした要素が非表示になります。
+          </p>
+          <textarea
+            value={adBlockRules}
+            onChange={(e) => {
+              setAdBlockRules(e.target.value);
+              try { localStorage.setItem(AD_BLOCK_RULES_KEY, e.target.value); } catch { /* ignore */ }
+            }}
+            rows={5}
+            className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 font-mono text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setAdBlockRules(DEFAULT_AD_RULES);
+              try { localStorage.setItem(AD_BLOCK_RULES_KEY, DEFAULT_AD_RULES); } catch { /* ignore */ }
+            }}
+            className="mt-1 rounded px-2 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
+          >
+            デフォルトに戻す
+          </button>
+        </div>
+      )}
 
       {/* Search input */}
       <div className="border-b border-[var(--color-border-secondary)] p-2">

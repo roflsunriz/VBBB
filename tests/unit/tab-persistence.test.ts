@@ -93,7 +93,29 @@ describe('saveSessionState', () => {
   it('round-trips correctly', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
     mkdirSync(dir, { recursive: true });
-    const state = { selectedBoardUrl: 'https://news.5ch.net/newsplus/' };
+    const state = {
+      selectedBoardUrl: 'https://news.5ch.net/newsplus/',
+      activeThreadTabId: undefined,
+      boardTabUrls: undefined,
+      activeBoardTabId: undefined,
+    };
+    await saveSessionState(dir, state);
+    const loaded = loadSessionState(dir);
+    expect(loaded).toStrictEqual(state);
+  });
+
+  it('round-trips with board tabs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    const state = {
+      selectedBoardUrl: 'https://news.5ch.net/newsplus/',
+      activeThreadTabId: 'https://news.5ch.net/newsplus/:1234567890',
+      boardTabUrls: [
+        'https://news.5ch.net/newsplus/',
+        'https://eagle.5ch.net/livejupiter/',
+      ],
+      activeBoardTabId: 'https://eagle.5ch.net/livejupiter/',
+    };
     await saveSessionState(dir, state);
     const loaded = loadSessionState(dir);
     expect(loaded).toStrictEqual(state);

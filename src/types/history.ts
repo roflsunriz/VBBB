@@ -36,4 +36,8 @@ export const MAX_HISTORY_ENTRIES = 200 as const;
 export interface SessionState {
   readonly selectedBoardUrl: string | null;
   readonly activeThreadTabId?: string | undefined;
+  /** URLs of open board tabs (for restoring board tabs on restart) */
+  readonly boardTabUrls?: readonly string[] | undefined;
+  /** Active board tab id (board URL) to restore after restart */
+  readonly activeBoardTabId?: string | undefined;
 }

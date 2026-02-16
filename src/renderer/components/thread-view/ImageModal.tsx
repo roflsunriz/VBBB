@@ -16,6 +16,8 @@ import { MdiIcon } from '../common/MdiIcon';
 
 interface ImageModalProps {
   readonly url: string;
+  /** All image URLs in the context for left/right keyboard navigation */
+  readonly allImageUrls?: readonly string[] | undefined;
   readonly onClose: () => void;
 }
 
@@ -23,7 +25,8 @@ const ZOOM_STEP = 0.25;
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
 
-export function ImageModal({ url, onClose }: ImageModalProps): React.JSX.Element {
+export function ImageModal({ url, allImageUrls, onClose }: ImageModalProps): React.JSX.Element {
+  const [currentUrl, setCurrentUrl] = useState(url);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -33,7 +36,7 @@ export function ImageModal({ url, onClose }: ImageModalProps): React.JSX.Element
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  const fileName = url.split('/').pop() ?? 'image.jpg';
+  const fileName = currentUrl.split('/').pop() ?? 'image.jpg';
 
   // Calculate fit-to-view scale on load
   const handleImageLoad = useCallback(() => {
@@ -53,17 +56,30 @@ export function ImageModal({ url, onClose }: ImageModalProps): React.JSX.Element
     setPosition({ x: 0, y: 0 });
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (including F19: left/right navigation)
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
       if (e.key === '+' || e.key === '=') setScale((s) => Math.min(ZOOM_MAX, s + ZOOM_STEP));
       if (e.key === '-') setScale((s) => Math.max(ZOOM_MIN, s - ZOOM_STEP));
       if (e.key === '0') { setScale(1); setPosition({ x: 0, y: 0 }); }
+
+      // Left/Right arrow navigation
+      if (allImageUrls !== undefined && allImageUrls.length > 1) {
+        const idx = allImageUrls.indexOf(currentUrl);
+        if (e.key === 'ArrowLeft' && idx > 0) {
+          const prev = allImageUrls[idx - 1];
+          if (prev !== undefined) { setCurrentUrl(prev); setScale(1); setPosition({ x: 0, y: 0 }); }
+        }
+        if (e.key === 'ArrowRight' && idx < allImageUrls.length - 1) {
+          const next = allImageUrls[idx + 1];
+          if (next !== undefined) { setCurrentUrl(next); setScale(1); setPosition({ x: 0, y: 0 }); }
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => { window.removeEventListener('keydown', handler); };
-  }, [onClose]);
+  }, [onClose, allImageUrls, currentUrl]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -121,12 +137,12 @@ export function ImageModal({ url, onClose }: ImageModalProps): React.JSX.Element
   }, []);
 
   const handleSave = useCallback(() => {
-    void window.electronApi.invoke('image:save', url, fileName);
-  }, [url, fileName]);
+    void window.electronApi.invoke('image:save', currentUrl, fileName);
+  }, [currentUrl, fileName]);
 
   const handleOpenExternal = useCallback(() => {
-    void window.electronApi.invoke('shell:open-external', url);
-  }, [url]);
+    void window.electronApi.invoke('shell:open-external', currentUrl);
+  }, [currentUrl]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -180,13 +196,16 @@ export function ImageModal({ url, onClose }: ImageModalProps): React.JSX.Element
 
       {/* Image info */}
       <div className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-[var(--color-bg-secondary)]/90 px-3 py-1 text-xs text-[var(--color-text-muted)] shadow-lg backdrop-blur">
+        {allImageUrls !== undefined && allImageUrls.length > 1 && (
+          <span className="mr-2">[{allImageUrls.indexOf(currentUrl) + 1}/{allImageUrls.length}] ← → で切替</span>
+        )}
         {naturalSize.w > 0 ? `${String(naturalSize.w)} x ${String(naturalSize.h)}` : ''} — {fileName}
       </div>
 
       {/* Image */}
       <img
         ref={imgRef}
-        src={url}
+        src={currentUrl}
         alt={fileName}
         onLoad={handleImageLoad}
         onMouseDown={handleMouseDown}

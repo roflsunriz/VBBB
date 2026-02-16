@@ -10,6 +10,7 @@ import {
   mdiBulletinBoard,
   mdiRefresh,
   mdiLoading,
+  mdiMagnify,
 } from '@mdi/js';
 import type { Board, Category } from '@shared/domain';
 import { BoardType } from '@shared/domain';
@@ -114,8 +115,11 @@ export function BoardTree(): React.JSX.Element {
   const favorites = useBBSStore((s) => s.favorites);
   const ngRules = useBBSStore((s) => s.ngRules);
   const addNgRule = useBBSStore((s) => s.addNgRule);
+  const externalBoards = useBBSStore((s) => s.externalBoards);
+  const removeExternalBoard = useBBSStore((s) => s.removeExternalBoard);
 
   const [ctxMenu, setCtxMenu] = useState<BoardCtxMenu | null>(null);
+  const [searchFilter, setSearchFilter] = useState('');
 
   // Close context menu on click
   useEffect(() => {
@@ -169,6 +173,29 @@ export function BoardTree(): React.JSX.Element {
     }
     return set;
   }, [boardNgRules]);
+
+  // F20+F33: Merge external boards as a virtual "外部" category and filter
+  const filteredCategories = useMemo(() => {
+    const baseCats: Category[] = menu !== null ? [...menu.categories] : [];
+
+    // F20: Add external boards as virtual "外部" category
+    if (externalBoards.length > 0) {
+      baseCats.push({ name: '外部', boards: externalBoards });
+    }
+
+    if (searchFilter.trim().length === 0) return baseCats;
+    const lower = searchFilter.toLowerCase();
+    return baseCats
+      .map((cat) => {
+        // Match category name
+        if (cat.name.toLowerCase().includes(lower)) return cat;
+        // Match individual boards
+        const matchedBoards = cat.boards.filter((b) => b.title.toLowerCase().includes(lower));
+        if (matchedBoards.length === 0) return null;
+        return { ...cat, boards: matchedBoards };
+      })
+      .filter((c): c is Category => c !== null);
+  }, [menu, externalBoards, searchFilter]);
 
   const handleSelectBoard = useCallback(
     (board: Board) => {
@@ -252,6 +279,19 @@ export function BoardTree(): React.JSX.Element {
     setCtxMenu(null);
   }, [ctxMenu, addNgRule]);
 
+  // F20: Check if the context menu board is an external board
+  const isCtxExternal = useMemo(() => {
+    if (ctxMenu === null) return false;
+    return externalBoards.some((b) => b.url === ctxMenu.board.url);
+  }, [ctxMenu, externalBoards]);
+
+  const handleCtxRemoveExternal = useCallback(() => {
+    if (ctxMenu !== null) {
+      removeExternalBoard(ctxMenu.board.url);
+    }
+    setCtxMenu(null);
+  }, [ctxMenu, removeExternalBoard]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -272,6 +312,23 @@ export function BoardTree(): React.JSX.Element {
         </button>
       </div>
 
+      {/* F33: Category search bar */}
+      {menu !== null && (
+        <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
+          <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
+          <input
+            type="text"
+            value={searchFilter}
+            onChange={(e) => { setSearchFilter(e.target.value); }}
+            placeholder="カテゴリ・板を検索..."
+            className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+          />
+          {searchFilter.length > 0 && (
+            <span className="text-[10px] text-[var(--color-text-muted)]">{filteredCategories.length} カテゴリ</span>
+          )}
+        </div>
+      )}
+
       {/* Tree */}
       <div className="flex-1 overflow-y-auto p-1">
         {menu === null && !menuLoading && (
@@ -279,7 +336,7 @@ export function BoardTree(): React.JSX.Element {
             更新ボタンで板一覧を取得
           </p>
         )}
-        {menu?.categories.map((category) => (
+        {filteredCategories.map((category) => (
           <CategoryNode
             key={category.name}
             category={category}
@@ -335,6 +392,19 @@ export function BoardTree(): React.JSX.Element {
           >
             NG板 (透明あぼーん)
           </button>
+          {isCtxExternal && (
+            <>
+              <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"
+                onClick={handleCtxRemoveExternal}
+                role="menuitem"
+              >
+                外部板を削除
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

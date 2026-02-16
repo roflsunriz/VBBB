@@ -74,6 +74,9 @@ interface BBSState {
   favorites: FavTree;
   favoritesOpen: boolean;
 
+  // External boards (F20)
+  externalBoards: readonly Board[];
+
   // Browsing history
   browsingHistory: readonly BrowsingHistoryEntry[];
 
@@ -115,6 +118,9 @@ interface BBSState {
   restoreTabs: () => Promise<void>;
   restoreSession: () => Promise<void>;
   loadBrowsingHistory: () => Promise<void>;
+  clearBrowsingHistory: () => Promise<void>;
+  addExternalBoard: (board: Board) => void;
+  removeExternalBoard: (url: string) => void;
   refreshActiveThread: () => Promise<void>;
   loadPostHistory: () => Promise<void>;
   setHighlightSettings: (settings: HighlightSettings) => void;
@@ -188,6 +194,17 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   favorites: { children: [] },
   favoritesOpen: false,
 
+  externalBoards: (() => {
+    try {
+      const stored = localStorage.getItem('vbbb-external-boards');
+      if (stored !== null) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed as readonly Board[];
+      }
+    } catch { /* ignore */ }
+    return [] as readonly Board[];
+  })(),
+
   browsingHistory: [],
 
   postHistory: [],
@@ -209,6 +226,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   selectBoard: async (board: Board) => {
     const boardTabId = board.url;
+
+    // F20: Auto-add external boards to the external category
+    if (board.boardType === 'jbbs' || board.boardType === 'shitaraba') {
+      get().addExternalBoard(board);
+    }
 
     // Check if board tab already exists
     const { boardTabs } = get();
@@ -485,11 +507,29 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       const kokomade = idx?.kokomade ?? -1;
       const scrollTop = idx?.scrollTop ?? 0;
 
+      // F8: If the provided title is empty or looks like a raw thread ID, try to
+      // extract a proper title from the first response's title field (DAT line 1).
+      let resolvedTitle = title;
+      if (
+        (resolvedTitle.trim().length === 0 || /^\d{9,}$/.test(resolvedTitle.trim())) &&
+        result.responses.length > 0
+      ) {
+        const firstRes = result.responses[0];
+        if (firstRes !== undefined && firstRes.title.trim().length > 0) {
+          resolvedTitle = firstRes.title
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'");
+        }
+      }
+
       const newTab: ThreadTab = {
         id: tabId,
         boardUrl,
         threadId,
-        title,
+        title: resolvedTitle,
         responses: result.responses,
         scrollTop,
         kokomade,
@@ -591,16 +631,39 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   restoreSession: async () => {
     try {
       const session = await getApi().invoke('session:load');
-      if (session.selectedBoardUrl !== null) {
-        const { menu } = get();
-        if (menu !== null) {
-          for (const cat of menu.categories) {
-            const board = cat.boards.find((b) => b.url === session.selectedBoardUrl);
-            if (board !== undefined) {
-              await get().selectBoard(board);
-              return;
-            }
+      const { menu } = get();
+      if (menu === null) return;
+
+      // Helper: find a Board from the menu by URL
+      const findBoard = (url: string): Board | undefined => {
+        for (const cat of menu.categories) {
+          const b = cat.boards.find((board) => board.url === url);
+          if (b !== undefined) return b;
+        }
+        return undefined;
+      };
+
+      // Restore board tabs (F27)
+      if (session.boardTabUrls !== undefined && session.boardTabUrls.length > 0) {
+        for (const url of session.boardTabUrls) {
+          const board = findBoard(url);
+          if (board !== undefined) {
+            await get().selectBoard(board);
           }
+        }
+        // Restore active board tab
+        if (session.activeBoardTabId !== undefined) {
+          const { boardTabs } = get();
+          const target = boardTabs.find((t) => t.id === session.activeBoardTabId);
+          if (target !== undefined) {
+            get().setActiveBoardTab(target.id);
+          }
+        }
+      } else if (session.selectedBoardUrl !== null) {
+        // Backward compatibility: restore single board
+        const board = findBoard(session.selectedBoardUrl);
+        if (board !== undefined) {
+          await get().selectBoard(board);
         }
       }
     } catch {
@@ -615,6 +678,30 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     } catch {
       // Silently ignore
     }
+  },
+
+  clearBrowsingHistory: async () => {
+    try {
+      await getApi().invoke('history:clear');
+      set({ browsingHistory: [] });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  addExternalBoard: (board: Board) => {
+    const { externalBoards } = get();
+    if (externalBoards.some((b) => b.url === board.url)) return;
+    const updated = [...externalBoards, board];
+    set({ externalBoards: updated });
+    try { localStorage.setItem('vbbb-external-boards', JSON.stringify(updated)); } catch { /* ignore */ }
+  },
+
+  removeExternalBoard: (url: string) => {
+    const { externalBoards } = get();
+    const updated = externalBoards.filter((b) => b.url !== url);
+    set({ externalBoards: updated });
+    try { localStorage.setItem('vbbb-external-boards', JSON.stringify(updated)); } catch { /* ignore */ }
   },
 
   loadPostHistory: async () => {
