@@ -6,6 +6,9 @@ import type { BBSMenu, Board, DatFetchResult, KotehanConfig, Res, SambaInfo, Sub
 import type { FavNode, FavTree } from '@shared/favorite';
 import type { BrowsingHistoryEntry, DisplayRange } from '@shared/history';
 import type { NgRule } from '@shared/ng';
+import type { PostHistoryEntry } from '@shared/post-history';
+import type { HighlightSettings } from '@shared/settings';
+import { DEFAULT_HIGHLIGHT_SETTINGS } from '@shared/settings';
 
 /** Tab state for viewing threads */
 interface ThreadTab {
@@ -19,13 +22,27 @@ interface ThreadTab {
   readonly displayRange: DisplayRange;
 }
 
+/** Tab state for board (category) tabs */
+interface BoardTab {
+  readonly id: string;
+  readonly board: Board;
+  readonly subjects: readonly SubjectRecord[];
+  readonly threadIndices: readonly ThreadIndex[];
+  readonly subjectLoading: boolean;
+  readonly subjectError: string | null;
+}
+
 interface BBSState {
   // Board tree
   menu: BBSMenu | null;
   menuLoading: boolean;
   menuError: string | null;
 
-  // Selected board
+  // Board tabs
+  boardTabs: readonly BoardTab[];
+  activeBoardTabId: string | null;
+
+  // Selected board (derived from active board tab for backward compatibility)
   selectedBoard: Board | null;
   subjects: readonly SubjectRecord[];
   threadIndices: readonly ThreadIndex[];
@@ -60,12 +77,20 @@ interface BBSState {
   // Browsing history
   browsingHistory: readonly BrowsingHistoryEntry[];
 
+  // Post history (for highlight)
+  postHistory: readonly PostHistoryEntry[];
+
+  // Highlight settings
+  highlightSettings: HighlightSettings;
+
   // Status
   statusMessage: string;
 
   // Actions
   fetchMenu: () => Promise<void>;
   selectBoard: (board: Board) => Promise<void>;
+  closeBoardTab: (tabId: string) => void;
+  setActiveBoardTab: (tabId: string) => void;
   fetchKotehan: (boardUrl: string) => Promise<void>;
   saveKotehan: (boardUrl: string, config: KotehanConfig) => Promise<void>;
   fetchSambaInfo: (boardUrl: string) => Promise<void>;
@@ -90,9 +115,37 @@ interface BBSState {
   restoreTabs: () => Promise<void>;
   restoreSession: () => Promise<void>;
   loadBrowsingHistory: () => Promise<void>;
+  refreshActiveThread: () => Promise<void>;
+  loadPostHistory: () => Promise<void>;
+  setHighlightSettings: (settings: HighlightSettings) => void;
   togglePostEditor: () => void;
+  closePostEditor: () => void;
   openPostEditorWithQuote: (resNumber: number) => void;
   setStatusMessage: (message: string) => void;
+}
+
+const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
+
+function loadHighlightSettings(): HighlightSettings {
+  try {
+    const raw = localStorage.getItem(HIGHLIGHT_SETTINGS_KEY);
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw);
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'highlightOwnPosts' in parsed &&
+        'highlightRepliesToOwn' in parsed &&
+        typeof (parsed as Record<string, unknown>)['highlightOwnPosts'] === 'boolean' &&
+        typeof (parsed as Record<string, unknown>)['highlightRepliesToOwn'] === 'boolean'
+      ) {
+        return parsed as HighlightSettings;
+      }
+    }
+  } catch {
+    // Fall through to default
+  }
+  return DEFAULT_HIGHLIGHT_SETTINGS;
 }
 
 function getApi(): Window['electronApi'] {
@@ -106,6 +159,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   menu: null,
   menuLoading: false,
   menuError: null,
+
+  boardTabs: [],
+  activeBoardTabId: null,
 
   selectedBoard: null,
   subjects: [],
@@ -134,6 +190,10 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   browsingHistory: [],
 
+  postHistory: [],
+
+  highlightSettings: loadHighlightSettings(),
+
   statusMessage: 'Ready',
 
   fetchMenu: async () => {
@@ -148,14 +208,50 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   selectBoard: async (board: Board) => {
-    set({
+    const boardTabId = board.url;
+
+    // Check if board tab already exists
+    const { boardTabs } = get();
+    const existing = boardTabs.find((t) => t.id === boardTabId);
+    if (existing !== undefined) {
+      // Switch to existing tab and update derived state
+      set({
+        activeBoardTabId: boardTabId,
+        selectedBoard: existing.board,
+        subjects: existing.subjects,
+        threadIndices: existing.threadIndices,
+        subjectLoading: existing.subjectLoading,
+        subjectError: existing.subjectError,
+      });
+      // Refresh kotehan/samba for this board
+      void get().fetchKotehan(board.url);
+      void get().fetchSambaInfo(board.url);
+      return;
+    }
+
+    // Create new board tab
+    const newTab: BoardTab = {
+      id: boardTabId,
+      board,
+      subjects: [],
+      threadIndices: [],
+      subjectLoading: true,
+      subjectError: null,
+    };
+    set((state) => ({
+      boardTabs: [...state.boardTabs, newTab],
+      activeBoardTabId: boardTabId,
       selectedBoard: board,
+      subjects: [],
+      threadIndices: [],
       subjectLoading: true,
       subjectError: null,
       statusMessage: `${board.title} のスレッド一覧を取得中...`,
-    });
+    }));
+
     // Persist selected board for session restore
     void getApi().invoke('session:save', { selectedBoardUrl: board.url });
+
     try {
       const [result, indices, kotehan, sambaInfo] = await Promise.all([
         getApi().invoke('bbs:fetch-subject', board.url),
@@ -163,18 +259,77 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         getApi().invoke('bbs:get-kotehan', board.url),
         getApi().invoke('bbs:get-samba', board.url),
       ]);
-      set({
-        subjects: result.threads,
-        threadIndices: indices,
-        kotehan,
-        sambaInfo,
-        subjectLoading: false,
+
+      set((state) => ({
+        boardTabs: state.boardTabs.map((t) =>
+          t.id === boardTabId
+            ? { ...t, subjects: result.threads, threadIndices: indices, subjectLoading: false, subjectError: null }
+            : t,
+        ),
+        // Update derived state only if this is still the active tab
+        ...(state.activeBoardTabId === boardTabId
+          ? {
+              subjects: result.threads,
+              threadIndices: indices,
+              kotehan,
+              sambaInfo,
+              subjectLoading: false,
+            }
+          : {}),
         statusMessage: `${board.title}: ${String(result.threads.length)} スレッド`,
-      });
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      set({ subjectLoading: false, subjectError: message, statusMessage: 'スレッド一覧の取得に失敗しました' });
+      set((state) => ({
+        boardTabs: state.boardTabs.map((t) =>
+          t.id === boardTabId
+            ? { ...t, subjectLoading: false, subjectError: message }
+            : t,
+        ),
+        ...(state.activeBoardTabId === boardTabId
+          ? { subjectLoading: false, subjectError: message }
+          : {}),
+        statusMessage: 'スレッド一覧の取得に失敗しました',
+      }));
     }
+  },
+
+  closeBoardTab: (tabId: string) => {
+    set((state) => {
+      const newTabs = state.boardTabs.filter((t) => t.id !== tabId);
+      let newActiveId = state.activeBoardTabId;
+      if (state.activeBoardTabId === tabId) {
+        const last = newTabs[newTabs.length - 1];
+        newActiveId = last?.id ?? null;
+      }
+      const activeTab = newTabs.find((t) => t.id === newActiveId);
+      return {
+        boardTabs: newTabs,
+        activeBoardTabId: newActiveId,
+        selectedBoard: activeTab?.board ?? null,
+        subjects: activeTab?.subjects ?? [],
+        threadIndices: activeTab?.threadIndices ?? [],
+        subjectLoading: activeTab?.subjectLoading ?? false,
+        subjectError: activeTab?.subjectError ?? null,
+      };
+    });
+  },
+
+  setActiveBoardTab: (tabId: string) => {
+    const { boardTabs } = get();
+    const tab = boardTabs.find((t) => t.id === tabId);
+    if (tab === undefined) return;
+    set({
+      activeBoardTabId: tabId,
+      selectedBoard: tab.board,
+      subjects: tab.subjects,
+      threadIndices: tab.threadIndices,
+      subjectLoading: tab.subjectLoading,
+      subjectError: tab.subjectError,
+    });
+    // Refresh kotehan/samba for the switched board
+    void get().fetchKotehan(tab.board.url);
+    void get().fetchSambaInfo(tab.board.url);
   },
 
   fetchKotehan: async (boardUrl: string) => {
@@ -419,6 +574,15 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       for (const tab of savedTabs) {
         await get().openThread(tab.boardUrl, tab.threadId, tab.title);
       }
+      // Restore active thread tab from session
+      const session = await getApi().invoke('session:load');
+      if (session.activeThreadTabId !== undefined) {
+        const { tabs } = get();
+        const target = tabs.find((t) => t.id === session.activeThreadTabId);
+        if (target !== undefined) {
+          set({ activeTabId: target.id });
+        }
+      }
     } catch {
       // Silently ignore restore errors
     }
@@ -453,8 +617,49 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
   },
 
+  loadPostHistory: async () => {
+    try {
+      const history = await getApi().invoke('post:load-history');
+      set({ postHistory: history });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  setHighlightSettings: (settings: HighlightSettings) => {
+    set({ highlightSettings: settings });
+    try {
+      localStorage.setItem(HIGHLIGHT_SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      // Silently ignore storage errors
+    }
+  },
+
+  refreshActiveThread: async () => {
+    const { tabs, activeTabId } = get();
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab === undefined) return;
+
+    try {
+      const result = await getApi().invoke('bbs:fetch-dat', activeTab.boardUrl, activeTab.threadId);
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === activeTab.id ? { ...t, responses: result.responses } : t,
+        ),
+        statusMessage: `${activeTab.title}: ${String(result.responses.length)} レス (更新済み)`,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({ statusMessage: `スレ更新失敗: ${message}` });
+    }
+  },
+
   togglePostEditor: () => {
     set((state) => ({ postEditorOpen: !state.postEditorOpen, postEditorInitialMessage: '' }));
+  },
+
+  closePostEditor: () => {
+    set({ postEditorOpen: false, postEditorInitialMessage: '' });
   },
 
   openPostEditorWithQuote: (resNumber: number) => {

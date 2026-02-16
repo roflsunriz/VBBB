@@ -4,9 +4,10 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { mdiClose, mdiPencil, mdiShieldOff } from '@mdi/js';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
+import type { PostHistoryEntry } from '@shared/post-history';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
@@ -91,9 +92,13 @@ function applyNgFilter(rules: readonly NgRule[], res: Res, boardId: string, thre
   return NgFilterResultEnum.None;
 }
 
+/** Highlight type for a response */
+type HighlightType = 'none' | 'own' | 'reply';
+
 function ResItem({
   res,
   ngResult,
+  highlightType,
   onAnchorHover,
   onAnchorLeave,
   onResNumberClick,
@@ -102,6 +107,7 @@ function ResItem({
 }: {
   readonly res: Res;
   readonly ngResult: NgFilterResult;
+  readonly highlightType: HighlightType;
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onAnchorLeave: () => void;
   readonly onResNumberClick: (resNumber: number) => void;
@@ -200,8 +206,15 @@ function ResItem({
     }
   }, []);
 
+  const highlightClass =
+    highlightType === 'own'
+      ? 'border-l-2 border-l-[var(--color-highlight-own-border)] bg-[var(--color-highlight-own)]'
+      : highlightType === 'reply'
+        ? 'border-l-2 border-l-[var(--color-highlight-reply-border)] bg-[var(--color-highlight-reply)]'
+        : '';
+
   return (
-    <div className="border-b border-[var(--color-border-secondary)] px-4 py-2" id={`res-${String(res.number)}`} onContextMenu={handleContextMenu}>
+    <div className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${highlightClass}`} id={`res-${String(res.number)}`} onContextMenu={handleContextMenu}>
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
         <button
           type="button"
@@ -288,6 +301,72 @@ function extractBoardId(boardUrl: string): string {
   }
 }
 
+/** Anchor pattern for extracting >>N references from body HTML */
+const ANCHOR_REF_PATTERN = />>(\d+)/g;
+
+/**
+ * Build a set of own post res numbers by matching post history entries
+ * against thread responses by message content.
+ */
+function buildOwnResNumbers(
+  responses: readonly Res[],
+  postHistory: readonly PostHistoryEntry[],
+  boardUrl: string,
+  threadId: string,
+): ReadonlySet<number> {
+  const threadEntries = postHistory.filter(
+    (h) => h.boardUrl === boardUrl && h.threadId === threadId,
+  );
+  if (threadEntries.length === 0) return new Set<number>();
+
+  const set = new Set<number>();
+  for (const entry of threadEntries) {
+    const normalizedMsg = entry.message.trim();
+    for (const res of responses) {
+      // Strip HTML tags from body for comparison
+      const plainBody = res.body
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&gt;/g, '>')
+        .replace(/&lt;/g, '<')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .trim();
+      if (plainBody === normalizedMsg) {
+        set.add(res.number);
+      }
+    }
+  }
+  return set;
+}
+
+/**
+ * Build a set of res numbers that are replies to own posts.
+ * Scans all responses for >>N anchors pointing to own posts.
+ */
+function buildReplyResNumbers(
+  responses: readonly Res[],
+  ownResNumbers: ReadonlySet<number>,
+): ReadonlySet<number> {
+  if (ownResNumbers.size === 0) return new Set<number>();
+
+  const set = new Set<number>();
+  for (const res of responses) {
+    if (ownResNumbers.has(res.number)) continue;
+    ANCHOR_REF_PATTERN.lastIndex = 0;
+    let match: RegExpExecArray | null = ANCHOR_REF_PATTERN.exec(res.body);
+    while (match !== null) {
+      const refNum = Number(match[1]);
+      if (ownResNumbers.has(refNum)) {
+        set.add(res.number);
+        break;
+      }
+      match = ANCHOR_REF_PATTERN.exec(res.body);
+    }
+  }
+  return set;
+}
+
 export function ThreadView(): React.JSX.Element {
   const tabs = useBBSStore((s) => s.tabs);
   const activeTabId = useBBSStore((s) => s.activeTabId);
@@ -302,6 +381,9 @@ export function ThreadView(): React.JSX.Element {
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
   const openNgEditorWithToken = useBBSStore((s) => s.openNgEditorWithToken);
+  const postHistory = useBBSStore((s) => s.postHistory);
+  const highlightSettings = useBBSStore((s) => s.highlightSettings);
+  const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<PopupState | null>(null);
 
@@ -320,6 +402,36 @@ export function ThreadView(): React.JSX.Element {
     }
     return results;
   }, [activeTab, ngRules]);
+
+  // Pre-compute highlight data
+  const ownResNumbers = useMemo(() => {
+    if (activeTab === undefined || !highlightSettings.highlightOwnPosts) {
+      return new Set<number>();
+    }
+    return buildOwnResNumbers(activeTab.responses, postHistory, activeTab.boardUrl, activeTab.threadId);
+  }, [activeTab, postHistory, highlightSettings.highlightOwnPosts]);
+
+  const replyResNumbers = useMemo(() => {
+    if (!highlightSettings.highlightRepliesToOwn || activeTab === undefined) {
+      return new Set<number>();
+    }
+    return buildReplyResNumbers(activeTab.responses, ownResNumbers);
+  }, [activeTab, ownResNumbers, highlightSettings.highlightRepliesToOwn]);
+
+  const getHighlightType = useCallback((resNumber: number): HighlightType => {
+    if (ownResNumbers.has(resNumber)) return 'own';
+    if (replyResNumbers.has(resNumber)) return 'reply';
+    return 'none';
+  }, [ownResNumbers, replyResNumbers]);
+
+  const handleToggleHighlight = useCallback(() => {
+    const bothOn = highlightSettings.highlightOwnPosts && highlightSettings.highlightRepliesToOwn;
+    if (bothOn) {
+      setHighlightSettings({ highlightOwnPosts: false, highlightRepliesToOwn: false });
+    } else {
+      setHighlightSettings({ highlightOwnPosts: true, highlightRepliesToOwn: true });
+    }
+  }, [highlightSettings, setHighlightSettings]);
 
   // Restore scroll position when tab changes
   const activeTabScrollTop = activeTab?.scrollTop ?? 0;
@@ -435,6 +547,16 @@ export function ThreadView(): React.JSX.Element {
           <div className="mr-2 flex items-center gap-1">
             <button
               type="button"
+              onClick={handleToggleHighlight}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                highlightSettings.highlightOwnPosts ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]' : ''
+              }`}
+              title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
+            >
+              <MdiIcon path={mdiFormatColorHighlight} size={14} />
+            </button>
+            <button
+              type="button"
               onClick={toggleNgEditor}
               className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
                 ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
@@ -483,6 +605,7 @@ export function ThreadView(): React.JSX.Element {
                   <ResItem
                     res={res}
                     ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
+                    highlightType={getHighlightType(res.number)}
                     onAnchorHover={handleAnchorHover}
                     onAnchorLeave={handleAnchorLeave}
                     onResNumberClick={handleResNumberClick}

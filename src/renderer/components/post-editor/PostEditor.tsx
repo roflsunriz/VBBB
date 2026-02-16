@@ -31,6 +31,8 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
   const saveKotehan = useBBSStore((s) => s.saveKotehan);
   const recordSambaTime = useBBSStore((s) => s.recordSambaTime);
   const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
+  const closePostEditor = useBBSStore((s) => s.closePostEditor);
+  const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
 
   const postEditorInitialMessage = useBBSStore((s) => s.postEditorInitialMessage);
 
@@ -149,6 +151,12 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
           mail,
           message,
         });
+
+        // Auto-refresh thread and close editor after brief delay
+        void refreshActiveThread();
+        setTimeout(() => {
+          closePostEditor();
+        }, 800);
       } else {
         // Update donguri state on relevant result types
         if (result.resultType === 'grtDonguri' || result.resultType === 'grtDngBroken') {
@@ -168,7 +176,7 @@ export function PostEditor({ boardUrl, threadId }: PostEditorProps): React.JSX.E
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, sambaRemaining, setStatusMessage, saveKotehan, recordSambaTime]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

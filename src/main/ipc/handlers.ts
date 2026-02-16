@@ -21,7 +21,7 @@ import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { searchLocal } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
-import { savePostHistory } from '../services/post-history';
+import { loadPostHistory, savePostHistory } from '../services/post-history';
 import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory, loadBrowsingHistory, saveBrowsingHistory } from '../services/browsing-history';
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
@@ -34,7 +34,7 @@ import {
   getTimerConfig, loadRoundLists, removeRoundBoard, removeRoundItem,
   saveRoundBoard, saveRoundItem, setTimerConfig,
 } from '../services/round-list';
-import { searchRemote } from '../services/remote-search';
+import { buildRemoteSearchUrl } from '../services/remote-search';
 import { loadSavedTabs, loadSessionState, saveSessionState, saveTabs } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
@@ -306,8 +306,8 @@ export function registerIpcHandlers(): void {
     return Promise.resolve(searchLocal(query, dataDir));
   });
 
-  handle('search:remote', async (query) => {
-    return searchRemote(query);
+  handle('search:remote-url', (keywords: string) => {
+    return Promise.resolve(buildRemoteSearchUrl(keywords));
   });
 
   // Round list
@@ -385,6 +385,10 @@ export function registerIpcHandlers(): void {
   // Post history
   handle('post:save-history', async (entry) => {
     await savePostHistory(dataDir, entry);
+  });
+
+  handle('post:load-history', () => {
+    return Promise.resolve(loadPostHistory(dataDir));
   });
 
   // Menu action long-poll: renderer calls this and waits until a menu action occurs
@@ -517,6 +521,27 @@ export function registerIpcHandlers(): void {
   handle('diag:clear-logs', () => {
     clearLogBuffer();
     return Promise.resolve();
+  });
+
+  handle('diag:save-logs', async (content: string) => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win === null) return { saved: false, path: '' };
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: `vbbb-console-${timestamp}.log`,
+      filters: [
+        { name: 'Log Files', extensions: ['log'] },
+        { name: 'Text Files', extensions: ['txt'] },
+      ],
+    });
+
+    if (result.canceled || result.filePath === undefined) {
+      return { saved: false, path: '' };
+    }
+
+    await writeFile(result.filePath, content, 'utf-8');
+    return { saved: true, path: result.filePath };
   });
 
   logger.info('IPC handlers registered');

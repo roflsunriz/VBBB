@@ -5,7 +5,7 @@
  * Supports right-click context menu for favorites and NG.
  */
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline } from '@mdi/js';
+import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose } from '@mdi/js';
 import { AgeSage, type SubjectRecord } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
@@ -66,6 +66,10 @@ export function ThreadList(): React.JSX.Element {
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const ngRules = useBBSStore((s) => s.ngRules);
   const addNgRule = useBBSStore((s) => s.addNgRule);
+  const boardTabs = useBBSStore((s) => s.boardTabs);
+  const activeBoardTabId = useBBSStore((s) => s.activeBoardTabId);
+  const setActiveBoardTab = useBBSStore((s) => s.setActiveBoardTab);
+  const closeBoardTab = useBBSStore((s) => s.closeBoardTab);
 
   const [sortKey, setSortKey] = useState<SortKey>('index');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -342,8 +346,49 @@ export function ThreadList(): React.JSX.Element {
     [handleSort, sortKey, sortDir],
   );
 
+  const handleCloseBoardTab = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      e.stopPropagation();
+      closeBoardTab(tabId);
+    },
+    [closeBoardTab],
+  );
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col">
+      {/* Board tabs */}
+      {boardTabs.length > 1 && (
+        <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
+            {boardTabs.map((bt) => (
+              <div
+                key={bt.id}
+                role="tab"
+                tabIndex={0}
+                onClick={() => { setActiveBoardTab(bt.id); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
+                className={`group flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-0.5 text-xs ${
+                  bt.id === activeBoardTabId
+                    ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
+                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
+                }`}
+                aria-selected={bt.id === activeBoardTabId}
+              >
+                <span className="truncate">{bt.board.title}</span>
+                <button
+                  type="button"
+                  onClick={(e) => { handleCloseBoardTab(e, bt.id); }}
+                  className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
+                  aria-label="板タブを閉じる"
+                >
+                  <MdiIcon path={mdiClose} size={9} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header with board title and refresh */}
       <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-secondary)]">

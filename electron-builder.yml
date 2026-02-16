@@ -7,7 +7,7 @@ files:
   - out/**/*
   - "!out/**/*.map"
 win:
-  icon: resources/icon.svg
+  icon: resources/icon.png
   target:
     - target: nsis
       arch:

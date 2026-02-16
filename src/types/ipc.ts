@@ -14,7 +14,7 @@ import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
 import type { MenuAction } from './menu';
-import type { LocalSearchQuery, RemoteSearchQuery, RemoteSearchResult, SearchResult } from './search';
+import type { LocalSearchQuery, SearchResult } from './search';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -207,10 +207,10 @@ export interface IpcChannelMap {
     args: [query: LocalSearchQuery];
     result: readonly SearchResult[];
   };
-  /** Remote search via dig.2ch.net */
-  'search:remote': {
-    args: [query: RemoteSearchQuery];
-    result: readonly RemoteSearchResult[];
+  /** Build remote search URL for ff5ch.syoboi.jp */
+  'search:remote-url': {
+    args: [keywords: string];
+    result: string;
   };
   /** Get round board list */
   'round:get-boards': {
@@ -262,6 +262,11 @@ export interface IpcChannelMap {
     args: [entry: PostHistoryEntry];
     result: void;
   };
+  /** Load post history */
+  'post:load-history': {
+    args: [];
+    result: readonly PostHistoryEntry[];
+  };
   /** Wait for the next menu action (long-poll from renderer) */
   'menu:wait-action': {
     args: [];
@@ -301,6 +306,11 @@ export interface IpcChannelMap {
   'diag:clear-logs': {
     args: [];
     result: void;
+  };
+  /** Save diagnostic logs to a file via save dialog */
+  'diag:save-logs': {
+    args: [content: string];
+    result: { saved: boolean; path: string };
   };
 }
 

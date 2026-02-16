@@ -100,7 +100,7 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
   }, [refreshAuthState]);
 
   return (
-    <div className="flex flex-col gap-3 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-4">
+    <div className="flex h-full flex-col gap-3 overflow-auto rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

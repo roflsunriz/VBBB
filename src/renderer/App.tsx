@@ -12,6 +12,7 @@ import {
   mdiClose,
   mdiCookie,
   mdiConsoleLine,
+  mdiLinkPlus,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
@@ -25,13 +26,14 @@ import { RoundPanel } from './components/round/RoundPanel';
 import { NgEditor } from './components/ng-editor/NgEditor';
 import { CookieManager } from './components/settings/CookieManager';
 import { ConsoleModal } from './components/console/ConsoleModal';
+import { AddBoardDialog } from './components/board-tree/AddBoardDialog';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search';
-type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | null;
+type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | null;
 
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
@@ -62,6 +64,7 @@ export function App(): React.JSX.Element {
   const fetchNgRules = useBBSStore((s) => s.fetchNgRules);
   const restoreTabs = useBBSStore((s) => s.restoreTabs);
   const restoreSession = useBBSStore((s) => s.restoreSession);
+  const loadPostHistory = useBBSStore((s) => s.loadPostHistory);
 
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
@@ -82,6 +85,23 @@ export function App(): React.JSX.Element {
     applyTheme(theme);
   }, [theme]);
 
+  // Save tabs and session state before window unload
+  useEffect(() => {
+    const handleBeforeUnload = (): void => {
+      const state = useBBSStore.getState();
+      void state.saveTabs();
+      // Save active thread tab ID in session state
+      void window.electronApi.invoke('session:save', {
+        selectedBoardUrl: state.selectedBoard?.url ?? null,
+        activeThreadTabId: state.activeTabId ?? undefined,
+      });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
   // Auto-initialize on first mount (runs once via ref guard)
   const initRef = useRef(false);
   useEffect(() => {
@@ -93,12 +113,13 @@ export function App(): React.JSX.Element {
         fetchMenu(),
         fetchFavorites(),
         fetchNgRules(),
+        loadPostHistory(),
       ]);
       await restoreSession();
       await restoreTabs();
     };
     void init();
-  }, [fetchMenu, fetchFavorites, fetchNgRules, restoreSession, restoreTabs]);
+  }, [fetchMenu, fetchFavorites, fetchNgRules, loadPostHistory, restoreSession, restoreTabs]);
 
   // Subscribe to menu actions from main process via invoke-based long-poll.
   // No ref guard: each mount starts its own poll, cleanup cancels it.
@@ -168,6 +189,7 @@ export function App(): React.JSX.Element {
   const openCookieManager = useCallback(() => { setActiveModal('cookie-manager'); }, []);
   const openConsole = useCallback(() => { setActiveModal('console'); }, []);
   const openAbout = useCallback(() => { setActiveModal('about'); }, []);
+  const openAddBoard = useCallback(() => { setActiveModal('add-board'); }, []);
 
   const handleLeftResize = useCallback((delta: number) => {
     setLeftWidth((w) => Math.max(LEFT_PANE_MIN, Math.min(LEFT_PANE_MAX, w + delta)));
@@ -203,6 +225,17 @@ export function App(): React.JSX.Element {
             className={menuLoading ? 'animate-spin' : ''}
           />
           板一覧更新
+        </button>
+
+        {/* Add external board */}
+        <button
+          type="button"
+          onClick={openAddBoard}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          title="外部掲示板を追加 (したらば/まちBBS)"
+        >
+          <MdiIcon path={mdiLinkPlus} size={14} />
+          外部板追加
         </button>
 
         <div className="mx-1 h-4 w-px bg-[var(--color-border-primary)]" />
@@ -345,13 +378,13 @@ export function App(): React.JSX.Element {
         <ThemeSelector currentTheme={theme} onThemeChange={handleThemeChange} />
       </footer>
 
-      {/* Modal: Auth */}
-      <Modal open={activeModal === 'auth'} onClose={closeModal}>
+      {/* Modal: Auth (resizable) */}
+      <Modal open={activeModal === 'auth'} onClose={closeModal} resizable initialWidth={500} initialHeight={400}>
         <AuthPanel onClose={closeModal} />
       </Modal>
 
-      {/* Modal: Proxy */}
-      <Modal open={activeModal === 'proxy'} onClose={closeModal}>
+      {/* Modal: Proxy (resizable) */}
+      <Modal open={activeModal === 'proxy'} onClose={closeModal} resizable initialWidth={520} initialHeight={480}>
         <ProxySettings onClose={closeModal} />
       </Modal>
 
@@ -362,21 +395,26 @@ export function App(): React.JSX.Element {
         </div>
       </Modal>
 
-      {/* Modal: Round */}
-      <Modal open={activeModal === 'round'} onClose={closeModal} width="max-w-md">
-        <div className="max-h-[70vh] overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+      {/* Modal: Round (resizable) */}
+      <Modal open={activeModal === 'round'} onClose={closeModal} resizable initialWidth={480} initialHeight={500}>
+        <div className="h-full overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
           <RoundPanel onClose={closeModal} />
         </div>
       </Modal>
 
-      {/* Modal: Cookie/UA Manager */}
-      <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} width="max-w-xl">
+      {/* Modal: Cookie/UA Manager (resizable) */}
+      <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} resizable initialWidth={600} initialHeight={500}>
         <CookieManager onClose={closeModal} />
       </Modal>
 
-      {/* Modal: Console */}
-      <Modal open={activeModal === 'console'} onClose={closeModal} width="max-w-4xl">
+      {/* Modal: Console (resizable) */}
+      <Modal open={activeModal === 'console'} onClose={closeModal} resizable initialWidth={900} initialHeight={600}>
         <ConsoleModal onClose={closeModal} />
+      </Modal>
+
+      {/* Modal: Add Board */}
+      <Modal open={activeModal === 'add-board'} onClose={closeModal} width="max-w-lg">
+        <AddBoardDialog onClose={closeModal} />
       </Modal>
 
       {/* Modal: About */}

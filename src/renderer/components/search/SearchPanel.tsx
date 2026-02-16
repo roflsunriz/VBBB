@@ -1,10 +1,12 @@
 /**
  * Search panel component.
- * Supports local DAT search and remote dig.2ch.net search.
+ * Supports local DAT search and remote ff5ch.syoboi.jp search.
+ * Remote search renders results in a webview.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { mdiMagnify, mdiClose } from '@mdi/js';
-import type { SearchResult, RemoteSearchResult, SearchTarget } from '@shared/search';
+import type { SearchResult, SearchTarget } from '@shared/search';
+import { parseThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -16,12 +18,44 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
   const [target, setTarget] = useState<SearchTarget>('all');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [localResults, setLocalResults] = useState<readonly SearchResult[]>([]);
-  const [remoteResults, setRemoteResults] = useState<readonly RemoteSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
 
   const selectedBoard = useBBSStore((s) => s.selectedBoard);
   const openThread = useBBSStore((s) => s.openThread);
+  const webviewRef = useRef<HTMLElement>(null);
+
+  // Intercept navigation in webview to open 5ch threads in VBBB
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (wv === null || remoteUrl === null) return;
+
+    const handleNavigation = (e: Event): void => {
+      const navEvent = e as CustomEvent & { url: string };
+      const parsed = parseThreadUrl(navEvent.url);
+      if (parsed !== null) {
+        e.preventDefault();
+        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
+      }
+    };
+
+    const handleNewWindow = (e: Event): void => {
+      const newWinEvent = e as CustomEvent & { url: string };
+      e.preventDefault();
+      const parsed = parseThreadUrl(newWinEvent.url);
+      if (parsed !== null) {
+        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
+      }
+    };
+
+    wv.addEventListener('will-navigate', handleNavigation);
+    wv.addEventListener('new-window', handleNewWindow);
+    return () => {
+      wv.removeEventListener('will-navigate', handleNavigation);
+      wv.removeEventListener('new-window', handleNewWindow);
+    };
+  }, [remoteUrl, openThread]);
 
   const handleSearch = useCallback(async () => {
     if (pattern.trim().length === 0) return;
@@ -40,13 +74,10 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
           caseSensitive,
         });
         setLocalResults(results);
-        setRemoteResults([]);
+        setRemoteUrl(null);
       } else {
-        const results = await window.electronApi.invoke('search:remote', {
-          keywords: pattern.trim(),
-          maxResults: 50,
-        });
-        setRemoteResults(results);
+        const url = await window.electronApi.invoke('search:remote-url', pattern.trim());
+        setRemoteUrl(url);
         setLocalResults([]);
       }
     } catch (err) {
@@ -102,7 +133,7 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
             value={pattern}
             onChange={(e) => { setPattern(e.target.value); }}
             onKeyDown={handleKeyDown}
-            placeholder={mode === 'local' ? '検索パターン (正規表現)' : 'キーワード'}
+            placeholder={mode === 'local' ? '検索パターン (正規表現)' : 'キーワード (ff5ch.syoboi.jp)'}
             className="flex-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
           />
           <button
@@ -166,34 +197,16 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
           </button>
         ))}
 
-        {/* Remote results */}
-        {remoteResults.map((r, i) => (
-          <button
-            key={`${r.url}-${String(i)}`}
-            type="button"
-            onClick={() => {
-              // Extract board URL and thread ID from result URL
-              try {
-                const urlObj = new URL(r.url);
-                const pathParts = urlObj.pathname.split('/').filter((s) => s.length > 0);
-                const threadId = pathParts[pathParts.length - 1] ?? '';
-                const boardPath = pathParts.slice(0, -2).join('/');
-                const boardUrl = `${urlObj.protocol}//${urlObj.host}/${boardPath}/`;
-                handleResultClick(boardUrl, threadId, r.subject);
-              } catch {
-                // Ignore invalid URLs
-              }
-            }}
-            className="w-full border-b border-[var(--color-border-secondary)] px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
-          >
-            <div className="font-medium text-[var(--color-text-primary)]">{r.subject}</div>
-            <div className="text-[var(--color-text-muted)]">
-              {r.ita} ({String(r.resno)} レス)
-            </div>
-          </button>
-        ))}
+        {/* Remote results (webview) */}
+        {remoteUrl !== null && mode === 'remote' && (
+          <webview
+            ref={webviewRef as React.Ref<HTMLElement>}
+            src={remoteUrl}
+            className="h-full w-full"
+          />
+        )}
 
-        {!searching && localResults.length === 0 && remoteResults.length === 0 && (
+        {!searching && localResults.length === 0 && remoteUrl === null && (
           <div className="flex items-center justify-center py-4 text-xs text-[var(--color-text-muted)]">
             検索結果なし
           </div>

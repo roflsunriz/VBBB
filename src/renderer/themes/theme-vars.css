@@ -56,6 +56,12 @@
   --color-popup-border: #525252;
   --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.5);
 
+  /* Highlight (own posts / replies) */
+  --color-highlight-own: rgba(59, 130, 246, 0.12);
+  --color-highlight-reply: rgba(234, 179, 8, 0.12);
+  --color-highlight-own-border: #3b82f6;
+  --color-highlight-reply-border: #eab308;
+
   /* Scrollbar */
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: #404040;
@@ -105,6 +111,11 @@
   --color-popup-border: #d4d4d4;
   --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.15);
 
+  --color-highlight-own: rgba(37, 99, 235, 0.08);
+  --color-highlight-reply: rgba(202, 138, 4, 0.08);
+  --color-highlight-own-border: #2563eb;
+  --color-highlight-reply-border: #ca8a04;
+
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: #d4d4d4;
   --color-scrollbar-thumb-hover: #a3a3a3;
@@ -152,6 +163,11 @@
   --color-popup-bg: #f0e8d8;
   --color-popup-border: #c8b898;
   --shadow-popup: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  --color-highlight-own: rgba(51, 102, 153, 0.12);
+  --color-highlight-reply: rgba(204, 153, 0, 0.12);
+  --color-highlight-own-border: #336699;
+  --color-highlight-reply-border: #cc9900;
 
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: #c8b898;

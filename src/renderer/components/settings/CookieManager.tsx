@@ -74,7 +74,7 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
   }, {});
 
   return (
-    <div className="flex max-h-[70vh] flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <div className="flex h-full flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-4 py-2">
         <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Cookie / UA 管理</h2>

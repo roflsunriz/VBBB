@@ -4,7 +4,7 @@
  * Features: level filter, auto-scroll, clear, copy-all.
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { mdiClose, mdiContentCopy, mdiDeleteOutline, mdiRefresh, mdiFilterOutline } from '@mdi/js';
+import { mdiClose, mdiContentCopy, mdiContentSave, mdiDeleteOutline, mdiRefresh, mdiFilterOutline } from '@mdi/js';
 import type { DiagLogEntry, DiagLogLevel } from '@shared/diagnostic';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -42,6 +42,7 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
   const [filter, setFilter] = useState<DiagLogLevel | 'all'>('all');
   const [autoScroll, setAutoScroll] = useState(true);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchLogs = useCallback(async () => {
@@ -76,11 +77,15 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     }
   }, []);
 
-  const handleCopyAll = useCallback(async () => {
+  const formatLogsToText = useCallback((): string => {
     const filtered = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
-    const text = filtered
+    return filtered
       .map((l) => `[${formatTimestamp(l.timestamp)}] [${l.tag}] ${LEVEL_LABELS[l.level]}: ${l.message}`)
       .join('\n');
+  }, [logs, filter]);
+
+  const handleCopyAll = useCallback(async () => {
+    const text = formatLogsToText();
     try {
       await navigator.clipboard.writeText(text);
       setCopyFeedback(true);
@@ -88,7 +93,21 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     } catch {
       // Fallback: ignore clipboard errors
     }
-  }, [logs, filter]);
+  }, [formatLogsToText]);
+
+  const handleSaveToFile = useCallback(async () => {
+    const text = formatLogsToText();
+    try {
+      const result = await window.electronApi.invoke('diag:save-logs', text);
+      if (result.saved) {
+        setSaveFeedback('保存しました');
+        setTimeout(() => { setSaveFeedback(null); }, 2000);
+      }
+    } catch {
+      setSaveFeedback('保存に失敗しました');
+      setTimeout(() => { setSaveFeedback(null); }, 2000);
+    }
+  }, [formatLogsToText]);
 
   const handleScroll = useCallback(() => {
     if (scrollRef.current === null) return;
@@ -100,7 +119,7 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
   const filteredLogs = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
 
   return (
-    <div className="flex max-h-[80vh] flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <div className="flex h-full flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 border-b border-[var(--color-border-primary)] px-3 py-2">
         <span className="text-sm font-bold text-[var(--color-text-primary)]">
@@ -146,6 +165,14 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
           title={copyFeedback ? 'コピー済み' : 'ログをコピー'}
         >
           <MdiIcon path={mdiContentCopy} size={14} className={copyFeedback ? 'text-[var(--color-success)]' : ''} />
+        </button>
+        <button
+          type="button"
+          onClick={() => { void handleSaveToFile(); }}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          title={saveFeedback ?? 'ログをファイルに保存'}
+        >
+          <MdiIcon path={mdiContentSave} size={14} className={saveFeedback === '保存しました' ? 'text-[var(--color-success)]' : ''} />
         </button>
         <button
           type="button"
