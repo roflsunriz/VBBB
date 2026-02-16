@@ -12,6 +12,7 @@ import type { NgRule } from './ng';
 import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
+import type { MenuAction } from './menu';
 import type { LocalSearchQuery, RemoteSearchQuery, RemoteSearchResult, SearchResult } from './search';
 
 export interface IpcChannelMap {
@@ -249,6 +250,11 @@ export interface IpcChannelMap {
   'post:save-history': {
     args: [entry: PostHistoryEntry];
     result: void;
+  };
+  /** Wait for the next menu action (long-poll from renderer) */
+  'menu:wait-action': {
+    args: [];
+    result: MenuAction;
   };
 }
 

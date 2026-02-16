@@ -92,6 +92,9 @@ function getApi(): Window['electronApi'] {
   return window.electronApi;
 }
 
+/** Guards against concurrent openThread calls for the same thread */
+const pendingThreadOpens = new Set<string>();
+
 export const useBBSStore = create<BBSState>((set, get) => ({
   menu: null,
   menuLoading: false,
@@ -276,20 +279,25 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   openThread: async (boardUrl: string, threadId: string, title: string) => {
+    const tabId = `${boardUrl}:${threadId}`;
+
     const { tabs } = get();
-    const existingTab = tabs.find((t) => t.threadId === threadId && t.boardUrl === boardUrl);
+    const existingTab = tabs.find((t) => t.id === tabId);
     if (existingTab !== undefined) {
       set({ activeTabId: existingTab.id });
       return;
     }
 
-    const tabId = `${boardUrl}:${threadId}`;
+    if (pendingThreadOpens.has(tabId)) {
+      return;
+    }
+    pendingThreadOpens.add(tabId);
+
     set({ statusMessage: `${title} を読み込み中...` });
 
     try {
       const result: DatFetchResult = await getApi().invoke('bbs:fetch-dat', boardUrl, threadId);
 
-      // Get kokomade/scrollTop from thread index if available
       const { threadIndices } = get();
       const idx = threadIndices.find((i) => i.fileName === `${threadId}.dat`);
       const kokomade = idx?.kokomade ?? -1;
@@ -311,11 +319,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         statusMessage: `${title}: ${String(result.responses.length)} レス`,
       }));
 
-      // Record browsing history
       void getApi().invoke('history:add', boardUrl, threadId, title);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `読み込み失敗: ${message}` });
+    } finally {
+      pendingThreadOpens.delete(tabId);
     }
   },
 

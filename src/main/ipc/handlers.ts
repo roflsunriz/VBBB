@@ -7,7 +7,9 @@ import { join } from 'node:path';
 import type { Board } from '@shared/domain';
 import type { IpcChannelMap } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
+import type { MenuAction } from '@shared/menu';
 import { createLogger } from '../logger';
+import { menuEmitter } from '../menu';
 import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
 import { fetchDat } from '../services/dat';
@@ -368,6 +370,15 @@ export function registerIpcHandlers(): void {
   // Post history
   handle('post:save-history', async (entry) => {
     await savePostHistory(dataDir, entry);
+  });
+
+  // Menu action long-poll: renderer calls this and waits until a menu action occurs
+  handle('menu:wait-action', () => {
+    return new Promise<MenuAction>((resolve) => {
+      menuEmitter.once('action', (action: MenuAction) => {
+        resolve(action);
+      });
+    });
   });
 
   // Initialize board plugins

@@ -54,12 +54,18 @@ function NgRuleRow({
   );
 }
 
-export function NgEditor(): React.JSX.Element {
+interface NgEditorProps {
+  /** Optional close callback. Falls back to store's toggleNgEditor when not provided. */
+  readonly onClose?: () => void;
+}
+
+export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
   const ngRules = useBBSStore((s) => s.ngRules);
   const addNgRule = useBBSStore((s) => s.addNgRule);
   const removeNgRule = useBBSStore((s) => s.removeNgRule);
   const fetchNgRules = useBBSStore((s) => s.fetchNgRules);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
+  const handleClose = onClose ?? toggleNgEditor;
 
   const [newToken, setNewToken] = useState('');
   const [newAbonType, setNewAbonType] = useState<'normal' | 'transparent'>('normal');
@@ -108,7 +114,7 @@ export function NgEditor(): React.JSX.Element {
         <h3 className="text-xs font-medium text-[var(--color-text-primary)]">NG ルール管理</h3>
         <button
           type="button"
-          onClick={toggleNgEditor}
+          onClick={handleClose}
           className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           aria-label="閉じる"
         >

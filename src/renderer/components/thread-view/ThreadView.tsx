@@ -295,15 +295,18 @@ export function ThreadView(): React.JSX.Element {
       <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
           {tabs.map((tab) => (
-            <button
+            <div
               key={tab.id}
-              type="button"
+              role="tab"
+              tabIndex={0}
               onClick={() => { setActiveTab(tab.id); }}
-              className={`group flex max-w-48 shrink-0 items-center gap-1 rounded-t px-2 py-1 text-xs ${
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
+              className={`group flex max-w-48 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-1 text-xs ${
                 tab.id === activeTabId
                   ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
                   : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
               }`}
+              aria-selected={tab.id === activeTabId}
             >
               <span className="truncate">{tab.title}</span>
               <button
@@ -314,7 +317,7 @@ export function ThreadView(): React.JSX.Element {
               >
                 <MdiIcon path={mdiClose} size={10} />
               </button>
-            </button>
+            </div>
           ))}
         </div>
         {activeTab !== undefined && (
