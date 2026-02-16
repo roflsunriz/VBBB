@@ -182,10 +182,15 @@ export function registerIpcHandlers(): void {
     }
     const board = lookupBoard(validated.data.boardUrl);
     const plugin = getBoardPlugin(board.boardType);
-    if (plugin !== undefined) {
-      return plugin.postResponse(validated.data, board);
-    }
-    return postResponse(validated.data, board);
+    const result = plugin !== undefined
+      ? await plugin.postResponse(validated.data, board)
+      : await postResponse(validated.data, board);
+
+    // Persist any cookies received during the post flow
+    // (Set-Cookie from bbs.cgi and confirmation tokens from hidden fields)
+    await saveCookies(dataDir);
+
+    return result;
   });
 
   handle('bbs:get-thread-index', (boardUrl: string) => {

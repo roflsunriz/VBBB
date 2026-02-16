@@ -6,7 +6,7 @@ import type { EncodingType } from '@shared/api';
 import { type Board, BoardType, type PostParams, type PostResult, PostResultType } from '@shared/domain';
 import { MAX_POST_RETRIES } from '@shared/file-format';
 import { createLogger } from '../logger';
-import { buildCookieHeader, parseSetCookieHeaders } from './cookie-store';
+import { buildCookieHeader, parseSetCookieHeaders, setCookie } from './cookie-store';
 import { handleDonguriPostResult } from './donguri';
 import { decodeBuffer, httpEncode } from './encoding';
 import { httpFetch } from './http-client';
@@ -191,16 +191,27 @@ export function detectResultType(html: string): PostResultType {
 
 /**
  * Extract hidden input fields from HTML response.
+ * Attribute order does not matter: handles both
+ *   <input type=hidden name="x" value="y">
+ *   <input name="x" type="hidden" value="y">
+ *   <input value="y" name="x" type=hidden>
  */
 export function extractHiddenFields(html: string): Record<string, string> {
   const fields: Record<string, string> = {};
-  const regex = /<input\s+type=["']?hidden["']?\s+name=["']?([^"'\s>]+)["']?\s+value=["']?([^"'>]*)["']?/gi;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(html)) !== null) {
-    const name = match[1];
-    const value = match[2];
-    if (name !== undefined && value !== undefined) {
-      fields[name] = value;
+  const inputRegex = /<input\b[^>]*>/gi;
+  const typeRegex = /type\s*=\s*["']?hidden["']?/i;
+  const nameRegex = /name\s*=\s*["']?([^"'\s>]+)["']?/i;
+  const valueRegex = /value\s*=\s*["']?([^"'>]*)["']?/i;
+
+  let inputMatch: RegExpExecArray | null;
+  while ((inputMatch = inputRegex.exec(html)) !== null) {
+    const tag = inputMatch[0];
+    if (!typeRegex.test(tag)) continue;
+
+    const nm = nameRegex.exec(tag);
+    const vm = valueRegex.exec(tag);
+    if (nm !== null && nm[1] !== undefined) {
+      fields[nm[1]] = vm !== null && vm[1] !== undefined ? vm[1] : '';
     }
   }
   return fields;
@@ -290,6 +301,25 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     ) {
       // Extract hidden fields and retry
       hiddenFields = extractHiddenFields(html);
+
+      // Per protocol §5.7: store confirmation tokens as cookies so they
+      // appear in the Cookie header on the retry request.
+      // Standard POST parameters are excluded — only tokens like "yuki" are set.
+      const postUrlObj = new URL(postUrl);
+      const excludedNames = new Set(['FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject', 'submit']);
+      for (const [fieldName, fieldValue] of Object.entries(hiddenFields)) {
+        if (!excludedNames.has(fieldName)) {
+          setCookie({
+            name: fieldName,
+            value: fieldValue,
+            domain: postUrlObj.hostname,
+            path: '/',
+            sessionOnly: false,
+            secure: postUrlObj.protocol === 'https:',
+          });
+        }
+      }
+
       const fieldNames = Object.keys(hiddenFields);
       logger.info(`${resultType} response, retrying with ${String(fieldNames.length)} hidden fields: ${fieldNames.join(', ')}`);
       continue;
