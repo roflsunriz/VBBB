@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Debug Test Page</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 2rem; }
+    h1 { color: #333; margin-bottom: 1rem; }
+    .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .card h2 { color: #555; margin-bottom: 0.75rem; font-size: 1.1rem; }
+    label { display: block; margin-bottom: 0.25rem; font-weight: 600; color: #666; }
+    input, select, textarea {
+      width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;
+      margin-bottom: 0.75rem; font-size: 0.95rem;
+    }
+    button {
+      background: #4a90d9; color: #fff; border: none; padding: 0.6rem 1.2rem;
+      border-radius: 4px; cursor: pointer; font-size: 0.95rem; margin-right: 0.5rem;
+    }
+    button:hover { background: #357abd; }
+    button.secondary { background: #6c757d; }
+    button.danger { background: #dc3545; }
+    #output { background: #1e1e1e; color: #0f0; padding: 1rem; border-radius: 4px; min-height: 80px; font-family: monospace; white-space: pre-wrap; }
+    #counter { font-size: 2rem; font-weight: bold; color: #4a90d9; }
+    .status { padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; }
+    .status.success { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+    th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; font-weight: 600; }
+    #checkbox-list label { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <h1 id="page-title">MCP Debug Test Page</h1>
+
+  <!-- Section 1: Form Input -->
+  <div class="card" id="form-section">
+    <h2>1. フォーム入力テスト</h2>
+    <label for="username">ユーザー名:</label>
+    <input type="text" id="username" placeholder="名前を入力してください">
+    <label for="email">メールアドレス:</label>
+    <input type="email" id="email" placeholder="example@test.com">
+    <label for="category">カテゴリ:</label>
+    <select id="category">
+      <option value="">選択してください</option>
+      <option value="bug">バグ報告</option>
+      <option value="feature">機能要望</option>
+      <option value="question">質問</option>
+    </select>
+    <label for="message">メッセージ:</label>
+    <textarea id="message" rows="3" placeholder="メッセージを入力"></textarea>
+    <button id="submit-btn" onclick="handleSubmit()">送信</button>
+    <button class="secondary" onclick="handleReset()">リセット</button>
+    <div id="form-status"></div>
+  </div>
+
+  <!-- Section 2: Counter -->
+  <div class="card" id="counter-section">
+    <h2>2. カウンターテスト</h2>
+    <div id="counter">0</div>
+    <button onclick="increment()">+1</button>
+    <button onclick="decrement()">-1</button>
+    <button class="danger" onclick="resetCounter()">リセット</button>
+  </div>
+
+  <!-- Section 3: Checkbox -->
+  <div class="card" id="checkbox-section">
+    <h2>3. チェックボックステスト</h2>
+    <div id="checkbox-list">
+      <label><input type="checkbox" value="item1" onchange="updateChecked()"> アイテム1</label>
+      <label><input type="checkbox" value="item2" onchange="updateChecked()"> アイテム2</label>
+      <label><input type="checkbox" value="item3" onchange="updateChecked()"> アイテム3</label>
+    </div>
+    <div id="checked-output">選択中: なし</div>
+  </div>
+
+  <!-- Section 4: Data Table -->
+  <div class="card" id="table-section">
+    <h2>4. データテーブル</h2>
+    <button onclick="loadData()">データ読み込み</button>
+    <table id="data-table">
+      <thead><tr><th>ID</th><th>名前</th><th>ステータス</th></tr></thead>
+      <tbody id="table-body">
+        <tr><td colspan="3" style="text-align:center;color:#999;">データなし</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 5: Console Output -->
+  <div class="card" id="console-section">
+    <h2>5. コンソール出力</h2>
+    <button onclick="logInfo()">Info ログ</button>
+    <button onclick="logWarn()">Warn ログ</button>
+    <button class="danger" onclick="logError()">Error ログ</button>
+    <button class="secondary" onclick="clearOutput()">クリア</button>
+    <div id="output"></div>
+  </div>
+
+  <script>
+    let count = 0;
+
+    function handleSubmit() {
+      const name = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
+      const category = document.getElementById('category').value;
+      const message = document.getElementById('message').value;
+      const status = document.getElementById('form-status');
+
+      console.log('Form submitted:', { name, email, category, message });
+
+      if (!name || !email) {
+        status.className = 'status error';
+        status.textContent = 'エラー: ユーザー名とメールアドレスは必須です';
+        return;
+      }
+
+      status.className = 'status success';
+      status.textContent = `送信成功: ${name} (${email}) - ${category || '未選択'}`;
+      appendOutput(`[SUBMIT] ${name} / ${email} / ${category} / ${message}`);
+    }
+
+    function handleReset() {
+      document.getElementById('username').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('category').value = '';
+      document.getElementById('message').value = '';
+      document.getElementById('form-status').textContent = '';
+      document.getElementById('form-status').className = '';
+      console.log('Form reset');
+    }
+
+    function increment() {
+      count++;
+      document.getElementById('counter').textContent = count;
+      console.log('Counter:', count);
+    }
+
+    function decrement() {
+      count--;
+      document.getElementById('counter').textContent = count;
+      console.log('Counter:', count);
+    }
+
+    function resetCounter() {
+      count = 0;
+      document.getElementById('counter').textContent = count;
+      console.log('Counter reset');
+    }
+
+    function updateChecked() {
+      const checked = [...document.querySelectorAll('#checkbox-list input:checked')]
+        .map(cb => cb.value);
+      const output = document.getElementById('checked-output');
+      output.textContent = checked.length > 0
+        ? `選択中: ${checked.join(', ')}`
+        : '選択中: なし';
+      console.log('Checked items:', checked);
+    }
+
+    function loadData() {
+      const data = [
+        { id: 1, name: 'タスクA', status: '完了' },
+        { id: 2, name: 'タスクB', status: '進行中' },
+        { id: 3, name: 'タスクC', status: '未着手' },
+      ];
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = data.map(d =>
+        `<tr><td>${d.id}</td><td>${d.name}</td><td>${d.status}</td></tr>`
+      ).join('');
+      console.log('Data loaded:', data);
+      appendOutput('[DATA] テーブルデータを読み込みました');
+    }
+
+    function logInfo()  { console.log('INFO: これは情報ログです');  appendOutput('[INFO] 情報ログ出力'); }
+    function logWarn()  { console.warn('WARN: これは警告ログです'); appendOutput('[WARN] 警告ログ出力'); }
+    function logError() { console.error('ERROR: これはエラーログです'); appendOutput('[ERROR] エラーログ出力'); }
+
+    function appendOutput(text) {
+      const output = document.getElementById('output');
+      const time = new Date().toLocaleTimeString('ja-JP');
+      output.textContent += `${time} ${text}\n`;
+    }
+
+    function clearOutput() {
+      document.getElementById('output').textContent = '';
+      console.log('Output cleared');
+    }
+
+    // テスト用グローバル関数
+    window.getFormData = () => ({
+      name: document.getElementById('username').value,
+      email: document.getElementById('email').value,
+      category: document.getElementById('category').value,
+      message: document.getElementById('message').value,
+    });
+
+    window.getCounterValue = () => count;
+
+    console.log('MCP Debug Test Page loaded successfully');
+  </script>
+</body>
+</html>
