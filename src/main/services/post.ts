@@ -5,8 +5,11 @@
 import { type Board, BoardType, type PostParams, type PostResult, PostResultType } from '@shared/domain';
 import { MAX_POST_RETRIES } from '@shared/file-format';
 import { createLogger } from '../logger';
+import { buildCookieHeader, parseSetCookieHeaders } from './cookie-store';
+import { handleDonguriPostResult } from './donguri';
 import { decodeBuffer, httpEncode } from './encoding';
 import { httpFetch } from './http-client';
+import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('post');
 
@@ -37,6 +40,12 @@ function buildPostBody(
         fields.push([key, value]);
       }
     }
+  }
+
+  // Add UPLIFT sid if available
+  const sid = getUpliftSid();
+  if (sid.length > 0) {
+    fields.push(['sid', sid]);
   }
 
   fields.push(['FROM', params.name]);
@@ -138,19 +147,34 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
     logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)})`);
 
+    // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
+    const cookieHeader = buildCookieHeader(postUrl);
+    const postHeaders: Record<string, string> = {
+      'Content-Type': `application/x-www-form-urlencoded${charset}`,
+      Referer: `${board.serverUrl}test/bbs.cgi`,
+      'Accept-Language': 'ja',
+    };
+    if (cookieHeader.length > 0) {
+      postHeaders['Cookie'] = cookieHeader;
+    }
+
     const response = await httpFetch({
       url: postUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': `application/x-www-form-urlencoded${charset}`,
-        Referer: `${board.serverUrl}test/bbs.cgi`,
-        'Accept-Language': 'ja',
-      },
+      headers: postHeaders,
       body,
     });
 
+    // Parse and store any cookies from the response
+    parseSetCookieHeaders(response.headers, postUrl);
+
     const html = decodeBuffer(response.body, encoding);
     const resultType = detectResultType(html);
+
+    // Update donguri state for donguri-related results
+    if (resultType === PostResultType.Donguri || resultType === PostResultType.DonguriError) {
+      handleDonguriPostResult(resultType, html);
+    }
 
     if (resultType === PostResultType.OK) {
       return { success: true, resultType, message: html };

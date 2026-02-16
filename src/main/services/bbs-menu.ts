@@ -27,13 +27,23 @@ function detectBoardType(url: string): BoardType {
 }
 
 /**
- * Extract BBSID and server URL from a board URL.
+ * Extract BBSID, server URL, and optional JBBS directory from a board URL.
+ * JBBS URLs have pattern: https://jbbs.shitaraba.net/{dir}/{bbs}/
  */
-function parseBoardUrl(url: string): { bbsId: string; serverUrl: string } {
+function parseBoardUrl(url: string): { bbsId: string; serverUrl: string; jbbsDir?: string } {
   const parsed = new URL(url);
   const pathSegments = parsed.pathname.split('/').filter((s) => s.length > 0);
+  const boardType = detectBoardType(url);
+
+  // JBBS URLs: /{dir}/{bbs}/ — dir is the category, bbs is the board ID
+  if (boardType === BoardType.JBBS || boardType === BoardType.Shitaraba) {
+    const jbbsDir = pathSegments.length >= 2 ? (pathSegments[pathSegments.length - 2] ?? '') : '';
+    const bbsId = pathSegments[pathSegments.length - 1] ?? '';
+    const serverUrl = `${parsed.protocol}//${parsed.host}/`;
+    return { bbsId, serverUrl, jbbsDir };
+  }
+
   const bbsId = pathSegments[pathSegments.length - 1] ?? '';
-  // Server URL = everything except the last path segment
   const serverPath = pathSegments.slice(0, -1).join('/');
   const serverUrl = `${parsed.protocol}//${parsed.host}/${serverPath.length > 0 ? serverPath + '/' : ''}`;
   return { bbsId, serverUrl };
@@ -98,10 +108,10 @@ export function parseBBSMenuHtml(html: string): BBSMenu {
       }
 
       const url = normalizeUrl(rawUrl);
-      const { bbsId, serverUrl } = parseBoardUrl(url);
+      const { bbsId, serverUrl, jbbsDir } = parseBoardUrl(url);
       const boardType = detectBoardType(url);
 
-      currentCategory.boards.push({ title, url, bbsId, serverUrl, boardType });
+      currentCategory.boards.push({ title, url, bbsId, serverUrl, boardType, jbbsDir });
     }
   }
 
@@ -161,13 +171,14 @@ export function loadBBSMenuCache(dataDir: string): BBSMenu | null {
         name: cat.name,
         boards: cat.boards.map((b) => {
           const url = normalizeUrl(b.url);
-          const { bbsId, serverUrl } = parseBoardUrl(url);
+          const { bbsId, serverUrl, jbbsDir } = parseBoardUrl(url);
           return {
             title: b.title,
             url,
             bbsId,
             serverUrl,
             boardType: detectBoardType(url),
+            jbbsDir,
           };
         }),
       }));

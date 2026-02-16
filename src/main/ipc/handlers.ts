@@ -17,6 +17,12 @@ import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
+import { beLogin, beLogout, getBeSession } from '../services/be-auth';
+import { getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
+import { getDonguriState } from '../services/donguri';
+import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
+import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
+import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 
 const logger = createLogger('ipc');
 
@@ -45,6 +51,25 @@ function lookupBoard(boardUrl: string): Board {
   // Fallback: construct minimal Board from URL
   const url = new URL(boardUrl);
   const segments = url.pathname.split('/').filter((s) => s.length > 0);
+  const hostname = url.hostname.toLowerCase();
+
+  // Detect JBBS boards
+  const isJBBS = hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor');
+  const isShitaraba = !isJBBS && hostname.includes('shitaraba');
+
+  if (isJBBS || isShitaraba) {
+    const jbbsDir = segments.length >= 2 ? (segments[segments.length - 2] ?? '') : '';
+    const bbsId = segments[segments.length - 1] ?? 'unknown';
+    return {
+      title: bbsId,
+      url: boardUrl,
+      bbsId,
+      serverUrl: `${url.protocol}//${url.host}/`,
+      boardType: isJBBS ? 'jbbs' : 'shitaraba',
+      jbbsDir,
+    };
+  }
+
   const bbsId = segments[segments.length - 1] ?? 'unknown';
   const board: Board = {
     title: bbsId,
@@ -99,11 +124,19 @@ export function registerIpcHandlers(): void {
 
   handle('bbs:fetch-subject', async (boardUrl: string) => {
     const board = lookupBoard(boardUrl);
+    const plugin = getBoardPlugin(board.boardType);
+    if (plugin !== undefined) {
+      return plugin.fetchSubject(board, dataDir);
+    }
     return fetchSubject(board, dataDir);
   });
 
   handle('bbs:fetch-dat', async (boardUrl: string, threadId: string) => {
     const board = lookupBoard(boardUrl);
+    const plugin = getBoardPlugin(board.boardType);
+    if (plugin !== undefined) {
+      return plugin.fetchDat(board, threadId, dataDir);
+    }
     return fetchDat(board, threadId, dataDir);
   });
 
@@ -117,6 +150,10 @@ export function registerIpcHandlers(): void {
       };
     }
     const board = lookupBoard(validated.data.boardUrl);
+    const plugin = getBoardPlugin(board.boardType);
+    if (plugin !== undefined) {
+      return plugin.postResponse(validated.data, board);
+    }
     return postResponse(validated.data, board);
   });
 
@@ -176,6 +213,76 @@ export function registerIpcHandlers(): void {
 
   handle('fav:remove', async (nodeId: string) => {
     await removeFavorite(dataDir, nodeId);
+  });
+
+  // Initialize board plugins
+  initializeBoardPlugins();
+
+  // Initialize cookie store on startup
+  loadCookies(dataDir);
+
+  handle('cookie:get-for-url', (url: string) => {
+    return Promise.resolve(getCookiesForUrl(url));
+  });
+
+  handle('cookie:set', async (cookie) => {
+    setCookie(cookie);
+    await saveCookies(dataDir);
+  });
+
+  handle('cookie:remove', async (name: string, domain: string) => {
+    removeCookie(name, domain);
+    await saveCookies(dataDir);
+  });
+
+  handle('cookie:save', async () => {
+    await saveCookies(dataDir);
+  });
+
+  // Initialize proxy config on startup
+  loadProxyConfig(dataDir);
+
+  handle('proxy:get-config', () => {
+    return Promise.resolve(getProxyConfig());
+  });
+
+  handle('proxy:set-config', async (config) => {
+    await saveProxyConfig(dataDir, config);
+  });
+
+  // Auth handlers
+  handle('auth:get-state', () => {
+    return Promise.resolve({
+      uplift: getUpliftSession(),
+      be: getBeSession(),
+      donguri: getDonguriState(),
+    });
+  });
+
+  handle('auth:uplift-login', async (userId: string, password: string) => {
+    const result = await upliftLogin(userId, password);
+    if (result.success) {
+      await saveCookies(dataDir);
+    }
+    return result;
+  });
+
+  handle('auth:uplift-logout', () => {
+    upliftLogout();
+    return Promise.resolve();
+  });
+
+  handle('auth:be-login', async (mail: string, password: string) => {
+    const result = await beLogin(mail, password);
+    if (result.success) {
+      await saveCookies(dataDir);
+    }
+    return result;
+  });
+
+  handle('auth:be-logout', async () => {
+    beLogout();
+    await saveCookies(dataDir);
   });
 
   logger.info('IPC handlers registered');

@@ -53,6 +53,7 @@
     "@mdi/js": "^7.4.47",
     "@xmldom/xmldom": "^0.8.11",
     "dompurify": "^3.3.1",
+    "https-proxy-agent": "^7.0.6",
     "iconv-lite": "^0.7.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

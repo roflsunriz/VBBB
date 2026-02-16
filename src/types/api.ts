@@ -1,6 +1,7 @@
 /**
  * HTTP communication types.
  */
+import type { Agent as HttpAgent } from 'node:http';
 
 /** HTTP request configuration */
 export interface HttpRequestConfig {
@@ -18,6 +19,8 @@ export interface HttpRequestConfig {
   readonly ifModifiedSince?: string | undefined;
   /** Whether to send Accept-Encoding: gzip */
   readonly acceptGzip?: boolean | undefined;
+  /** Optional proxy agent (http.Agent compatible) */
+  readonly agent?: HttpAgent | undefined;
 }
 
 /** HTTP response */

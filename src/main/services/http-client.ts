@@ -61,13 +61,20 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
       headers['Accept-Encoding'] = 'gzip';
     }
 
+    const requestOptions: Record<string, unknown> = {
+      method: config.method,
+      headers,
+      timeout: config.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT,
+    };
+
+    // Inject proxy agent if provided
+    if (config.agent !== undefined) {
+      requestOptions['agent'] = config.agent;
+    }
+
     const req = requestFn(
       config.url,
-      {
-        method: config.method,
-        headers,
-        timeout: config.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT,
-      },
+      requestOptions,
       (res) => {
         const chunks: Buffer[] = [];
         const readTimeout = config.readTimeout ?? DEFAULT_READ_TIMEOUT;

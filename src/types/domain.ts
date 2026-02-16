@@ -63,6 +63,8 @@ export interface Board {
   readonly serverUrl: string;
   /** Board type */
   readonly boardType: BoardType;
+  /** JBBS directory (e.g. "game", "news") — only for JBBS boards */
+  readonly jbbsDir?: string | undefined;
 }
 
 /** One line of subject.txt (TSubjectRec) */
@@ -121,6 +123,8 @@ export interface Res {
   readonly body: string;
   /** Thread title (only present on res #1) */
   readonly title: string;
+  /** Poster ID — present in JBBS 7-field DAT format */
+  readonly id?: string | undefined;
 }
 
 /** Board-specific default name/mail configuration (コテハン) */

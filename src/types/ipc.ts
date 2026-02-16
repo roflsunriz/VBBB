@@ -3,9 +3,12 @@
  * Maps channel names to their argument/result types.
  * Used by both main process and preload to ensure type safety.
  */
+import type { AuthState } from './auth';
+import type { StoredCookie } from './cookie';
 import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
 import type { FavNode, FavTree } from './favorite';
 import type { NgRule } from './ng';
+import type { ProxyConfig } from './proxy';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -96,6 +99,61 @@ export interface IpcChannelMap {
   /** Remove a favorite by id */
   'fav:remove': {
     args: [nodeId: string];
+    result: void;
+  };
+  /** Get proxy configuration */
+  'proxy:get-config': {
+    args: [];
+    result: ProxyConfig;
+  };
+  /** Save proxy configuration */
+  'proxy:set-config': {
+    args: [config: ProxyConfig];
+    result: void;
+  };
+  /** Get cookies for a URL */
+  'cookie:get-for-url': {
+    args: [url: string];
+    result: readonly StoredCookie[];
+  };
+  /** Set a cookie */
+  'cookie:set': {
+    args: [cookie: StoredCookie];
+    result: void;
+  };
+  /** Remove a cookie by name and domain */
+  'cookie:remove': {
+    args: [name: string, domain: string];
+    result: void;
+  };
+  /** Save cookies to disk */
+  'cookie:save': {
+    args: [];
+    result: void;
+  };
+  /** Get current auth state (UPLIFT, Be, Donguri) */
+  'auth:get-state': {
+    args: [];
+    result: AuthState;
+  };
+  /** UPLIFT login */
+  'auth:uplift-login': {
+    args: [userId: string, password: string];
+    result: { success: boolean; message: string };
+  };
+  /** UPLIFT logout */
+  'auth:uplift-logout': {
+    args: [];
+    result: void;
+  };
+  /** Be login */
+  'auth:be-login': {
+    args: [mail: string, password: string];
+    result: { success: boolean; message: string };
+  };
+  /** Be logout */
+  'auth:be-logout': {
+    args: [];
     result: void;
   };
 }

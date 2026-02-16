@@ -15,6 +15,40 @@ import { PostEditor } from '../post-editor/PostEditor';
 import { ResPopup } from './ResPopup';
 import { NgEditor } from '../ng-editor/NgEditor';
 
+/** Be ID regex for matching "BE:ID-Level" in datetime field */
+const BE_PATTERN = /BE:(\d+)-(\d+)/;
+
+/**
+ * Render datetime text, converting Be IDs into clickable profile links.
+ */
+function renderDateTimeWithBe(dateTime: string, resNumber: number): React.ReactNode {
+  const match = BE_PATTERN.exec(dateTime);
+  if (match?.[1] === undefined || match[2] === undefined) {
+    return dateTime;
+  }
+
+  const beId = match[1];
+  const before = dateTime.substring(0, match.index);
+  const after = dateTime.substring(match.index + match[0].length);
+  const profileUrl = `https://be.5ch.net/test/p.php?i=${beId}/${String(resNumber)}`;
+
+  return (
+    <>
+      {before}
+      <a
+        href={profileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--color-link)] hover:underline"
+        title={`Be Profile: ${beId}`}
+      >
+        {match[0]}
+      </a>
+      {after}
+    </>
+  );
+}
+
 /** Popup state for anchor hover */
 interface PopupState {
   readonly resNumbers: readonly number[];
@@ -124,7 +158,7 @@ function ResItem({
         {res.mail.length > 0 && (
           <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
         )}
-        <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
+        <span className="text-[var(--color-res-datetime)]">{renderDateTimeWithBe(res.dateTime, res.number)}</span>
       </div>
       <div
         className="res-body text-sm leading-relaxed text-[var(--color-res-body)]"

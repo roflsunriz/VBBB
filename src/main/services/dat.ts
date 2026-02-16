@@ -9,6 +9,7 @@ import { createLogger } from '../logger';
 import { decodeBuffer } from './encoding';
 import { atomicAppendFile, atomicWriteFile, getBoardDir, readFileLastBytes, readFileSafe } from './file-io';
 import { httpFetch } from './http-client';
+import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('dat');
 
@@ -82,10 +83,29 @@ function getDatUrl(board: Board, threadId: string): string {
 }
 
 /**
+ * Get the oyster URL for UPLIFT past-log access.
+ * Returns undefined if not logged in.
+ */
+function getOysterUrl(board: Board, threadId: string): string | undefined {
+  const sid = getUpliftSid();
+  if (sid.length === 0) return undefined;
+  const prefix4 = threadId.substring(0, 4);
+  return `${board.url}oyster/${prefix4}/${threadId}.dat?sid=${encodeURIComponent(sid)}`;
+}
+
+/**
  * Get the kako (archive) URLs for a thread.
+ * Includes oyster URL (UPLIFT) at the front if logged in.
  */
 function getKakoUrls(board: Board, threadId: string): string[] {
   const urls: string[] = [];
+
+  // UPLIFT oyster URL gets priority if available
+  const oysterUrl = getOysterUrl(board, threadId);
+  if (oysterUrl !== undefined) {
+    urls.push(oysterUrl);
+  }
+
   if (threadId.length <= 9) {
     // 9 digits or less
     const prefix3 = threadId.substring(0, 3);
