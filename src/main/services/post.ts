@@ -14,8 +14,34 @@ import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('post');
 
-/** Max chars of response HTML to log for diagnostics. */
-const DIAGNOSTIC_HTML_LIMIT = 500;
+/** Max chars of response HTML to log for grtError diagnostics. */
+const DIAGNOSTIC_HTML_LIMIT = 2000;
+
+/** Max chars of response HTML to log for grtCookie/grtCheck diagnostics. */
+const CONFIRMATION_HTML_LIMIT = 4000;
+
+/**
+ * Extract POST body parameter keys for diagnostic logging.
+ * Does NOT log values (may contain user input).
+ */
+function extractBodyParamKeys(body: string): string {
+  return body.split('&').map((pair) => pair.split('=')[0] ?? '').join(', ');
+}
+
+/**
+ * Format response headers as a single diagnostic string.
+ * Cookie values are omitted for security.
+ */
+function formatHeadersDiag(headers: Readonly<Record<string, string>>): string {
+  return Object.entries(headers)
+    .map(([key, value]) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        return `${key}: (present, ${value.split('\n').length} cookie(s))`;
+      }
+      return `${key}: ${value}`;
+    })
+    .join(' | ');
+}
 
 /**
  * Determine POST encoding for a board type.
@@ -325,11 +351,19 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
   const postUrlObj = new URL(postUrl);
   const origin = postUrlObj.origin;
 
+  // Diagnostic: log the full post context
+  logger.info(
+    `[DIAG] Post context: boardType=${board.boardType}, encoding=${requestEncoding}, ` +
+    `bbsId=${board.bbsId}, threadId=${params.threadId}, referer=${referer}`,
+  );
+
   let hiddenFields: Record<string, string> | undefined;
   let retrySubmitBtn: SubmitButton | undefined;
   let lastPayloadHash = '';
 
   for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
+    const isRetry = hiddenFields !== undefined && retrySubmitBtn !== undefined;
+
     // On retry after grtCookie/grtCheck, submit the server's confirmation
     // form directly (preserving its `time` value, submit button text, etc.)
     const body = hiddenFields !== undefined && retrySubmitBtn !== undefined
@@ -347,6 +381,14 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     }
     lastPayloadHash = body;
 
+    // Diagnostic: log body param keys and size
+    const bodyParamKeys = extractBodyParamKeys(body);
+    const bodyBytes = Buffer.byteLength(body, 'utf-8');
+    logger.info(
+      `[DIAG] Request body (attempt ${String(attempt + 1)}, ${isRetry ? 'retry' : 'initial'}): ` +
+      `params=[${bodyParamKeys}], size=${String(bodyBytes)} bytes`,
+    );
+
     // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
     const cookieHeader = buildCookieHeader(postUrl);
     // Log cookie names (not values) for diagnostics
@@ -354,6 +396,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       ? cookieHeader.split('; ').map((c) => c.split('=')[0]).join(', ')
       : '(none)';
     logger.info(`Posting to ${postUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
+
     const postHeaders: Record<string, string> = {
       'Content-Type': `application/x-www-form-urlencoded${charset}`,
       Referer: referer,
@@ -364,12 +407,25 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       postHeaders['Cookie'] = cookieHeader;
     }
 
+    // Diagnostic: log all request headers (Cookie values already masked by logger)
+    logger.info(
+      `[DIAG] Request headers: ${Object.keys(postHeaders).join(', ')}`,
+    );
+
     const response = await httpFetch({
       url: postUrl,
       method: 'POST',
       headers: postHeaders,
       body,
     });
+
+    // Diagnostic: log full response headers
+    logger.info(
+      `[DIAG] Response HTTP ${String(response.status)}, headers: ${formatHeadersDiag(response.headers)}`,
+    );
+    logger.info(
+      `[DIAG] Response body size: ${String(response.body.length)} bytes`,
+    );
 
     // Parse and store any cookies from the response
     const hadSetCookie = response.headers['set-cookie'] !== undefined;
@@ -397,6 +453,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     }
 
     if (resultType === PostResultType.OK) {
+      logger.info('[DIAG] Post succeeded');
       return { success: true, resultType, message: html };
     }
 
@@ -404,6 +461,12 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       (resultType === PostResultType.Cookie || resultType === PostResultType.Check) &&
       attempt < MAX_POST_RETRIES
     ) {
+      // Diagnostic: log full confirmation page HTML for debugging
+      const confirmSnippet = html.length > CONFIRMATION_HTML_LIMIT
+        ? html.substring(0, CONFIRMATION_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
+        : html;
+      logger.info(`[DIAG] ${resultType} full response:\n${confirmSnippet}`);
+
       // Extract form data from the confirmation page
       hiddenFields = extractHiddenFields(html);
       const submitBtn = extractSubmitButton(html);
@@ -416,14 +479,25 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
         `submit name=${retrySubmitBtn.name ?? '(none)'} value="${retrySubmitBtn.value}"`,
       );
 
-      // Per protocol §5.7: also store confirmation tokens as cookies
-      // so they appear in the Cookie header on the retry request.
-      const confirmUrlObj = new URL(postUrl);
+      // Diagnostic: log all hidden field keys and whether they are standard params
       const standardParamNames = new Set([
         'FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject', 'submit',
       ]);
+      const hiddenSummary = Object.entries(hiddenFields)
+        .map(([k, v]) => {
+          const isStd = standardParamNames.has(k);
+          const safeVal = isStd && (k === 'MESSAGE' || k === 'FROM') ? '(user-input)' : v;
+          return `${k}=${safeVal}${isStd ? '' : ' [non-std]'}`;
+        })
+        .join(', ');
+      logger.info(`[DIAG] Hidden fields: ${hiddenSummary}`);
+
+      // Per protocol §5.7: also store confirmation tokens as cookies
+      // so they appear in the Cookie header on the retry request.
+      const confirmUrlObj = new URL(postUrl);
       for (const [fieldName, fieldValue] of Object.entries(hiddenFields)) {
         if (!standardParamNames.has(fieldName)) {
+          logger.info(`[DIAG] Storing hidden field as cookie: ${fieldName} for ${confirmUrlObj.hostname}`);
           setCookie({
             name: fieldName,
             value: htmlDecode(fieldValue),
@@ -445,9 +519,9 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     // Log diagnostic info for non-OK results to aid debugging
     if (resultType === PostResultType.Error) {
       const snippet = html.length > DIAGNOSTIC_HTML_LIMIT
-        ? html.substring(0, DIAGNOSTIC_HTML_LIMIT) + '...'
+        ? html.substring(0, DIAGNOSTIC_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
         : html;
-      logger.warn(`grtError response body (first ${String(DIAGNOSTIC_HTML_LIMIT)} chars): ${snippet}`);
+      logger.warn(`[DIAG] grtError response body:\n${snippet}`);
     }
 
     // Non-retryable or max retries exceeded

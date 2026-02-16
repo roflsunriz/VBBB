@@ -140,7 +140,13 @@ export function removeCookie(name: string, domain: string): void {
  */
 export function buildCookieHeader(url: string): string {
   const matched = getCookiesForUrl(url);
-  if (matched.length === 0) return '';
+  if (matched.length === 0) {
+    logger.info(`[DIAG] buildCookieHeader(${url}): no matching cookies`);
+    return '';
+  }
+  // Diagnostic: log matched cookie names and domains (not values)
+  const summary = matched.map((c) => `${c.name}@${c.domain}`).join(', ');
+  logger.info(`[DIAG] buildCookieHeader(${url}): matched ${String(matched.length)} cookie(s): ${summary}`);
   return matched.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
@@ -236,7 +242,11 @@ export function parseSetCookieHeaders(headers: Readonly<Record<string, string>>,
     };
 
     setCookie(cookie);
-    logger.info(`Cookie set: ${name} for domain ${domain} (value masked)`);
+    logger.info(
+      `Cookie set: ${name} for domain=${domain} path=${path}` +
+      `${expires !== undefined ? ` expires=${expires}` : ' (session)'}` +
+      `${secure ? ' secure' : ''} (value masked)`,
+    );
   }
 }
 

@@ -117,6 +117,14 @@ export function buildAppMenu(): void {
             dispatchAction({ type: 'open-modal', modal: 'cookie-manager' });
           },
         },
+        { type: 'separator' },
+        {
+          label: '診断コンソール',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: () => {
+            dispatchAction({ type: 'open-modal', modal: 'console' });
+          },
+        },
       ],
     },
     {

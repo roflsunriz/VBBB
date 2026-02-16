@@ -11,6 +11,7 @@ import {
   mdiInformation,
   mdiClose,
   mdiCookie,
+  mdiConsoleLine,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
@@ -23,13 +24,14 @@ import { ProxySettings } from './components/settings/ProxySettings';
 import { RoundPanel } from './components/round/RoundPanel';
 import { NgEditor } from './components/ng-editor/NgEditor';
 import { CookieManager } from './components/settings/CookieManager';
+import { ConsoleModal } from './components/console/ConsoleModal';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search';
-type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | null;
+type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | null;
 
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
@@ -123,7 +125,7 @@ export function App(): React.JSX.Element {
               }
               break;
             case 'open-modal':
-              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager') {
+              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager' || action.modal === 'console') {
                 setActiveModalRef.current(action.modal);
               }
               break;
@@ -164,6 +166,7 @@ export function App(): React.JSX.Element {
   const openProxy = useCallback(() => { setActiveModal('proxy'); }, []);
   const openRound = useCallback(() => { setActiveModal('round'); }, []);
   const openCookieManager = useCallback(() => { setActiveModal('cookie-manager'); }, []);
+  const openConsole = useCallback(() => { setActiveModal('console'); }, []);
   const openAbout = useCallback(() => { setActiveModal('about'); }, []);
 
   const handleLeftResize = useCallback((delta: number) => {
@@ -246,6 +249,17 @@ export function App(): React.JSX.Element {
         >
           <MdiIcon path={mdiCookie} size={14} />
           Cookie/UA
+        </button>
+
+        {/* Console */}
+        <button
+          type="button"
+          onClick={openConsole}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          title="診断コンソール (Ctrl+Shift+L)"
+        >
+          <MdiIcon path={mdiConsoleLine} size={14} />
+          コンソール
         </button>
 
         <div className="flex-1" />
@@ -358,6 +372,11 @@ export function App(): React.JSX.Element {
       {/* Modal: Cookie/UA Manager */}
       <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} width="max-w-xl">
         <CookieManager onClose={closeModal} />
+      </Modal>
+
+      {/* Modal: Console */}
+      <Modal open={activeModal === 'console'} onClose={closeModal} width="max-w-4xl">
+        <ConsoleModal onClose={closeModal} />
       </Modal>
 
       {/* Modal: About */}

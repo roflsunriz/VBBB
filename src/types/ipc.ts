@@ -5,6 +5,7 @@
  */
 import type { AuthState } from './auth';
 import type { StoredCookie } from './cookie';
+import type { DiagLogEntry } from './diagnostic';
 import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
 import type { FavNode, FavTree } from './favorite';
 import type { BrowsingHistoryEntry, SavedTab, SessionState } from './history';
@@ -289,6 +290,16 @@ export interface IpcChannelMap {
   /** Set custom user agent */
   'config:set-user-agent': {
     args: [userAgent: string];
+    result: void;
+  };
+  /** Get diagnostic log buffer */
+  'diag:get-logs': {
+    args: [];
+    result: readonly DiagLogEntry[];
+  };
+  /** Clear diagnostic log buffer */
+  'diag:clear-logs': {
+    args: [];
     result: void;
   };
 }

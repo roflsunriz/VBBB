@@ -64,6 +64,21 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
       headers['Accept-Encoding'] = 'gzip';
     }
 
+    // Set explicit Content-Length for POST bodies to avoid chunked encoding
+    // (some BBS servers such as 5ch bbs.cgi may not support chunked requests)
+    if (config.body !== undefined) {
+      headers['Content-Length'] = String(Buffer.byteLength(config.body, 'utf-8'));
+    }
+
+    // Diagnostic: log outgoing request details
+    const headerNames = Object.keys(headers).join(', ');
+    const bodyInfo = config.body !== undefined
+      ? `${String(Buffer.byteLength(config.body, 'utf-8'))} bytes`
+      : 'none';
+    logger.info(
+      `[DIAG] ${config.method} ${config.url} headers=[${headerNames}] body=${bodyInfo}`,
+    );
+
     const requestOptions: Record<string, unknown> = {
       method: config.method,
       headers,
@@ -104,6 +119,12 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
           }
 
           const responseHeaders = headersToRecord(res.headers);
+
+          // Diagnostic: log response summary
+          logger.info(
+            `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
+          );
+
           resolve({
             status: res.statusCode ?? 0,
             headers: responseHeaders,

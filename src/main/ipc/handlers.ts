@@ -9,7 +9,7 @@ import type { Board } from '@shared/domain';
 import type { IpcChannelMap } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
-import { createLogger } from '../logger';
+import { clearLogBuffer, createLogger, getLogBuffer } from '../logger';
 import { menuEmitter } from '../menu';
 import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
@@ -506,6 +506,16 @@ export function registerIpcHandlers(): void {
 
   handle('config:set-user-agent', (userAgent: string) => {
     customUserAgent = userAgent.trim().length > 0 ? userAgent.trim() : null;
+    return Promise.resolve();
+  });
+
+  // Diagnostic log handlers
+  handle('diag:get-logs', () => {
+    return Promise.resolve(getLogBuffer());
+  });
+
+  handle('diag:clear-logs', () => {
+    clearLogBuffer();
     return Promise.resolve();
   });
 
