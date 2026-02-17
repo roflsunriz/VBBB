@@ -54,10 +54,12 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const consumedQuoteRef = useRef('');
 
   // Apply initial message (e.g. >>N from res number click)
   useEffect(() => {
-    if (postEditorInitialMessage.length > 0) {
+    if (postEditorInitialMessage.length > 0 && postEditorInitialMessage !== consumedQuoteRef.current) {
+      consumedQuoteRef.current = postEditorInitialMessage;
       setMessage((prev) => prev + postEditorInitialMessage);
       // Focus textarea after inserting quote
       requestAnimationFrame(() => {
