@@ -256,6 +256,16 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
             placeholder={mode === 'local' ? '検索パターン (正規表現)' : 'キーワード (ff5ch.syoboi.jp)'}
             className="flex-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
           />
+          {pattern.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { setPattern(''); }}
+              className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              aria-label="検索をクリア"
+            >
+              <MdiIcon path={mdiClose} size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => { void handleSearch(); }}

@@ -11,6 +11,7 @@ import {
   mdiRefresh,
   mdiLoading,
   mdiMagnify,
+  mdiClose,
 } from '@mdi/js';
 import type { Board, Category } from '@shared/domain';
 import { BoardType } from '@shared/domain';
@@ -324,7 +325,17 @@ export function BoardTree(): React.JSX.Element {
             className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
           {searchFilter.length > 0 && (
-            <span className="text-[10px] text-[var(--color-text-muted)]">{filteredCategories.length} カテゴリ</span>
+            <>
+              <span className="text-[10px] text-[var(--color-text-muted)]">{filteredCategories.length} カテゴリ</span>
+              <button
+                type="button"
+                onClick={() => { setSearchFilter(''); }}
+                className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                aria-label="検索をクリア"
+              >
+                <MdiIcon path={mdiClose} size={11} />
+              </button>
+            </>
           )}
         </div>
       )}

@@ -569,7 +569,17 @@ export function ThreadList(): React.JSX.Element {
             className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
           {filter.length > 0 && (
-            <span className="text-xs text-[var(--color-text-muted)]">{filteredSubjects.length} 件</span>
+            <>
+              <span className="text-xs text-[var(--color-text-muted)]">{filteredSubjects.length} 件</span>
+              <button
+                type="button"
+                onClick={() => { setFilter(''); }}
+                className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                aria-label="検索をクリア"
+              >
+                <MdiIcon path={mdiClose} size={12} />
+              </button>
+            </>
           )}
         </div>
       )}
