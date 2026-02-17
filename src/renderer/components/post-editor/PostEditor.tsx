@@ -74,6 +74,8 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const [autoClose, setAutoClose] = useState(loadAutoClose);
   const [tripHelpOpen, setTripHelpOpen] = useState(false);
   const [donguriPopupOpen, setDonguriPopupOpen] = useState(false);
+  const donguriButtonRef = useRef<HTMLButtonElement>(null);
+  const [donguriPopupPos, setDonguriPopupPos] = useState({ x: 0, y: 0 });
   const [donguriLoading, setDonguriLoading] = useState(false);
   const [donguriMail, setDonguriMail] = useState('');
   const [donguriPassword, setDonguriPassword] = useState('');
@@ -116,6 +118,10 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
       const next = !prev;
       if (next) {
         void refreshDonguriDetails();
+        if (donguriButtonRef.current !== null) {
+          const rect = donguriButtonRef.current.getBoundingClientRect();
+          setDonguriPopupPos({ x: rect.left, y: rect.top });
+        }
       }
       return next;
     });
@@ -316,6 +322,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         {/* F34: Donguri status (clickable for popup) */}
         <div className="relative">
           <button
+            ref={donguriButtonRef}
             type="button"
             onClick={handleToggleDonguriPopup}
             className={`flex items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-[var(--color-bg-hover)] ${
@@ -333,7 +340,12 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
              donguriState.status === 'none' ? 'どんぐり未ログイン' : ''}
           </button>
           {donguriPopupOpen && (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-72 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg">
+            <>
+            <div className="fixed inset-0 z-40" onClick={() => { setDonguriPopupOpen(false); }} />
+            <div
+              className="fixed z-50 w-72 max-h-[80vh] overflow-y-auto rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg"
+              style={{ left: donguriPopupPos.x, bottom: window.innerHeight - donguriPopupPos.y + 4 }}
+            >
               <h4 className="mb-1 font-bold text-[var(--color-text-primary)]">どんぐりステータス</h4>
               {donguriLoading && (
                 <p className="mb-2 text-[var(--color-text-muted)]">どんぐり状態を取得中...</p>
@@ -452,6 +464,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
                 閉じる
               </button>
             </div>
+            </>
           )}
         </div>
         <label className="ml-auto flex cursor-pointer items-center gap-1 text-xs text-[var(--color-text-muted)]">
