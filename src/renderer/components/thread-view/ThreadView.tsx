@@ -28,6 +28,7 @@ import { InlineVideo } from './InlineVideo';
 import { ThreadAnalysis } from './ThreadAnalysis';
 import { NgEditor } from '../ng-editor/NgEditor';
 import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
+import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
 import type { IpLookupResult } from '@shared/ipc';
@@ -328,6 +329,8 @@ function ResItem({
   onFilterByWatchoi,
   onScrollToResNumber,
   onFilterByKotehan,
+  aaOverride,
+  onToggleAaFont,
 }: {
   readonly res: Res;
   readonly ngResult: NgFilterResult;
@@ -347,6 +350,8 @@ function ResItem({
   readonly onFilterByWatchoi: (label: string) => void;
   readonly onScrollToResNumber: (resNumber: number) => void;
   readonly onFilterByKotehan: (name: string) => void;
+  readonly aaOverride: boolean | undefined;
+  readonly onToggleAaFont: (resNumber: number, forceAa: boolean) => void;
 }): React.JSX.Element | null {
   // Transparent abon: completely hidden
   if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
@@ -421,6 +426,10 @@ function ResItem({
   }, [contextMenu]);
 
   const bodyHtml = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
+
+  // ASCII art detection and manual override
+  const isAutoAa = useMemo(() => isAsciiArt(res.body), [res.body]);
+  const isAaFinal = aaOverride ?? isAutoAa;
 
   // Detect image URLs in the body for inline thumbnails
   const images = useMemo(() => detectImageUrls(res.body), [res.body]);
@@ -531,7 +540,7 @@ function ResItem({
         ))}
       </div>
       <div
-        className="res-body text-sm leading-relaxed text-[var(--color-res-body)]"
+        className={`res-body ${isAaFinal ? 'aa-font' : 'text-sm leading-relaxed'} text-[var(--color-res-body)]`}
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
         onMouseOver={handleMouseOver}
         onMouseOut={onAnchorLeave}
@@ -609,6 +618,15 @@ function ResItem({
               </button>
             </>
           )}
+          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={() => { onToggleAaFont(res.number, !isAaFinal); setContextMenu(null); }}
+            role="menuitem"
+          >
+            {isAaFinal ? '通常フォントに戻す' : 'AAフォントで表示'}
+          </button>
         </div>,
         document.body,
       )}
@@ -900,6 +918,16 @@ export function ThreadView(): React.JSX.Element {
   }, []);
   const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
 
+  // AA font override state: manual per-post toggle (true = force AA, false = force normal)
+  const [aaOverrides, setAaOverrides] = useState(() => new Map<number, boolean>());
+  const handleToggleAaFont = useCallback((resNumber: number, forceAa: boolean) => {
+    setAaOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(resNumber, forceAa);
+      return next;
+    });
+  }, []);
+
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   // Collect all image URLs across the entire thread for modal keyboard navigation
@@ -1102,9 +1130,10 @@ export function ThreadView(): React.JSX.Element {
     };
   }, [activeTabId, updateTabScroll]);
 
-  // Close popup on tab change
+  // Close popup and reset AA overrides on tab change
   useEffect(() => {
     setPopup(null);
+    setAaOverrides((prev) => prev.size > 0 ? new Map<number, boolean>() : prev);
   }, [activeTabId]);
 
   const handleCloseTab = useCallback(
@@ -1385,6 +1414,8 @@ export function ThreadView(): React.JSX.Element {
                         onFilterById={handleFilterById}
                         onFilterByWatchoi={handleFilterByWatchoi}
                         onFilterByKotehan={handleFilterByKotehan}
+                        aaOverride={aaOverrides.get(res.number)}
+                        onToggleAaFont={handleToggleAaFont}
                       />
                     </div>
                   );

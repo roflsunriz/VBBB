@@ -6,6 +6,7 @@ import { useRef, useLayoutEffect, useCallback } from 'react';
 import type { Res } from '@shared/domain';
 import { MAX_POPUP_RES } from '@shared/file-format';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
+import { isAsciiArt } from '../../utils/aa-detect';
 
 interface ResPopupProps {
   /** Response numbers to display */
@@ -77,22 +78,25 @@ export function ResPopup({ resNumbers, responses, position, onClose }: ResPopupP
       }}
       onMouseLeave={handleMouseLeave}
     >
-      {matchedResponses.map((res) => (
-        <div key={res.number} className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0">
-          <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5 text-xs">
-            <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
-            <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
-            {res.mail.length > 0 && (
-              <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
-            )}
-            <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
+      {matchedResponses.map((res) => {
+        const bodyIsAa = isAsciiArt(res.body);
+        return (
+          <div key={res.number} className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0">
+            <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5 text-xs">
+              <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
+              <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
+              {res.mail.length > 0 && (
+                <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
+              )}
+              <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
+            </div>
+            <div
+              className={`${bodyIsAa ? 'aa-font' : 'text-xs leading-relaxed'} text-[var(--color-res-body)]`}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.body) }}
+            />
           </div>
-          <div
-            className="text-xs leading-relaxed text-[var(--color-res-body)]"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.body) }}
-          />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

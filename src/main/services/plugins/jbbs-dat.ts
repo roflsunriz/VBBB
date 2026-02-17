@@ -48,9 +48,8 @@ export function parseJBBSDatLine(line: string): Res | null {
   const title = parts[5] ?? '';
   const id = parts[6] ?? '';
 
-  // Trim leading whitespace from body
-  body = body.replace(/^\s+/, '');
-  if (body.length === 0) {
+  // Empty body -> &nbsp; (leading whitespace preserved for AA rendering)
+  if (body.trim().length === 0) {
     body = '&nbsp;';
   }
 

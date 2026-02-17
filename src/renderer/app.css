@@ -12,6 +12,18 @@
   color: var(--color-anchor-hover);
 }
 
+/* ASCII art font — MS PGothic or compatible AA font with preserved spacing.
+ * 2ch AA is designed for MS PGothic at 16px with 18px line-height.
+ * white-space: pre prevents space collapsing critical for AA alignment. */
+.aa-font {
+  font-family: "IPAMonaPGothic", "Mona", "MS PGothic", monospace;
+  font-size: 16px;
+  line-height: 18px;
+  white-space: pre;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
 /* Themed scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

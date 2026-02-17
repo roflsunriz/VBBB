@@ -37,8 +37,7 @@ function parseMachiOfflawDat(parts: readonly string[]): Res | null {
   const title = hasTitleField ? (parts[5] ?? '') : '';
   const idCandidate = hasTitleField ? parts[6] : parts[5];
 
-  body = body.replace(/^\s+/, '');
-  if (body.length === 0) {
+  if (body.trim().length === 0) {
     body = '&nbsp;';
   }
 
@@ -86,10 +85,8 @@ export function parseDatLine(line: string, lineNumber: number): Res | null {
   let body = parts[3] ?? '';
   const title = parts[4] ?? '';
 
-  // Trim leading whitespace from body
-  body = body.replace(/^\s+/, '');
-  // Empty body -> &nbsp;
-  if (body.length === 0) {
+  // Empty body -> &nbsp; (leading whitespace preserved for AA rendering)
+  if (body.trim().length === 0) {
     body = '&nbsp;';
   }
 

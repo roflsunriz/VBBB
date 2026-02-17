@@ -30,10 +30,10 @@ describe('parseDatLine', () => {
     expect(res?.title).toBe('');
   });
 
-  it('trims leading whitespace from body', () => {
+  it('preserves leading whitespace in body for AA rendering', () => {
     const line = '名前<>sage<>date<>  本文先頭空白<>';
     const res = parseDatLine(line, 1);
-    expect(res?.body).toBe('本文先頭空白');
+    expect(res?.body).toBe('  本文先頭空白');
   });
 
   it('returns null for empty lines', () => {
