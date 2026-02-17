@@ -3,7 +3,8 @@
  * Saves/restores open tabs to tab.sav.
  * Format: 1 line per tab, fields separated by TAB.
  */
-import { join } from 'node:path';
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { SavedTab, SessionState } from '@shared/history';
 import { createLogger } from '../logger';
 import { atomicWriteFile, readFileSafe } from './file-io';
@@ -66,13 +67,39 @@ export function loadSavedTabs(dataDir: string): SavedTab[] {
 }
 
 /**
- * Save tabs to disk.
+ * Save tabs to disk (async, with locking).
  */
 export async function saveTabs(dataDir: string, tabs: readonly SavedTab[]): Promise<void> {
   const filePath = join(dataDir, TAB_SAV_FILE);
   const content = serializeTabSav(tabs);
   await atomicWriteFile(filePath, content);
   logger.info(`Saved ${String(tabs.length)} tabs`);
+}
+
+/**
+ * Save tabs to disk synchronously (for use in beforeunload / process exit).
+ * Bypasses the async lock — safe because the process is about to exit.
+ */
+export function saveTabsSync(dataDir: string, tabs: readonly SavedTab[]): void {
+  const filePath = join(dataDir, TAB_SAV_FILE);
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const content = serializeTabSav(tabs);
+  const tmpPath = `${filePath}.tmp.sync.${String(Date.now())}`;
+  writeFileSync(tmpPath, content);
+  if (existsSync(filePath)) {
+    const bakPath = `${filePath}.bak`;
+    try {
+      if (existsSync(bakPath)) unlinkSync(bakPath);
+      renameSync(filePath, bakPath);
+    } catch {
+      // Backup error is non-fatal
+    }
+  }
+  renameSync(tmpPath, filePath);
+  logger.info(`Saved ${String(tabs.length)} tabs (sync)`);
 }
 
 /**
@@ -98,11 +125,36 @@ export function loadSessionState(dataDir: string): SessionState {
 }
 
 /**
- * Save session state to disk.
+ * Save session state to disk (async, with locking).
  */
 export async function saveSessionState(dataDir: string, state: SessionState): Promise<void> {
   const filePath = join(dataDir, SESSION_FILE);
   await atomicWriteFile(filePath, JSON.stringify(state));
+}
+
+/**
+ * Save session state to disk synchronously (for use in beforeunload / process exit).
+ * Bypasses the async lock — safe because the process is about to exit.
+ */
+export function saveSessionStateSync(dataDir: string, state: SessionState): void {
+  const filePath = join(dataDir, SESSION_FILE);
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const content = JSON.stringify(state);
+  const tmpPath = `${filePath}.tmp.sync.${String(Date.now())}`;
+  writeFileSync(tmpPath, content);
+  if (existsSync(filePath)) {
+    const bakPath = `${filePath}.bak`;
+    try {
+      if (existsSync(bakPath)) unlinkSync(bakPath);
+      renameSync(filePath, bakPath);
+    } catch {
+      // Backup error is non-fatal
+    }
+  }
+  renameSync(tmpPath, filePath);
 }
 
 /**

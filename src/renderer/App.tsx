@@ -88,13 +88,21 @@ export function App(): React.JSX.Element {
     applyTheme(theme);
   }, [theme]);
 
-  // Save tabs and session state before window unload
+  // Save tabs and session state before window unload (synchronous to guarantee completion)
   useEffect(() => {
     const handleBeforeUnload = (): void => {
       const state = useBBSStore.getState();
-      void state.saveTabs();
-      // Save session state including board tabs for F27 restore
-      void window.electronApi.invoke('session:save', {
+      const savedTabs = state.tabs.map((t) => ({
+        boardUrl: t.boardUrl,
+        threadId: t.threadId,
+        title: t.title,
+        scrollTop: t.scrollTop,
+      }));
+      // Use synchronous IPC to ensure the write completes before the process exits.
+      // The async `saveTabs()` via `invoke` was unreliable here because app.quit()
+      // could terminate the process before atomicWriteFile finished.
+      window.electronApi.sendSync('tab:save-sync', savedTabs);
+      window.electronApi.sendSync('session:save-sync', {
         selectedBoardUrl: state.selectedBoard?.url ?? null,
         activeThreadTabId: state.activeTabId ?? undefined,
         boardTabUrls: state.boardTabs.map((t) => t.board.url),

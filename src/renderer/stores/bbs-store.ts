@@ -1027,3 +1027,27 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set({ statusMessage: message });
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Debounced auto-save: persist tab list whenever tabs are added/removed/reordered.
+// This ensures tab.sav is always reasonably up-to-date, so even if the
+// synchronous beforeunload save fails, at most a few hundred ms of changes
+// are lost (instead of the entire session).
+// ---------------------------------------------------------------------------
+const TAB_AUTO_SAVE_DELAY_MS = 500;
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let prevTabIdSnapshot = '';
+
+useBBSStore.subscribe((state) => {
+  const snapshot = state.tabs.map((t) => t.id).join('\t');
+  if (snapshot === prevTabIdSnapshot) return;
+  prevTabIdSnapshot = snapshot;
+
+  if (autoSaveTimer !== null) {
+    clearTimeout(autoSaveTimer);
+  }
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    void useBBSStore.getState().saveTabs();
+  }, TAB_AUTO_SAVE_DELAY_MS);
+});

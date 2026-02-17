@@ -37,7 +37,8 @@ import {
   saveRoundBoard, saveRoundItem, setTimerConfig,
 } from '../services/round-list';
 import { buildRemoteSearchUrl } from '../services/remote-search';
-import { loadSavedTabs, loadSessionState, saveSessionState, saveTabs } from '../services/tab-persistence';
+import type { SavedTab, SessionState } from '@shared/history';
+import { loadSavedTabs, loadSessionState, saveSessionState, saveSessionStateSync, saveTabs, saveTabsSync } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
 
@@ -330,6 +331,25 @@ export function registerIpcHandlers(): void {
 
   handle('session:save', async (state) => {
     await saveSessionState(dataDir, state);
+  });
+
+  // Synchronous save handlers for beforeunload (blocks renderer until write completes)
+  ipcMain.on('tab:save-sync', (event, tabs: unknown) => {
+    try {
+      saveTabsSync(dataDir, tabs as readonly SavedTab[]);
+    } catch (err) {
+      logger.error(`tab:save-sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    event.returnValue = null;
+  });
+
+  ipcMain.on('session:save-sync', (event, state: unknown) => {
+    try {
+      saveSessionStateSync(dataDir, state as SessionState);
+    } catch (err) {
+      logger.error(`session:save-sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    event.returnValue = null;
   });
 
   // Browsing history

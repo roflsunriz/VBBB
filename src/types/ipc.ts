@@ -352,3 +352,20 @@ export interface IpLookupResult {
 
 /** All IPC channel names */
 export type IpcChannel = keyof IpcChannelMap;
+
+/**
+ * Synchronous IPC channel definitions.
+ * Used only for critical saves during beforeunload where async calls may be lost.
+ */
+export interface IpcSyncChannelMap {
+  /** Save tabs synchronously (beforeunload) */
+  'tab:save-sync': {
+    args: [tabs: readonly SavedTab[]];
+    result: void;
+  };
+  /** Save session state synchronously (beforeunload) */
+  'session:save-sync': {
+    args: [state: SessionState];
+    result: void;
+  };
+}
