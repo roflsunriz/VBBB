@@ -6,8 +6,11 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading } from '@mdi/js';
 import type { Res } from '@shared/domain';
+import { BoardType } from '@shared/domain';
+import type { FavItem, FavNode } from '@shared/favorite';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
+import { detectBoardTypeByHost } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
@@ -659,13 +662,33 @@ export function ThreadView(): React.JSX.Element {
   const postHistory = useBBSStore((s) => s.postHistory);
   const highlightSettings = useBBSStore((s) => s.highlightSettings);
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
+  const addFavorite = useBBSStore((s) => s.addFavorite);
+  const removeFavorite = useBBSStore((s) => s.removeFavorite);
+  const favorites = useBBSStore((s) => s.favorites);
   const scrollRef = useRef<HTMLDivElement>(null);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
-  const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string; isFavorite: boolean } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
+
+  // Build favorite lookup for thread URLs
+  const favoriteUrlToId = useMemo(() => {
+    const map = new Map<string, string>();
+    const walk = (nodes: readonly FavNode[]): void => {
+      for (const node of nodes) {
+        if (node.kind === 'item' && node.type === 'thread') {
+          map.set(node.url, node.id);
+        }
+        if (node.kind === 'folder') {
+          walk(node.children);
+        }
+      }
+    };
+    walk(favorites.children);
+    return map;
+  }, [favorites]);
 
   // Close tab context menu on click
   useEffect(() => {
@@ -678,8 +701,38 @@ export function ThreadView(): React.JSX.Element {
   const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    setTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
-  }, []);
+    const tab = tabs.find((t) => t.id === tabId);
+    const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
+    setTabCtxMenu({ x: e.clientX, y: e.clientY, tabId, isFavorite: favoriteUrlToId.has(threadUrl) });
+  }, [tabs, favoriteUrlToId]);
+
+  const handleTabCtxToggleFavorite = useCallback(() => {
+    if (tabCtxMenu === null) return;
+    const tab = tabs.find((t) => t.id === tabCtxMenu.tabId);
+    if (tab === undefined) return;
+    const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
+    const existingFavId = favoriteUrlToId.get(threadUrl);
+    if (existingFavId !== undefined) {
+      void removeFavorite(existingFavId);
+    } else {
+      let boardType: BoardType;
+      try {
+        boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname.toLowerCase());
+      } catch {
+        boardType = BoardType.Type2ch;
+      }
+      const node: FavItem = {
+        id: `fav-${tab.threadId}-${String(Date.now())}`,
+        kind: 'item',
+        type: 'thread',
+        boardType,
+        url: threadUrl,
+        title: tab.title,
+      };
+      void addFavorite(node);
+    }
+    setTabCtxMenu(null);
+  }, [tabCtxMenu, tabs, favoriteUrlToId, addFavorite, removeFavorite]);
 
   const handleAddTabToRound = useCallback(() => {
     if (tabCtxMenu === null) return;
@@ -1181,6 +1234,15 @@ export function ThreadView(): React.JSX.Element {
             role="menuitem"
           >
             巡回に追加
+          </button>
+          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleTabCtxToggleFavorite}
+            role="menuitem"
+          >
+            {tabCtxMenu.isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
           </button>
         </div>
       )}

@@ -123,7 +123,7 @@ function parseFromDatPath(url: URL): ParsedThreadPathParts | null {
   };
 }
 
-function detectBoardTypeByHost(hostname: string): BoardType {
+export function detectBoardTypeByHost(hostname: string): BoardType {
   if (hostname.includes('jbbs.shitaraba')) return BoardType.Shitaraba;
   if (hostname.includes('jbbs.livedoor')) return BoardType.JBBS;
   if (hostname.includes('machi.to')) return BoardType.MachiBBS;
