@@ -167,6 +167,16 @@ export interface IpcChannelMap {
     args: [];
     result: void;
   };
+  /** Refresh donguri state from donguri.5ch.net */
+  'auth:donguri-refresh': {
+    args: [];
+    result: AuthState['donguri'];
+  };
+  /** Donguri login with mail/password */
+  'auth:donguri-login': {
+    args: [mail: string, password: string];
+    result: { success: boolean; message: string; state: AuthState['donguri'] };
+  };
   /** Update a single thread's index entry (kokomade, scrollTop, etc.) */
   'bbs:update-thread-index': {
     args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number }];

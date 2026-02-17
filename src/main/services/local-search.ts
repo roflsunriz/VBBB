@@ -3,6 +3,7 @@
  * Searches DAT files under a board directory by regex pattern.
  */
 import { readdirSync } from 'node:fs';
+import { BoardType } from '@shared/domain';
 import type { LocalSearchQuery, SearchResult } from '@shared/search';
 import { SearchTarget } from '@shared/search';
 import { createLogger } from '../logger';
@@ -20,9 +21,13 @@ const MAX_RESULTS = 500;
 export function searchLocal(
   query: LocalSearchQuery,
   dataDir: string,
+  boardType: BoardType,
 ): SearchResult[] {
   const boardDir = getBoardDir(dataDir, query.boardUrl);
   const results: SearchResult[] = [];
+  const encoding = boardType === BoardType.JBBS || boardType === BoardType.Shitaraba
+    ? 'EUC-JP'
+    : 'Shift_JIS';
 
   let datFiles: string[];
   try {
@@ -47,7 +52,7 @@ export function searchLocal(
     const content = readFileSafe(`${boardDir}/${datFile}`);
     if (content === null) continue;
 
-    const text = decodeBuffer(content, 'Shift_JIS');
+    const text = decodeBuffer(content, encoding);
     const responses = parseDat(text);
 
     // Extract thread ID and title

@@ -98,7 +98,7 @@ export function ThreadAnalysis({ responses, onClose, onScrollToRes }: ThreadAnal
   }, []);
 
   return (
-    <div className="flex max-h-80 min-h-32 flex-col border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <div className="flex h-80 min-h-32 max-h-[70vh] resize-y flex-col overflow-hidden border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
       <div className="flex items-center border-b border-[var(--color-border-secondary)] px-3 py-1">
         <span className="text-xs font-bold text-[var(--color-text-primary)]">スレッド分析</span>

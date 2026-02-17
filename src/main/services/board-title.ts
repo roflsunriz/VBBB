@@ -40,7 +40,9 @@ function extractTagText(html: string, tagName: string): string | null {
 }
 
 function getReadEncoding(board: Board): 'Shift_JIS' | 'EUC-JP' {
-  return board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
+  return board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
+    ? 'Shift_JIS'
+    : 'EUC-JP';
 }
 
 export function extractBoardTitleFromBoardInfoHtml(html: string): string | null {

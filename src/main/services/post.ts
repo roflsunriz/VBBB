@@ -51,6 +51,7 @@ function formatHeadersDiag(headers: Readonly<Record<string, string>>): string {
 function getPostEncoding(boardType: BoardType): EncodingType {
   switch (boardType) {
     case BoardType.Type2ch:
+    case BoardType.MachiBBS:
     case BoardType.Shitaraba:
       return 'Shift_JIS';
     case BoardType.JBBS:
@@ -554,7 +555,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
     // Update donguri state for donguri-related results
     if (resultType === PostResultType.Donguri || resultType === PostResultType.DonguriError) {
-      handleDonguriPostResult(resultType, html);
+      handleDonguriPostResult(resultType, html, response.headers);
     }
 
     if (resultType === PostResultType.OK) {

@@ -70,10 +70,14 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [sambaRemaining, setSambaRemaining] = useState(0);
-  const [donguriState, setDonguriState] = useState<DonguriState>({ status: 'none', message: '' });
+  const [donguriState, setDonguriState] = useState<DonguriState>({ status: 'none', message: '', loggedIn: false });
   const [autoClose, setAutoClose] = useState(loadAutoClose);
   const [tripHelpOpen, setTripHelpOpen] = useState(false);
   const [donguriPopupOpen, setDonguriPopupOpen] = useState(false);
+  const [donguriLoading, setDonguriLoading] = useState(false);
+  const [donguriMail, setDonguriMail] = useState('');
+  const [donguriPassword, setDonguriPassword] = useState('');
+  const [donguriActionMessage, setDonguriActionMessage] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -92,6 +96,49 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
       }
     })();
   }, []);
+
+  const refreshDonguriDetails = useCallback(async () => {
+    setDonguriLoading(true);
+    setDonguriActionMessage('');
+    try {
+      const state = await window.electronApi.invoke('auth:donguri-refresh');
+      setDonguriState(state);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setDonguriActionMessage(`どんぐり状態取得エラー: ${message}`);
+    } finally {
+      setDonguriLoading(false);
+    }
+  }, []);
+
+  const handleToggleDonguriPopup = useCallback(() => {
+    setDonguriPopupOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        void refreshDonguriDetails();
+      }
+      return next;
+    });
+  }, [refreshDonguriDetails]);
+
+  const handleDonguriLogin = useCallback(async () => {
+    setDonguriLoading(true);
+    setDonguriActionMessage('');
+    try {
+      const result = await window.electronApi.invoke('auth:donguri-login', donguriMail, donguriPassword);
+      setDonguriState(result.state);
+      setDonguriActionMessage(result.message);
+      setStatusMessage(result.message);
+      if (result.success) {
+        setDonguriPassword('');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setDonguriActionMessage(`どんぐりログインエラー: ${message}`);
+    } finally {
+      setDonguriLoading(false);
+    }
+  }, [donguriMail, donguriPassword, setStatusMessage]);
 
   // Samba countdown timer
   useEffect(() => {
@@ -177,12 +224,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
       } else {
         // Update donguri state on relevant result types
         if (result.resultType === 'grtDonguri' || result.resultType === 'grtDngBroken') {
-          try {
-            const authState = await window.electronApi.invoke('auth:get-state');
-            setDonguriState(authState.donguri);
-          } catch {
-            // Ignore
-          }
+          await refreshDonguriDetails();
         }
         setResultMessage(`投稿失敗: ${result.resultType}`);
         setStatusMessage(`投稿失敗: ${result.resultType}`);
@@ -193,7 +235,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor, refreshDonguriDetails]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -207,7 +249,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const isDisabled = posting || message.trim().length === 0;
 
   return (
-    <div className="border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
+    <div className="h-64 min-h-40 max-h-[70vh] resize-y overflow-auto border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
       {/* F35: IP privacy warning */}
       {hasExposedIps === true && (
         <div className="mb-2 flex items-center gap-2 rounded border border-[var(--color-error)] bg-[var(--color-error)]/10 px-3 py-1.5">
@@ -275,7 +317,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         <div className="relative">
           <button
             type="button"
-            onClick={() => { setDonguriPopupOpen((p) => !p); }}
+            onClick={handleToggleDonguriPopup}
             className={`flex items-center gap-1 rounded px-1 py-0.5 text-xs hover:bg-[var(--color-bg-hover)] ${
               donguriState.status === 'active' ? 'text-green-400' :
               donguriState.status === 'broken' ? 'text-[var(--color-error)]' :
@@ -288,11 +330,14 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
             {donguriState.status === 'active' ? 'どんぐり' :
              donguriState.status === 'broken' ? 'どんぐり破損' :
              donguriState.status === 'consumed' ? 'どんぐり消費済み' :
-             donguriState.status === 'none' ? 'どんぐり未取得' : ''}
+             donguriState.status === 'none' ? 'どんぐり未ログイン' : ''}
           </button>
           {donguriPopupOpen && (
-            <div className="absolute bottom-full left-0 z-50 mb-1 w-64 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg">
+            <div className="absolute bottom-full left-0 z-50 mb-1 w-72 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 text-xs shadow-lg">
               <h4 className="mb-1 font-bold text-[var(--color-text-primary)]">どんぐりステータス</h4>
+              {donguriLoading && (
+                <p className="mb-2 text-[var(--color-text-muted)]">どんぐり状態を取得中...</p>
+              )}
               <table className="w-full text-[var(--color-text-secondary)]">
                 <tbody>
                   <tr>
@@ -306,9 +351,61 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
                       {donguriState.status === 'active' ? 'アクティブ' :
                        donguriState.status === 'broken' ? '破損' :
                        donguriState.status === 'consumed' ? '消費済み' :
-                       '未取得'}
+                       '未ログイン'}
                     </td>
                   </tr>
+                  <tr>
+                    <td className="pr-2 font-semibold">ログイン</td>
+                    <td>{donguriState.loggedIn === true ? '済み' : '未ログイン'}</td>
+                  </tr>
+                  {donguriState.loggedIn === true && donguriState.userMode !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">モード</td>
+                      <td>{donguriState.userMode}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.userId !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">ID</td>
+                      <td>{donguriState.userId}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.userName !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">ユーザー名</td>
+                      <td>{donguriState.userName}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.level !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">レベル</td>
+                      <td>{donguriState.level}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.acorn !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">残高</td>
+                      <td>{donguriState.acorn}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.cannonStats !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">大砲統計</td>
+                      <td>{donguriState.cannonStats}</td>
+                    </tr>
+                  )}
+                  {donguriState.loggedIn === true && donguriState.fightStats !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">大乱闘統計</td>
+                      <td>{donguriState.fightStats}</td>
+                    </tr>
+                  )}
+                  {donguriState.donguriStat !== undefined && (
+                    <tr>
+                      <td className="pr-2 font-semibold">ヘッダ統計</td>
+                      <td>{donguriState.donguriStat}</td>
+                    </tr>
+                  )}
                   {donguriState.message.length > 0 && (
                     <tr>
                       <td className="pr-2 font-semibold">メッセージ</td>
@@ -317,9 +414,36 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
                   )}
                 </tbody>
               </table>
-              <p className="mt-2 text-[var(--color-text-muted)]">
-                どんぐりはCookieベースの投稿認証です。5chが発行するacorn Cookieが有効な場合に「アクティブ」になります。
-              </p>
+              {donguriState.loggedIn !== true && (
+                <div className="mt-2 space-y-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] p-2">
+                  <p className="text-[10px] text-[var(--color-text-muted)]">どんぐりにログインして詳細ステータスを取得</p>
+                  <input
+                    type="email"
+                    value={donguriMail}
+                    onChange={(e) => { setDonguriMail(e.target.value); }}
+                    placeholder="メールアドレス"
+                    className="w-full rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+                  />
+                  <input
+                    type="password"
+                    value={donguriPassword}
+                    onChange={(e) => { setDonguriPassword(e.target.value); }}
+                    placeholder="パスワード"
+                    className="w-full rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2 py-1 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { void handleDonguriLogin(); }}
+                    disabled={donguriLoading}
+                    className="w-full rounded bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    ログイン
+                  </button>
+                </div>
+              )}
+              {donguriActionMessage.length > 0 && (
+                <p className="mt-2 text-[10px] text-[var(--color-text-secondary)]">{donguriActionMessage}</p>
+              )}
               <button
                 type="button"
                 onClick={() => { setDonguriPopupOpen(false); }}
@@ -359,7 +483,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         onKeyDown={handleKeyDown}
         placeholder="本文を入力 (Ctrl+Enter で送信)"
         rows={4}
-        className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+        className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
       />
       {resultMessage.length > 0 && (
         <p className={`mt-1 text-xs ${resultMessage.includes('成功') ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'}`}>

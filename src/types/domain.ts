@@ -25,6 +25,8 @@ export const BoardType = {
   Shitaraba: 'shitaraba',
   /** JBBS (EUC-JP) */
   JBBS: 'jbbs',
+  /** Machi BBS (Shift_JIS) */
+  MachiBBS: 'machi',
 } as const;
 export type BoardType = (typeof BoardType)[keyof typeof BoardType];
 

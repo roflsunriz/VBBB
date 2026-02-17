@@ -4,8 +4,8 @@
  * Shows age/sage badges and new response counts.
  * Supports right-click context menu for favorites and NG.
  */
-import { useCallback, useMemo, useState, useEffect } from 'react';
-import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose } from '@mdi/js';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh } from '@mdi/js';
 import { AgeSage, type SubjectRecord } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
@@ -90,12 +90,18 @@ export function ThreadList(): React.JSX.Element {
   const activeBoardTabId = useBBSStore((s) => s.activeBoardTabId);
   const setActiveBoardTab = useBBSStore((s) => s.setActiveBoardTab);
   const closeBoardTab = useBBSStore((s) => s.closeBoardTab);
+  const refreshSelectedBoard = useBBSStore((s) => s.refreshSelectedBoard);
 
   const [sortKey, setSortKey] = useState<SortKey>('index');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filter, setFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [edgeRefreshIndicator, setEdgeRefreshIndicator] = useState<'top' | 'bottom' | null>(null);
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  const edgeIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edgeRefreshLockedRef = useRef(false);
 
   // Close board tab context menu on click
   useEffect(() => {
@@ -319,10 +325,45 @@ export function ThreadList(): React.JSX.Element {
   );
 
   const handleRefresh = useCallback(() => {
-    if (selectedBoard !== null) {
-      void selectBoard(selectedBoard);
+    if (selectedBoard === null || subjectLoading) return;
+    void refreshSelectedBoard();
+  }, [selectedBoard, subjectLoading, refreshSelectedBoard]);
+
+  const showEdgeRefreshIndicator = useCallback((edge: 'top' | 'bottom') => {
+    setEdgeRefreshIndicator(edge);
+    if (edgeIndicatorTimerRef.current !== null) {
+      clearTimeout(edgeIndicatorTimerRef.current);
     }
-  }, [selectedBoard, selectBoard]);
+    edgeIndicatorTimerRef.current = setTimeout(() => {
+      setEdgeRefreshIndicator(null);
+      edgeIndicatorTimerRef.current = null;
+    }, 900);
+  }, []);
+
+  const handleListWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const container = listScrollRef.current;
+    if (container === null) return;
+    if (edgeRefreshLockedRef.current || subjectLoading || selectedBoard === null) return;
+
+    const atTop = container.scrollTop <= 0;
+    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+    const scrollingUp = e.deltaY < 0;
+    const scrollingDown = e.deltaY > 0;
+
+    if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
+      edgeRefreshLockedRef.current = true;
+      showEdgeRefreshIndicator(atTop && scrollingUp ? 'top' : 'bottom');
+      void refreshSelectedBoard();
+
+      if (edgeRefreshUnlockTimerRef.current !== null) {
+        clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+      edgeRefreshUnlockTimerRef.current = setTimeout(() => {
+        edgeRefreshLockedRef.current = false;
+        edgeRefreshUnlockTimerRef.current = null;
+      }, 1200);
+    }
+  }, [subjectLoading, selectedBoard, refreshSelectedBoard, showEdgeRefreshIndicator]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, subject: SubjectRecord) => {
@@ -435,6 +476,27 @@ export function ThreadList(): React.JSX.Element {
     setBoardTabCtxMenu(null);
   }, [boardTabCtxMenu, boardTabs]);
 
+  const handleBoardTabRefresh = useCallback(() => {
+    if (boardTabCtxMenu === null) return;
+    const bt = boardTabs.find((t) => t.id === boardTabCtxMenu.tabId);
+    if (bt === undefined || subjectLoading) return;
+    void selectBoard(bt.board).then(() => {
+      void refreshSelectedBoard();
+    });
+    setBoardTabCtxMenu(null);
+  }, [boardTabCtxMenu, boardTabs, subjectLoading, selectBoard, refreshSelectedBoard]);
+
+  useEffect(() => {
+    return () => {
+      if (edgeIndicatorTimerRef.current !== null) {
+        clearTimeout(edgeIndicatorTimerRef.current);
+      }
+      if (edgeRefreshUnlockTimerRef.current !== null) {
+        clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+    };
+  }, []);
+
   // F24: Add board tab to favorites
   const handleAddBoardToFavorite = useCallback(() => {
     if (boardTabCtxMenu === null) return;
@@ -504,7 +566,7 @@ export function ThreadList(): React.JSX.Element {
             className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
             title="スレッド一覧を再取得"
           >
-            <MdiIcon path={mdiLoading} size={12} className={subjectLoading ? 'animate-spin' : ''} />
+            <MdiIcon path={subjectLoading ? mdiLoading : mdiRefresh} size={12} className={subjectLoading ? 'animate-spin' : ''} />
           </button>
         )}
       </div>
@@ -554,7 +616,17 @@ export function ThreadList(): React.JSX.Element {
       </div>
 
       {/* Thread rows */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={listScrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleListWheel}>
+        {edgeRefreshIndicator !== null && (
+          <div className={`pointer-events-none sticky z-20 flex justify-center ${
+            edgeRefreshIndicator === 'top' ? 'top-2' : 'bottom-2'
+          }`}>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bg-secondary)]/90 px-2 py-0.5 text-xs text-[var(--color-accent)] shadow">
+              <MdiIcon path={mdiRefresh} size={12} />
+              更新
+            </span>
+          </div>
+        )}
         {selectedBoard === null && (
           <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">板を選択してください</p>
         )}
@@ -636,6 +708,14 @@ export function ThreadList(): React.JSX.Element {
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleBoardTabRefresh}
+            role="menuitem"
+          >
+            更新
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
             onClick={handleAddBoardToFavorite}
             role="menuitem"
           >
@@ -659,6 +739,15 @@ export function ThreadList(): React.JSX.Element {
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           role="menu"
         >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleRefresh}
+            role="menuitem"
+          >
+            更新
+          </button>
+          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
           {ctxMenu.isFavorite ? (
             <button
               type="button"

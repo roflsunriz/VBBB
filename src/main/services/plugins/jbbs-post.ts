@@ -5,6 +5,7 @@
 import type { Board, PostParams, PostResult } from '@shared/domain';
 import { PostResultType } from '@shared/domain';
 import { createLogger } from '../../logger';
+import { buildCookieHeader, parseSetCookieHeaders } from '../cookie-store';
 import { decodeBuffer, httpEncode } from '../encoding';
 import { httpFetch } from '../http-client';
 
@@ -16,6 +17,11 @@ const logger = createLogger('jbbs-post');
 function getPostUrl(board: Board, threadId: string): string {
   const dir = board.jbbsDir ?? '';
   return `${board.serverUrl}bbs/write.cgi/${dir}/${board.bbsId}/${threadId}/`;
+}
+
+function getReadReferer(board: Board, threadId: string): string {
+  const dir = board.jbbsDir ?? '';
+  return `${board.serverUrl}bbs/read.cgi/${dir}/${board.bbsId}/${threadId}/`;
 }
 
 /**
@@ -81,24 +87,35 @@ export async function postJBBSResponse(
   board: Board,
 ): Promise<PostResult> {
   const postUrl = getPostUrl(board, params.threadId);
+  const referer = getReadReferer(board, params.threadId);
   const body = buildJBBSPostBody(params, board);
+  const cookieHeader = buildCookieHeader(postUrl);
 
   logger.info(`JBBS posting to ${postUrl}`);
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=EUC-JP',
+      Referer: referer,
+    };
+    if (cookieHeader.length > 0) {
+      headers['Cookie'] = cookieHeader;
+    }
+
     const response = await httpFetch({
       url: postUrl,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: postUrl,
-      },
+      headers,
       body,
     });
 
+    parseSetCookieHeaders(response.headers, postUrl);
+
     // JBBS responses are EUC-JP encoded
     const html = decodeBuffer(response.body, 'EUC-JP');
-    const resultType = detectJBBSResultType(html);
+    const resultType = response.status === 302 && html.trim().length === 0
+      ? PostResultType.OK
+      : detectJBBSResultType(html);
 
     return {
       success: resultType === PostResultType.OK,

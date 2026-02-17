@@ -51,4 +51,8 @@ export function initializeBoardPlugins(): void {
     registerBoardPlugin(BoardType.JBBS, jbbsPlugin);
     registerBoardPlugin(BoardType.Shitaraba, jbbsPlugin);
   });
+  void import('./machi-plugin').then(({ createMachiPlugin }) => {
+    const machiPlugin = createMachiPlugin();
+    registerBoardPlugin(BoardType.MachiBBS, machiPlugin);
+  });
 }

@@ -184,7 +184,7 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
   ]);
 
   return (
-    <div className="border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
+    <div className="h-72 min-h-44 max-h-[70vh] resize-y overflow-auto border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs font-bold text-[var(--color-text-primary)]">プログラマティック書き込み</span>
         <span className="text-[10px] text-[var(--color-text-muted)]">({boardUrl} / {threadId})</span>
@@ -276,7 +276,7 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
           </div>
           <textarea value={message} onChange={(e) => { setMessage(e.target.value); }} placeholder="本文"
             rows={2}
-            className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-0.5 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none" />
+            className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-0.5 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none" />
         </div>
       )}
 
@@ -295,7 +295,7 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
                 </div>
                 <textarea value={entry.message} onChange={(e) => { handleUpdateBatch(entry.id, 'message', e.target.value); }} placeholder="本文"
                   rows={1}
-                  className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-1 py-0.5 text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none" />
+                  className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-1 py-0.5 text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none" />
               </div>
               <button type="button" onClick={() => { handleRemoveBatch(entry.id); }}
                 className="mt-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-error)]">

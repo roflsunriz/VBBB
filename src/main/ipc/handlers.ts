@@ -5,7 +5,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import type { Board } from '@shared/domain';
+import { BoardType, type Board } from '@shared/domain';
 import type { IpcChannelMap } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
@@ -27,7 +27,7 @@ import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory, loadBrowsing
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
 import { getAllCookies, getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
-import { getDonguriState } from '../services/donguri';
+import { getDonguriState, loginDonguri, refreshDonguriState } from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
 import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
 import {
@@ -72,6 +72,7 @@ function lookupBoard(boardUrl: string): Board {
   // Detect JBBS boards
   const isShitaraba = hostname.includes('jbbs.shitaraba');
   const isJBBS = hostname.includes('jbbs.livedoor');
+  const isMachi = hostname.includes('machi.to');
 
   if (isJBBS || isShitaraba) {
     const jbbsDir = segments.length >= 2 ? (segments[segments.length - 2] ?? '') : '';
@@ -81,7 +82,7 @@ function lookupBoard(boardUrl: string): Board {
       url: boardUrl,
       bbsId,
       serverUrl: `${url.protocol}//${url.host}/`,
-      boardType: isJBBS ? 'jbbs' : 'shitaraba',
+      boardType: isJBBS ? BoardType.JBBS : BoardType.Shitaraba,
       jbbsDir,
     };
   }
@@ -92,7 +93,7 @@ function lookupBoard(boardUrl: string): Board {
     url: boardUrl,
     bbsId,
     serverUrl: `${url.protocol}//${url.host}/`,
-    boardType: '2ch',
+    boardType: isMachi ? BoardType.MachiBBS : BoardType.Type2ch,
   };
   return board;
 }
@@ -309,7 +310,8 @@ export function registerIpcHandlers(): void {
 
   // Search handlers
   handle('search:local', (query) => {
-    return Promise.resolve(searchLocal(query, dataDir));
+    const board = lookupBoard(query.boardUrl);
+    return Promise.resolve(searchLocal(query, dataDir, board.boardType));
   });
 
   handle('search:remote-url', (keywords: string) => {
@@ -474,6 +476,18 @@ export function registerIpcHandlers(): void {
   handle('auth:be-logout', async () => {
     beLogout();
     await saveCookies(dataDir);
+  });
+
+  handle('auth:donguri-refresh', async () => {
+    return refreshDonguriState();
+  });
+
+  handle('auth:donguri-login', async (mail: string, password: string) => {
+    const result = await loginDonguri(mail, password);
+    if (result.success) {
+      await saveCookies(dataDir);
+    }
+    return result;
   });
 
   // Image save via dialog

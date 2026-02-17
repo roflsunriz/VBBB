@@ -126,6 +126,7 @@ function parseFromDatPath(url: URL): ParsedThreadPathParts | null {
 function detectBoardTypeByHost(hostname: string): BoardType {
   if (hostname.includes('jbbs.shitaraba')) return BoardType.Shitaraba;
   if (hostname.includes('jbbs.livedoor')) return BoardType.JBBS;
+  if (hostname.includes('machi.to')) return BoardType.MachiBBS;
   return BoardType.Type2ch;
 }
 
@@ -157,7 +158,7 @@ function buildBoard(url: URL, boardPathSegments: readonly string[]): Board | nul
     url: `${url.protocol}//${url.host}/${boardPath}/`,
     bbsId,
     serverUrl: `${url.protocol}//${url.host}/`,
-    boardType: BoardType.Type2ch,
+    boardType,
   };
 }
 

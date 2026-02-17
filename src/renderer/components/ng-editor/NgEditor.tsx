@@ -135,7 +135,7 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
   }, [handleAdd]);
 
   return (
-    <div className="flex max-h-96 flex-col border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <div className="flex h-64 min-h-40 max-h-[70vh] resize-y flex-col overflow-hidden border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-3 py-1.5">
         <h3 className="text-xs font-medium text-[var(--color-text-primary)]">NG ルール管理</h3>

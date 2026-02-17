@@ -26,6 +26,9 @@ function detectBoardType(url: string): BoardType {
   if (hostname.includes('shitaraba')) {
     return BoardType.Shitaraba;
   }
+  if (hostname.includes('machi.to')) {
+    return BoardType.MachiBBS;
+  }
   return BoardType.Type2ch;
 }
 

@@ -111,7 +111,7 @@ describe('parseExternalBoardUrl', () => {
   it('parses a Machi BBS board URL', () => {
     const result = parseExternalBoardUrl('https://machi.to/hokkaidou/');
     expect(result).not.toBeNull();
-    expect(result?.board.boardType).toBe(BoardType.Type2ch);
+    expect(result?.board.boardType).toBe(BoardType.MachiBBS);
     expect(result?.board.bbsId).toBe('hokkaidou');
     expect(result?.board.url).toBe('https://machi.to/hokkaidou/');
     expect(result?.threadId).toBeUndefined();
@@ -121,7 +121,7 @@ describe('parseExternalBoardUrl', () => {
   it('parses a Machi BBS thread URL', () => {
     const result = parseExternalBoardUrl('https://machi.to/bbs/read.cgi/hokkaidou/1234567890/');
     expect(result).not.toBeNull();
-    expect(result?.board.boardType).toBe(BoardType.Type2ch);
+    expect(result?.board.boardType).toBe(BoardType.MachiBBS);
     expect(result?.board.bbsId).toBe('hokkaidou');
     expect(result?.threadId).toBe('1234567890');
   });
@@ -137,7 +137,7 @@ describe('parseExternalBoardUrl', () => {
   it('parses a Machi dat URL as thread', () => {
     const result = parseExternalBoardUrl('https://machi.to/tokyo/dat/1182428917.dat');
     expect(result).not.toBeNull();
-    expect(result?.board.boardType).toBe(BoardType.Type2ch);
+    expect(result?.board.boardType).toBe(BoardType.MachiBBS);
     expect(result?.board.bbsId).toBe('tokyo');
     expect(result?.threadId).toBe('1182428917');
   });
@@ -197,6 +197,7 @@ describe('parseAnyThreadUrl', () => {
     const result = parseAnyThreadUrl('https://machi.to/bbs/read.cgi/tokyo/1182428917/');
     expect(result).not.toBeNull();
     expect(result?.board.url).toBe('https://machi.to/tokyo/');
+    expect(result?.board.boardType).toBe(BoardType.MachiBBS);
     expect(result?.threadId).toBe('1182428917');
   });
 
@@ -204,6 +205,7 @@ describe('parseAnyThreadUrl', () => {
     const result = parseAnyThreadUrl('https://machi.to/tokyo/dat/1182428917.dat');
     expect(result).not.toBeNull();
     expect(result?.board.url).toBe('https://machi.to/tokyo/');
+    expect(result?.board.boardType).toBe(BoardType.MachiBBS);
     expect(result?.threadId).toBe('1182428917');
   });
 

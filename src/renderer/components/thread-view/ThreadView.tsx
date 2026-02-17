@@ -4,7 +4,7 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot } from '@mdi/js';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
@@ -642,6 +642,8 @@ export function ThreadView(): React.JSX.Element {
   const activeTabId = useBBSStore((s) => s.activeTabId);
   const closeTab = useBBSStore((s) => s.closeTab);
   const setActiveTab = useBBSStore((s) => s.setActiveTab);
+  const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
+  const refreshThreadTab = useBBSStore((s) => s.refreshThreadTab);
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
@@ -657,8 +659,13 @@ export function ThreadView(): React.JSX.Element {
   const highlightSettings = useBBSStore((s) => s.highlightSettings);
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const edgeIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [edgeRefreshIndicator, setEdgeRefreshIndicator] = useState<'top' | 'bottom' | null>(null);
 
   // Close tab context menu on click
   useEffect(() => {
@@ -687,6 +694,27 @@ export function ThreadView(): React.JSX.Element {
     });
     setTabCtxMenu(null);
   }, [tabCtxMenu, tabs]);
+
+  const handleRefreshCurrentThread = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshActiveThread();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, refreshActiveThread]);
+
+  const handleRefreshTabFromMenu = useCallback(async () => {
+    if (tabCtxMenu === null || refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshThreadTab(tabCtxMenu.tabId);
+    } finally {
+      setRefreshing(false);
+      setTabCtxMenu(null);
+    }
+  }, [tabCtxMenu, refreshing, refreshThreadTab]);
 
   const RELATIVE_TIME_KEY = 'vbbb-relative-time';
   const [showRelativeTime, setShowRelativeTime] = useState(() => {
@@ -895,6 +923,53 @@ export function ThreadView(): React.JSX.Element {
     openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
   }, [activeTab, openNgEditorWithToken]);
 
+  const showEdgeRefreshIndicator = useCallback((edge: 'top' | 'bottom') => {
+    setEdgeRefreshIndicator(edge);
+    if (edgeIndicatorTimerRef.current !== null) {
+      clearTimeout(edgeIndicatorTimerRef.current);
+    }
+    edgeIndicatorTimerRef.current = setTimeout(() => {
+      setEdgeRefreshIndicator(null);
+      edgeIndicatorTimerRef.current = null;
+    }, 900);
+  }, []);
+
+  const handleThreadWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const container = scrollRef.current;
+    if (container === null) return;
+    if (edgeRefreshLockedRef.current || refreshing) return;
+
+    const atTop = container.scrollTop <= 0;
+    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+    const scrollingUp = e.deltaY < 0;
+    const scrollingDown = e.deltaY > 0;
+
+    if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
+      edgeRefreshLockedRef.current = true;
+      showEdgeRefreshIndicator(atTop && scrollingUp ? 'top' : 'bottom');
+      void handleRefreshCurrentThread();
+
+      if (edgeRefreshUnlockTimerRef.current !== null) {
+        clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+      edgeRefreshUnlockTimerRef.current = setTimeout(() => {
+        edgeRefreshLockedRef.current = false;
+        edgeRefreshUnlockTimerRef.current = null;
+      }, 1200);
+    }
+  }, [refreshing, handleRefreshCurrentThread, showEdgeRefreshIndicator]);
+
+  useEffect(() => {
+    return () => {
+      if (edgeIndicatorTimerRef.current !== null) {
+        clearTimeout(edgeIndicatorTimerRef.current);
+      }
+      if (edgeRefreshUnlockTimerRef.current !== null) {
+        clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       {/* Tab bar */}
@@ -929,6 +1004,16 @@ export function ThreadView(): React.JSX.Element {
         </div>
         {activeTab !== undefined && (
           <div className="mr-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { void handleRefreshCurrentThread(); }}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                refreshing ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+              }`}
+              title="スレッドを更新"
+            >
+              <MdiIcon path={refreshing ? mdiLoading : mdiRefresh} size={14} className={refreshing ? 'animate-spin' : ''} />
+            </button>
             <button
               type="button"
               onClick={handleToggleRelativeTime}
@@ -1024,7 +1109,17 @@ export function ThreadView(): React.JSX.Element {
             )}
 
             {/* Responses */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
+              {edgeRefreshIndicator !== null && (
+                <div className={`pointer-events-none sticky z-20 flex justify-center ${
+                  edgeRefreshIndicator === 'top' ? 'top-2' : 'bottom-2'
+                }`}>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bg-secondary)]/90 px-2 py-0.5 text-xs text-[var(--color-accent)] shadow">
+                    <MdiIcon path={mdiRefresh} size={12} />
+                    更新
+                  </span>
+                </div>
+              )}
               {activeTab.responses.map((res) => {
                 // F31: skip non-matching responses when filter is active
                 if (filteredResNumbers !== null && !filteredResNumbers.has(res.number)) return null;
@@ -1094,6 +1189,14 @@ export function ThreadView(): React.JSX.Element {
           style={{ left: tabCtxMenu.x, top: tabCtxMenu.y }}
           role="menu"
         >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={() => { void handleRefreshTabFromMenu(); }}
+            role="menuitem"
+          >
+            更新
+          </button>
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"

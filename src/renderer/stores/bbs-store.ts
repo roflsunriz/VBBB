@@ -121,6 +121,8 @@ interface BBSState {
   clearBrowsingHistory: () => Promise<void>;
   addExternalBoard: (board: Board) => void;
   removeExternalBoard: (url: string) => void;
+  refreshSelectedBoard: () => Promise<void>;
+  refreshThreadTab: (tabId: string) => Promise<void>;
   refreshActiveThread: () => Promise<void>;
   loadPostHistory: () => Promise<void>;
   setHighlightSettings: (settings: HighlightSettings) => void;
@@ -774,6 +776,86 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     try { localStorage.setItem('vbbb-external-boards', JSON.stringify(updated)); } catch { /* ignore */ }
   },
 
+  refreshSelectedBoard: async () => {
+    const { selectedBoard } = get();
+    if (selectedBoard === null) return;
+
+    const boardTabId = selectedBoard.url;
+    const boardTitle = selectedBoard.title;
+
+    set((state) => ({
+      boardTabs: state.boardTabs.map((t) =>
+        t.id === boardTabId
+          ? { ...t, subjectLoading: true, subjectError: null }
+          : t,
+      ),
+      ...(state.activeBoardTabId === boardTabId
+        ? { subjectLoading: true, subjectError: null }
+        : {}),
+      statusMessage: `${boardTitle} のスレッド一覧を更新中...`,
+    }));
+
+    try {
+      const [result, indices, kotehan, sambaInfo] = await Promise.all([
+        getApi().invoke('bbs:fetch-subject', selectedBoard.url),
+        getApi().invoke('bbs:get-thread-index', selectedBoard.url),
+        getApi().invoke('bbs:get-kotehan', selectedBoard.url),
+        getApi().invoke('bbs:get-samba', selectedBoard.url),
+      ]);
+
+      set((state) => ({
+        boardTabs: state.boardTabs.map((t) =>
+          t.id === boardTabId
+            ? { ...t, subjects: result.threads, threadIndices: indices, subjectLoading: false, subjectError: null }
+            : t,
+        ),
+        ...(state.activeBoardTabId === boardTabId
+          ? {
+              subjects: result.threads,
+              threadIndices: indices,
+              kotehan,
+              sambaInfo,
+              subjectLoading: false,
+              subjectError: null,
+            }
+          : {}),
+        statusMessage: `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set((state) => ({
+        boardTabs: state.boardTabs.map((t) =>
+          t.id === boardTabId
+            ? { ...t, subjectLoading: false, subjectError: message }
+            : t,
+        ),
+        ...(state.activeBoardTabId === boardTabId
+          ? { subjectLoading: false, subjectError: message }
+          : {}),
+        statusMessage: `スレッド一覧更新失敗: ${message}`,
+      }));
+    }
+  },
+
+  refreshThreadTab: async (tabId: string) => {
+    const { tabs } = get();
+    const targetTab = tabs.find((t) => t.id === tabId);
+    if (targetTab === undefined) return;
+
+    try {
+      const result = await getApi().invoke('bbs:fetch-dat', targetTab.boardUrl, targetTab.threadId);
+      set((state) => ({
+        tabs: state.tabs.map((t) =>
+          t.id === tabId ? { ...t, responses: result.responses } : t,
+        ),
+        statusMessage: `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      set({ statusMessage: `スレ更新失敗: ${message}` });
+    }
+  },
+
   loadPostHistory: async () => {
     try {
       const history = await getApi().invoke('post:load-history');
@@ -793,22 +875,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   refreshActiveThread: async () => {
-    const { tabs, activeTabId } = get();
-    const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (activeTab === undefined) return;
-
-    try {
-      const result = await getApi().invoke('bbs:fetch-dat', activeTab.boardUrl, activeTab.threadId);
-      set((state) => ({
-        tabs: state.tabs.map((t) =>
-          t.id === activeTab.id ? { ...t, responses: result.responses } : t,
-        ),
-        statusMessage: `${activeTab.title}: ${String(result.responses.length)} レス (更新済み)`,
-      }));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set({ statusMessage: `スレ更新失敗: ${message}` });
-    }
+    const { activeTabId } = get();
+    if (activeTabId === null) return;
+    await get().refreshThreadTab(activeTabId);
   },
 
   togglePostEditor: () => {
