@@ -132,6 +132,8 @@ interface BBSState {
   togglePostEditor: () => void;
   closePostEditor: () => void;
   openPostEditorWithQuote: (resNumber: number) => void;
+  reorderBoardTabs: (fromIndex: number, toIndex: number) => void;
+  reorderThreadTabs: (fromIndex: number, toIndex: number) => void;
   setStatusMessage: (message: string) => void;
 }
 
@@ -997,6 +999,28 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   openPostEditorWithQuote: (resNumber: number) => {
     set({ postEditorOpen: true, postEditorInitialMessage: `>>${String(resNumber)}\n` });
+  },
+
+  reorderBoardTabs: (fromIndex: number, toIndex: number) => {
+    set((state) => {
+      const arr = [...state.boardTabs];
+      const item = arr[fromIndex];
+      if (item === undefined) return state;
+      arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, item);
+      return { boardTabs: arr };
+    });
+  },
+
+  reorderThreadTabs: (fromIndex: number, toIndex: number) => {
+    set((state) => {
+      const arr = [...state.tabs];
+      const item = arr[fromIndex];
+      if (item === undefined) return state;
+      arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, item);
+      return { tabs: arr };
+    });
   },
 
   setStatusMessage: (message: string) => {

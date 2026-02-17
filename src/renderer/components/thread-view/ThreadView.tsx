@@ -33,6 +33,7 @@ import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
 import type { IpLookupResult } from '@shared/ipc';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
+import { useDragReorder } from '../../hooks/use-drag-reorder';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -752,6 +753,7 @@ export function ThreadView(): React.JSX.Element {
   const setActiveTab = useBBSStore((s) => s.setActiveTab);
   const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
   const refreshThreadTab = useBBSStore((s) => s.refreshThreadTab);
+  const reorderThreadTabs = useBBSStore((s) => s.reorderThreadTabs);
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
@@ -1224,24 +1226,30 @@ export function ThreadView(): React.JSX.Element {
     };
   }, []);
 
+  const { getDragProps: getThreadTabDragProps, dragOverIndex: threadTabDragOverIndex, dragSourceIndex: threadTabDragSourceIndex } = useDragReorder({
+    itemCount: tabs.length,
+    onReorder: reorderThreadTabs,
+  });
+
   return (
     <section className="flex min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Tab bar */}
       <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
-          {tabs.map((tab) => (
+          {tabs.map((tab, i) => (
             <div
               key={tab.id}
               role="tab"
               tabIndex={0}
+              {...getThreadTabDragProps(i)}
               onClick={() => { setActiveTab(tab.id); }}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
               onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
-              className={`group flex max-w-48 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-1 text-xs ${
+              className={`group flex max-w-48 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-1 text-xs transition-opacity ${
                 tab.id === activeTabId
                   ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
                   : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
-              }`}
+              }${threadTabDragSourceIndex === i ? ' opacity-50' : ''}${threadTabDragOverIndex === i && threadTabDragSourceIndex !== i ? ' border-l-2 border-l-[var(--color-accent)]' : ''}`}
               aria-selected={tab.id === activeTabId}
             >
               <span className="truncate">{tab.title}</span>

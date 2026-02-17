@@ -15,6 +15,7 @@ import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { RefreshOverlay } from '../common/RefreshOverlay';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
+import { useDragReorder } from '../../hooks/use-drag-reorder';
 
 type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate';
 type SortDir = 'asc' | 'desc';
@@ -93,6 +94,7 @@ export function ThreadList(): React.JSX.Element {
   const setActiveBoardTab = useBBSStore((s) => s.setActiveBoardTab);
   const closeBoardTab = useBBSStore((s) => s.closeBoardTab);
   const refreshSelectedBoard = useBBSStore((s) => s.refreshSelectedBoard);
+  const reorderBoardTabs = useBBSStore((s) => s.reorderBoardTabs);
 
   const [sortKey, setSortKey] = useState<SortKey>('index');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -486,25 +488,31 @@ export function ThreadList(): React.JSX.Element {
     setBoardTabCtxMenu(null);
   }, [boardTabCtxMenu, boardTabs, addFavorite]);
 
+  const { getDragProps: getBoardTabDragProps, dragOverIndex: boardTabDragOverIndex, dragSourceIndex: boardTabDragSourceIndex } = useDragReorder({
+    itemCount: boardTabs.length,
+    onReorder: reorderBoardTabs,
+  });
+
   return (
     <section className="relative flex h-full min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Board tabs */}
       {boardTabs.length > 0 && (
         <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
           <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
-            {boardTabs.map((bt) => (
+            {boardTabs.map((bt, i) => (
               <div
                 key={bt.id}
                 role="tab"
                 tabIndex={0}
+                {...getBoardTabDragProps(i)}
                 onClick={() => { setActiveBoardTab(bt.id); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
                 onContextMenu={(e) => { handleBoardTabContextMenu(e, bt.id); }}
-                className={`group flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-0.5 text-xs ${
+                className={`group flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-0.5 text-xs transition-opacity ${
                   bt.id === activeBoardTabId
                     ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
                     : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
-                }`}
+                }${boardTabDragSourceIndex === i ? ' opacity-50' : ''}${boardTabDragOverIndex === i && boardTabDragSourceIndex !== i ? ' border-l-2 border-l-[var(--color-accent)]' : ''}`}
                 aria-selected={bt.id === activeBoardTabId}
               >
                 <span className="truncate">{bt.board.title}</span>
