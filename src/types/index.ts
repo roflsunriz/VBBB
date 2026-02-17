@@ -5,3 +5,4 @@ export * from './ipc';
 export * from './ng';
 export * from './favorite';
 export * from './settings';
+export * from './status-log';

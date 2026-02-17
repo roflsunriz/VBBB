@@ -9,6 +9,8 @@ import type { NgRule } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
 import type { HighlightSettings } from '@shared/settings';
 import { DEFAULT_HIGHLIGHT_SETTINGS } from '@shared/settings';
+import type { StatusLogCategory, StatusLogLevel } from '@shared/status-log';
+import { useStatusLogStore } from './status-log-store';
 
 /** Tab state for viewing threads */
 interface ThreadTab {
@@ -193,6 +195,11 @@ function isPlaceholderTitle(title: string, threadId: string): boolean {
   return machinePatterns.some((pattern) => pattern.test(normalized));
 }
 
+/** Shorthand to push a status log entry from store actions */
+function pushStatus(category: StatusLogCategory, level: StatusLogLevel, message: string): void {
+  useStatusLogStore.getState().pushLog(category, level, message);
+}
+
 function isExternalBoardUrl(boardUrl: string): boolean {
   try {
     const hostname = new URL(boardUrl).hostname.toLowerCase();
@@ -258,12 +265,15 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   fetchMenu: async () => {
     set({ menuLoading: true, menuError: null, statusMessage: '板一覧を取得中...' });
+    pushStatus('board', 'info', '板一覧を取得中...');
     try {
       const menu = await getApi().invoke('bbs:fetch-menu');
       set({ menu, menuLoading: false, statusMessage: `${String(menu.categories.length)} カテゴリを読み込みました` });
+      pushStatus('board', 'success', `板一覧取得完了: ${String(menu.categories.length)} カテゴリ`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ menuLoading: false, menuError: message, statusMessage: '板一覧の取得に失敗しました' });
+      pushStatus('board', 'error', `板一覧取得失敗: ${message}`);
     }
   },
 
@@ -346,6 +356,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       subjectError: null,
       statusMessage: `${board.title} のスレッド一覧を取得中...`,
     }));
+    pushStatus('board', 'info', `${board.title} のスレッド一覧を取得中...`);
     void maybeResolveExternalBoardTitle(board.url);
 
     // Persist selected board for session restore
@@ -377,6 +388,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: `${board.title}: ${String(result.threads.length)} スレッド`,
       }));
+      pushStatus('board', 'success', `${board.title}: ${String(result.threads.length)} スレッド取得`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set((state) => ({
@@ -390,6 +402,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: 'スレッド一覧の取得に失敗しました',
       }));
+      pushStatus('board', 'error', `${board.title} スレッド一覧取得失敗: ${message}`);
     }
   },
 
@@ -576,6 +589,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
     const loadingTitle = title.trim().length > 0 ? title : threadId;
     set({ statusMessage: `${loadingTitle} を読み込み中...` });
+    pushStatus('thread', 'info', `${loadingTitle} を読み込み中...`);
 
     try {
       const result: DatFetchResult = await getApi().invoke('bbs:fetch-dat', boardUrl, threadId);
@@ -627,11 +641,13 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         activeTabId: tabId,
         statusMessage: `${resolvedTitle}: ${String(result.responses.length)} レス`,
       }));
+      pushStatus('thread', 'success', `${resolvedTitle}: ${String(result.responses.length)} レス取得`);
 
       void getApi().invoke('history:add', boardUrl, threadId, resolvedTitle);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `読み込み失敗: ${message}` });
+      pushStatus('thread', 'error', `スレッド読み込み失敗: ${message}`);
     } finally {
       pendingThreadOpens.delete(tabId);
     }
@@ -831,6 +847,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         : {}),
       statusMessage: `${boardTitle} のスレッド一覧を更新中...`,
     }));
+    pushStatus('board', 'info', `${boardTitle} のスレッド一覧を更新中...`);
 
     try {
       const [result, indices, kotehan, sambaInfo] = await Promise.all([
@@ -858,6 +875,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
       }));
+      pushStatus('board', 'success', `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set((state) => ({
@@ -871,6 +889,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: `スレッド一覧更新失敗: ${message}`,
       }));
+      pushStatus('board', 'error', `${boardTitle} スレッド一覧更新失敗: ${message}`);
     }
   },
 
@@ -879,6 +898,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     const targetTab = tabs.find((t) => t.id === tabId);
     if (targetTab === undefined) return;
 
+    pushStatus('thread', 'info', `${targetTab.title} を更新中...`);
     try {
       const result = await getApi().invoke('bbs:fetch-dat', targetTab.boardUrl, targetTab.threadId);
       set((state) => ({
@@ -887,9 +907,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         ),
         statusMessage: `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
       }));
+      pushStatus('thread', 'success', `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `スレ更新失敗: ${message}` });
+      pushStatus('thread', 'error', `スレ更新失敗: ${message}`);
     }
   },
 

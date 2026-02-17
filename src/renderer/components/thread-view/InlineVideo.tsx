@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
+import { useStatusLogStore } from '../../stores/status-log-store';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -22,6 +23,7 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
   const handleError = useCallback(() => {
     console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url} / originalUrl: ${originalUrl}`);
     setHasError(true);
+    useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
   }, [url, originalUrl]);
 
   const handleOpenExternal = useCallback(() => {

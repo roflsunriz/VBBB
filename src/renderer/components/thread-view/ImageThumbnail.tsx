@@ -7,6 +7,7 @@ import { useState, useCallback } from 'react';
 import { ImageModal } from './ImageModal';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
+import { useStatusLogStore } from '../../stores/status-log-store';
 
 interface ImageThumbnailProps {
   readonly url: string;
@@ -36,6 +37,7 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
   const handleError = useCallback(() => {
     console.warn(`[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${displayUrl}`);
     setHasError(true);
+    useStatusLogStore.getState().pushLog('media', 'error', `画像読み込みエラー: ${displayUrl}`);
   }, [url, displayUrl]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

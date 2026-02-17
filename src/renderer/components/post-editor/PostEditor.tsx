@@ -8,6 +8,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { mdiSend, mdiLoading, mdiTimerSand, mdiTree, mdiHelpCircleOutline, mdiClose } from '@mdi/js';
 import type { DonguriState } from '@shared/auth';
 import { useBBSStore } from '../../stores/bbs-store';
+import { useStatusLogStore } from '../../stores/status-log-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { TopResizeHandle } from '../common/TopResizeHandle';
 
@@ -199,6 +200,8 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
 
     setPosting(true);
     setResultMessage('');
+    const pushLog = useStatusLogStore.getState().pushLog;
+    pushLog('post', 'info', '投稿送信中...');
 
     try {
       const result = await window.electronApi.invoke('bbs:post', {
@@ -213,6 +216,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         setMessage('');
         setResultMessage('投稿成功');
         setStatusMessage('投稿が完了しました');
+        pushLog('post', 'success', '投稿が完了しました');
         void saveKotehan(boardUrl, { name, mail });
         void recordSambaTime(boardUrl);
 
@@ -240,10 +244,12 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         }
         setResultMessage(`投稿失敗: ${result.resultType}`);
         setStatusMessage(`投稿失敗: ${result.resultType}`);
+        pushLog('post', 'error', `投稿失敗: ${result.resultType}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setResultMessage(`エラー: ${msg}`);
+      pushLog('post', 'error', `投稿エラー: ${msg}`);
     } finally {
       setPosting(false);
     }

@@ -28,6 +28,7 @@ import { RoundPanel } from './components/round/RoundPanel';
 import { NgEditor } from './components/ng-editor/NgEditor';
 import { CookieManager } from './components/settings/CookieManager';
 import { ConsoleModal } from './components/console/ConsoleModal';
+import { StatusConsole } from './components/status-console/StatusConsole';
 import { AddBoardDialog } from './components/board-tree/AddBoardDialog';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
@@ -368,12 +369,14 @@ export function App(): React.JSX.Element {
             </button>
           </div>
           {/* Tab content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             {leftTab === 'boards' && <BoardTree />}
             {leftTab === 'favorites' && <FavoriteTree />}
             {leftTab === 'search' && <SearchPanel />}
             {leftTab === 'history' && <HistoryPanel />}
           </div>
+          {/* Status console */}
+          <StatusConsole />
         </aside>
 
         <ResizeHandle onResize={handleLeftResize} onResizeEnd={handleLeftResizeEnd} />
