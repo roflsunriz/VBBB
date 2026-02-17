@@ -1,7 +1,7 @@
 /**
  * Thread list panel (中央ペイン).
  * Displays subject.txt threads in a sortable, filterable table.
- * Shows age/sage badges and new response counts.
+ * Shows age/sage badges per thread.
  * Supports right-click context menu for favorites and NG.
  */
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
@@ -16,7 +16,7 @@ import { MdiIcon } from '../common/MdiIcon';
 import { RefreshOverlay } from '../common/RefreshOverlay';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
-type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate' | 'newCount';
+type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate';
 type SortDir = 'asc' | 'desc';
 
 /** Compute thread momentum (勢い): posts per day */
@@ -126,16 +126,6 @@ export function ThreadList(): React.JSX.Element {
     const map = new Map<string, number>();
     for (const idx of threadIndices) {
       map.set(idx.fileName, idx.ageSage);
-    }
-    return map;
-  }, [threadIndices]);
-
-  const newCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const idx of threadIndices) {
-      if (idx.newResCount > 0) {
-        map.set(idx.fileName, idx.newResCount);
-      }
     }
     return map;
   }, [threadIndices]);
@@ -254,17 +244,11 @@ export function ThreadList(): React.JSX.Element {
         case 'firstPostDate':
           cmp = a.firstPostTs - b.firstPostTs;
           break;
-        case 'newCount': {
-          const na = newCountMap.get(a.fileName) ?? 0;
-          const nb = newCountMap.get(b.fileName) ?? 0;
-          cmp = na - nb;
-          break;
-        }
       }
       return sortDir === 'desc' ? -cmp : cmp;
     });
     return items;
-  }, [filteredSubjects, sortKey, sortDir, newCountMap]);
+  }, [filteredSubjects, sortKey, sortDir]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -604,9 +588,6 @@ export function ThreadList(): React.JSX.Element {
         <div className="w-16 text-right">
           <SortHeader label="作成日" field="firstPostDate" />
         </div>
-        <div className="w-10 text-right">
-          <SortHeader label="新着" field="newCount" />
-        </div>
         <div className="w-12 text-right">
           <SortHeader label="レス" field="count" />
         </div>
@@ -620,7 +601,6 @@ export function ThreadList(): React.JSX.Element {
         )}
         {sortedSubjects.map((subject, i) => {
           const threadId = subject.fileName.replace('.dat', '');
-          const newCount = newCountMap.get(subject.fileName);
           const threadUrl = selectedBoard !== null ? `${selectedBoard.url}dat/${threadId}.dat` : '';
           const isFavorite = favoriteUrlToId.has(threadUrl);
           const isNormalAbon = normalAbonThreads.has(subject.fileName);
@@ -659,13 +639,6 @@ export function ThreadList(): React.JSX.Element {
               </span>
               <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
                 {formatTimestamp(subject.firstPostTs)}
-              </span>
-              <span className="w-10 shrink-0 text-right">
-                {newCount !== undefined && newCount > 0 && (
-                  <span className="rounded bg-[var(--color-accent)] px-1 py-0.5 text-[10px] font-bold text-white">
-                    +{newCount}
-                  </span>
-                )}
               </span>
               <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">{subject.count}</span>
               <span

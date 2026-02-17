@@ -223,6 +223,7 @@ export function registerIpcHandlers(): void {
           ...idx,
           ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
           ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
+          ...(updates.lastModified !== undefined ? { lastModified: updates.lastModified } : {}),
         };
       });
       await saveFolderIdx(boardDir, updated);

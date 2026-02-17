@@ -638,6 +638,21 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       pushStatus('thread', 'success', `${resolvedTitle}: ${String(result.responses.length)} レス取得`);
 
       void getApi().invoke('history:add', boardUrl, threadId, resolvedTitle);
+
+      // Persist lastModified from DAT fetch to Folder.idx and update in-memory threadIndices
+      if (result.lastModified !== null) {
+        void getApi().invoke('bbs:update-thread-index', boardUrl, threadId, { lastModified: result.lastModified });
+        set((state) => {
+          const updateIdx = (indices: readonly ThreadIndex[]): readonly ThreadIndex[] =>
+            indices.map((i) => i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i);
+          return {
+            threadIndices: updateIdx(state.threadIndices),
+            boardTabs: state.boardTabs.map((bt) =>
+              bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+            ),
+          };
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `読み込み失敗: ${message}` });
@@ -902,6 +917,22 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         statusMessage: `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
       }));
       pushStatus('thread', 'success', `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`);
+
+      // Persist lastModified from DAT fetch to Folder.idx and update in-memory threadIndices
+      if (result.lastModified !== null) {
+        const datFileName = `${targetTab.threadId}.dat`;
+        void getApi().invoke('bbs:update-thread-index', targetTab.boardUrl, targetTab.threadId, { lastModified: result.lastModified });
+        set((state) => {
+          const updateIdx = (indices: readonly ThreadIndex[]): readonly ThreadIndex[] =>
+            indices.map((i) => i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i);
+          return {
+            threadIndices: updateIdx(state.threadIndices),
+            boardTabs: state.boardTabs.map((bt) =>
+              bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+            ),
+          };
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `スレ更新失敗: ${message}` });

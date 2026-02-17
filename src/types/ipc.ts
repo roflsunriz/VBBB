@@ -177,9 +177,9 @@ export interface IpcChannelMap {
     args: [mail: string, password: string];
     result: { success: boolean; message: string; state: AuthState['donguri'] };
   };
-  /** Update a single thread's index entry (kokomade, scrollTop, etc.) */
+  /** Update a single thread's index entry (kokomade, scrollTop, lastModified, etc.) */
   'bbs:update-thread-index': {
-    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number }];
+    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number; lastModified?: string | null }];
     result: void;
   };
   /** Load saved tabs */
