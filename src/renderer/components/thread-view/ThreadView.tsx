@@ -14,6 +14,7 @@ import { sanitizeHtml } from '../../hooks/use-sanitize';
 import { convertAnchorsToLinks } from '../../utils/anchor-parser';
 import { detectImageUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
+import { RefreshOverlay } from '../common/RefreshOverlay';
 import { PostEditor } from '../post-editor/PostEditor';
 import { ProgrammaticPost } from '../post-editor/ProgrammaticPost';
 import { ResPopup } from './ResPopup';
@@ -659,13 +660,12 @@ export function ThreadView(): React.JSX.Element {
   const highlightSettings = useBBSStore((s) => s.highlightSettings);
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const edgeIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [edgeRefreshIndicator, setEdgeRefreshIndicator] = useState<'top' | 'bottom' | null>(null);
+  const [edgeRefreshing, setEdgeRefreshing] = useState(false);
 
   // Close tab context menu on click
   useEffect(() => {
@@ -923,17 +923,6 @@ export function ThreadView(): React.JSX.Element {
     openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
   }, [activeTab, openNgEditorWithToken]);
 
-  const showEdgeRefreshIndicator = useCallback((edge: 'top' | 'bottom') => {
-    setEdgeRefreshIndicator(edge);
-    if (edgeIndicatorTimerRef.current !== null) {
-      clearTimeout(edgeIndicatorTimerRef.current);
-    }
-    edgeIndicatorTimerRef.current = setTimeout(() => {
-      setEdgeRefreshIndicator(null);
-      edgeIndicatorTimerRef.current = null;
-    }, 900);
-  }, []);
-
   const handleThreadWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     const container = scrollRef.current;
     if (container === null) return;
@@ -946,8 +935,8 @@ export function ThreadView(): React.JSX.Element {
 
     if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
       edgeRefreshLockedRef.current = true;
-      showEdgeRefreshIndicator(atTop && scrollingUp ? 'top' : 'bottom');
-      void handleRefreshCurrentThread();
+      setEdgeRefreshing(true);
+      void handleRefreshCurrentThread().finally(() => { setEdgeRefreshing(false); });
 
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
@@ -957,13 +946,10 @@ export function ThreadView(): React.JSX.Element {
         edgeRefreshUnlockTimerRef.current = null;
       }, 1200);
     }
-  }, [refreshing, handleRefreshCurrentThread, showEdgeRefreshIndicator]);
+  }, [refreshing, handleRefreshCurrentThread]);
 
   useEffect(() => {
     return () => {
-      if (edgeIndicatorTimerRef.current !== null) {
-        clearTimeout(edgeIndicatorTimerRef.current);
-      }
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
       }
@@ -1109,18 +1095,9 @@ export function ThreadView(): React.JSX.Element {
             )}
 
             {/* Responses */}
-            <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
-              {edgeRefreshIndicator !== null && (
-                <div className={`pointer-events-none sticky z-20 flex justify-center ${
-                  edgeRefreshIndicator === 'top' ? 'top-2' : 'bottom-2'
-                }`}>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bg-secondary)]/90 px-2 py-0.5 text-xs text-[var(--color-accent)] shadow">
-                    <MdiIcon path={mdiRefresh} size={12} />
-                    更新
-                  </span>
-                </div>
-              )}
-              {activeTab.responses.map((res) => {
+            <div className="relative min-h-0 flex-1">
+              <div ref={scrollRef} className="absolute inset-0 overflow-y-auto" onWheel={handleThreadWheel}>
+                {activeTab.responses.map((res) => {
                 // F31: skip non-matching responses when filter is active
                 if (filteredResNumbers !== null && !filteredResNumbers.has(res.number)) return null;
 
@@ -1155,6 +1132,8 @@ export function ThreadView(): React.JSX.Element {
                   </div>
                 );
               })}
+              </div>
+              {edgeRefreshing && <RefreshOverlay />}
             </div>
 
             {/* F16: Thread Analysis Panel */}

@@ -13,6 +13,7 @@ import { AbonType, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { RefreshOverlay } from '../common/RefreshOverlay';
 
 type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate' | 'newCount';
 type SortDir = 'asc' | 'desc';
@@ -97,9 +98,8 @@ export function ThreadList(): React.JSX.Element {
   const [filter, setFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
-  const [edgeRefreshIndicator, setEdgeRefreshIndicator] = useState<'top' | 'bottom' | null>(null);
+  const [edgeRefreshing, setEdgeRefreshing] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
-  const edgeIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
 
@@ -329,17 +329,6 @@ export function ThreadList(): React.JSX.Element {
     void refreshSelectedBoard();
   }, [selectedBoard, subjectLoading, refreshSelectedBoard]);
 
-  const showEdgeRefreshIndicator = useCallback((edge: 'top' | 'bottom') => {
-    setEdgeRefreshIndicator(edge);
-    if (edgeIndicatorTimerRef.current !== null) {
-      clearTimeout(edgeIndicatorTimerRef.current);
-    }
-    edgeIndicatorTimerRef.current = setTimeout(() => {
-      setEdgeRefreshIndicator(null);
-      edgeIndicatorTimerRef.current = null;
-    }, 900);
-  }, []);
-
   const handleListWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     const container = listScrollRef.current;
     if (container === null) return;
@@ -352,8 +341,8 @@ export function ThreadList(): React.JSX.Element {
 
     if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
       edgeRefreshLockedRef.current = true;
-      showEdgeRefreshIndicator(atTop && scrollingUp ? 'top' : 'bottom');
-      void refreshSelectedBoard();
+      setEdgeRefreshing(true);
+      void refreshSelectedBoard().finally(() => { setEdgeRefreshing(false); });
 
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
@@ -363,7 +352,7 @@ export function ThreadList(): React.JSX.Element {
         edgeRefreshUnlockTimerRef.current = null;
       }, 1200);
     }
-  }, [subjectLoading, selectedBoard, refreshSelectedBoard, showEdgeRefreshIndicator]);
+  }, [subjectLoading, selectedBoard, refreshSelectedBoard]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, subject: SubjectRecord) => {
@@ -488,9 +477,6 @@ export function ThreadList(): React.JSX.Element {
 
   useEffect(() => {
     return () => {
-      if (edgeIndicatorTimerRef.current !== null) {
-        clearTimeout(edgeIndicatorTimerRef.current);
-      }
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
       }
@@ -616,18 +602,9 @@ export function ThreadList(): React.JSX.Element {
       </div>
 
       {/* Thread rows */}
-      <div ref={listScrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleListWheel}>
-        {edgeRefreshIndicator !== null && (
-          <div className={`pointer-events-none sticky z-20 flex justify-center ${
-            edgeRefreshIndicator === 'top' ? 'top-2' : 'bottom-2'
-          }`}>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-bg-secondary)]/90 px-2 py-0.5 text-xs text-[var(--color-accent)] shadow">
-              <MdiIcon path={mdiRefresh} size={12} />
-              更新
-            </span>
-          </div>
-        )}
-        {selectedBoard === null && (
+      <div className="relative min-h-0 flex-1">
+        <div ref={listScrollRef} className="absolute inset-0 overflow-y-auto" onWheel={handleListWheel}>
+          {selectedBoard === null && (
           <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">板を選択してください</p>
         )}
         {sortedSubjects.map((subject, i) => {
@@ -696,6 +673,8 @@ export function ThreadList(): React.JSX.Element {
             </button>
           );
         })}
+        </div>
+        {edgeRefreshing && <RefreshOverlay />}
       </div>
 
       {/* Board tab context menu (F13 + F24) */}
