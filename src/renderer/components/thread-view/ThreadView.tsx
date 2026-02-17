@@ -262,6 +262,7 @@ function ResItem({
   highlightType,
   showRelativeTime,
   inlineMediaEnabled,
+  allThreadImageUrls,
   idCount,
   watchoiCount,
   kotehanCount,
@@ -279,6 +280,7 @@ function ResItem({
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
   readonly inlineMediaEnabled: boolean;
+  readonly allThreadImageUrls: readonly string[];
   readonly idCount: number;
   readonly watchoiCount: number;
   readonly kotehanCount: number;
@@ -481,7 +483,7 @@ function ResItem({
       {inlineMediaEnabled && images.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {images.map((img) => (
-            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={images.map((i) => i.url)} />
+            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={allThreadImageUrls} />
           ))}
         </div>
       )}
@@ -838,6 +840,22 @@ export function ThreadView(): React.JSX.Element {
   const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // Collect all image URLs across the entire thread for modal keyboard navigation
+  const allThreadImageUrls = useMemo<readonly string[]>(() => {
+    if (activeTab === undefined) return [];
+    const urls: string[] = [];
+    const seen = new Set<string>();
+    for (const r of activeTab.responses) {
+      for (const img of detectImageUrls(r.body)) {
+        if (!seen.has(img.url)) {
+          seen.add(img.url);
+          urls.push(img.url);
+        }
+      }
+    }
+    return urls;
+  }, [activeTab]);
 
   // F31: Pre-compute ID/ワッチョイ/コテハン count maps
   const idCountMap = useMemo(() => {
@@ -1218,6 +1236,7 @@ export function ThreadView(): React.JSX.Element {
                       highlightType={getHighlightType(res.number)}
                       showRelativeTime={showRelativeTime}
                       inlineMediaEnabled={inlineMediaEnabled}
+                      allThreadImageUrls={allThreadImageUrls}
                       idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
                       watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
                       kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
