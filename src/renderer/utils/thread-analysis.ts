@@ -123,128 +123,219 @@ export function sortedCounts(
 /* ---------- Connection type estimation (F29) ---------- */
 
 /**
- * Known ワッチョイ prefix → connection type mapping.
- * Sources: publicly documented on 5ch/2ch wikis.
- * Entries are sorted by specificity (longer prefixes first in lookup).
+ * Known ワッチョイ nickname → connection type mapping.
+ *
+ * Source: 5ch official wiki (info.5ch.net/index.php/BBS_SLIP)
+ *         https://headline.mtfj.net/2ch_watchoi.php
+ *
+ * Keys are full-width katakana. Input is NFKC-normalized before lookup
+ * because 5ch name fields use half-width katakana (e.g. ﾜｯﾁｮｲ).
+ *
+ * Suffix letters (W = WiFi, T = tethering, WW = mobile WiFi) are
+ * stripped before lookup and shown separately.
  */
 const CONNECTION_TYPE_MAP: ReadonlyMap<string, string> = new Map([
-  // 固定回線
-  ['ワッチョイWW', 'モバイルWiFi / テザリング'],
-  ['ワッチョイW', 'WiFi'],
-  ['ワッチョイ-', '固定回線'],
+  /* ── 固定回線 ───────────────────────────────── */
   ['ワッチョイ', '固定回線 (ISP)'],
-  // docomo
-  ['スプッッ', 'SPモード (docomo)'],
-  ['スップ', 'SPモード (docomo)'],
-  ['スプー', 'SPモード (docomo)'],
-  ['スフッ', 'SPモード (docomo)'],
-  ['ドコグロ', 'docomo グローバルIP'],
-  // au / KDDI
-  ['アウアウウー', 'au (4G LTE)'],
-  ['アウアウエー', 'au (4G LTE)'],
-  ['アウアウカー', 'au (4G LTE)'],
-  ['アウアウクー', 'au (4G LTE)'],
-  ['アウアウアー', 'au (4G LTE)'],
-  ['アウウィフ', 'au WiFi SPOT'],
-  // SoftBank
-  ['ササクッテロラ', 'SoftBank (4G LTE)'],
-  ['ササクッテロレ', 'SoftBank (4G LTE)'],
-  ['ササクッテロロ', 'SoftBank (4G LTE)'],
-  ['ササクッテロル', 'SoftBank (4G LTE)'],
-  ['ササクッテロリ', 'SoftBank (4G LTE)'],
-  ['ササクッテロ', 'SoftBank (4G LTE)'],
-  // MVNO / その他モバイル
-  ['オッペケ', 'OCN モバイル ONE'],
+  ['オッシ', 'OCN 固定回線 (逆引き不可)'],
+
+  /* ── docomo スマホ ──────────────────────────── */
+  ['スプー', 'docomo スマホ'],
+  ['スプッ', 'docomo スマホ'],
+  ['スプッッ', 'docomo スマホ'],
+  ['スップ', 'docomo スマホ'],
+  ['スッップ', 'docomo スマホ'],
+  ['スッッップ', 'docomo スマホ'],
+  ['スプププ', 'docomo スマホ'],
+  ['スプフ', 'docomo スマホ'],
+  ['スフッ', 'docomo スマホ'],
+  ['ペラペラ', 'docomo mopera'],
+  ['エアペラ', 'docomo air mopera'],
+
+  /* ── au スマホ / WiMAX2+ ────────────────────── */
+  ['アウアウ', 'au スマホ / WiMAX2+'],
+  ['アウアウアー', 'au スマホ / WiMAX2+'],
+  ['アウアウイー', 'au スマホ / WiMAX2+'],
+  ['アウアウウー', 'au スマホ / WiMAX2+'],
+  ['アウアウエー', 'au スマホ / WiMAX2+'],
+  ['アウアウオー', 'au スマホ / WiMAX2+'],
+  ['アウアウカー', 'au スマホ / WiMAX2+'],
+
+  /* ── SoftBank iPhone ────────────────────────── */
+  ['ササクッテロ', 'SoftBank iPhone'],
+  ['ササクッテロラ', 'SoftBank iPhone'],
+  ['ササクッテロリ', 'SoftBank iPhone'],
+  ['ササクッテロル', 'SoftBank iPhone'],
+  ['ササクッテロレ', 'SoftBank iPhone'],
+  ['ササクッテロロ', 'SoftBank iPhone'],
+
+  /* ── SoftBank Android / その他 ──────────────── */
+  ['オッペケ', 'SoftBank Android'],
+  ['アークセー', 'SoftBank アクセスインターネット'],
+
+  /* ── Y!mobile ───────────────────────────────── */
+  ['イモイモ', 'Y!mobile emb'],
+  ['エーイモ', 'Y!mobile EMNet'],
+
+  /* ── 公衆 Wi-Fi ──────────────────────────────── */
+  ['エムゾネ', 'docomo Wi-Fi'],
+  ['アウウィフ', 'au Wi-Fi SPOT'],
+  ['ワイーワ2', 'wi2 300 / at_STARBUCKS_Wi2'],
+  ['ワイワイ', 'wi2 300 / at_STARBUCKS_Wi2'],
+  ['フォンフォン', 'FON Wi-Fi'],
+  ['マクド', 'マクドナルド FREE Wi-Fi (SoftBank)'],
+  ['エフシーツー', 'FC2WiFi'],
+  ['フリスポ', 'FREESPOT'],
+  ['セブン', '7SPOT'],
+  ['ファミマ', 'Famima Wi-Fi'],
+  ['ファミワイ', 'FAMILY-WIFI'],
+  ['ロソーン', 'LAWSON Free Wi-Fi'],
+  ['フリモバ', 'FreeMobile'],
+  ['プラウィフィ', "FLET'S SPOT"],
+  ['ミカカウィ', 'NTT-BP (都営バスWi-Fi / Metro Wi-Fi等)'],
+  ['ミカカウィフィ', 'NTT-BP (都営バスWi-Fi / Metro Wi-Fi等)'],
+  ['アナファイー', 'NTT-BP (ANAラウンジWi-Fi / 京成Wi-Fi等)'],
+  ['アナファーイ', 'Panasonic Avionics (機内Wi-Fi)'],
+  ['スカファーイ', 'スカパー衛星回線'],
+  ['アポスー', 'Apple Store Japan'],
+  ['タニック', 'SafeComNet (船舶用衛星通信)'],
+  ['ムムー', 'VyprVPN'],
+
+  /* ── MVNO ────────────────────────────────────── */
+  ['ブーイモ', 'IIJmio等 (vmobile)'],
+  ['ベーイモ', '日本通信等 (bmobile)'],
   ['オイコラミネオ', 'mineo'],
-  ['ラクッペペ', '楽天モバイル'],
-  ['ラクッペ', '楽天モバイル'],
-  ['ブーイモ', 'UQ mobile / WiMAX'],
-  ['アークセー', 'UQ mobile'],
-  ['エムゾネ', 'MVNO (IIJmio系)'],
-  ['ワントンキン', 'MVNO'],
-  ['JP', 'MVNO (日本通信系)'],
-  // ISP
-  ['テテンテンテン', 'So-net'],
+  ['ワントンキン', 'OCN モバイル ONE'],
+  ['ワンミングク', 'OCN モバイル ONE'],
+  ['バットンキン', 'OCN回線の他社MVNO'],
+  ['バッミングク', 'OCN回線の他社MVNO'],
+  ['アウアウクー', 'UQ mobile'],
+  ['ドコグロ', 'BIGLOBE LTE・3G'],
+  ['ホカグロ', 'BIGLOBE LTE・3G'],
+  ['アウグロ', 'BIGLOBE光'],
+  ['ドナドナー', 'donedone (BIGLOBE)'],
+  ['ラクラッペ', 'NTTPC InfoSphere (楽天モバイル等)'],
+  ['ラクッペ', '楽天コミュニケーションズ (SANNET等)'],
+  ['ラクペッ', '楽天モバイル'],
+  ['ラクッペペ', '楽天モバイル MVNO'],
+  ['テテンテンテン', '楽天モバイル MNO'],
+  ['フォーッ', '@nifty FOMAデータ通信'],
+  ['フォホーッ', 'hi-ho FOMAデータ通信'],
+  ['フォオーッ', 'OCN モバイル d (FOMA回線)'],
+  ['ワーダリィ', '富士通回線MVNO (Wonderlink等)'],
+  ['パニャパー', 'パナソニック PANA-MVNO'],
+  ['ワイエディ', 'EDION-NET WiMAX2+'],
+  ['ワキゲー', 'ワイヤレスゲート'],
+  ['バックシ', 'So-net モバイル LTE'],
+  ['プッーモ', 'ぷららモバイル'],
+  ['ブモー', 'LIBMO (TOKAIコミュニケーションズ)'],
   ['ニャフニャ', 'NifMo'],
-  ['ベクトル', 'ベクトル'],
-  ['ペラペラ', 'BIGLOBE'],
-  ['アメ', 'アメリカ'],
-  // ガラケー
-  ['ガラプー', 'ガラケー (フィーチャーフォン)'],
+  ['フニャモ', 'NifMo'],
+  ['フリッテル', 'freetel mobile'],
+  ['トンモー', 'トーンモバイル'],
+  ['ソラノイロ', 'SORACOM / AWS'],
+  ['イルクン', '@モバイルくん。(ジェネス)'],
+  ['アメ', 'mvno.net (BEKKOAME)'],
+  ['クスマテ', 'LinksMate'],
+  ['ワイマゲー', 'WiMAX (一部)'],
+  ['ワイモマー', 'WiMAX1 (一部)'],
+
+  /* ── ガラケー / レガシー ──────────────────────── */
+  ['ガラプー', 'ガラケー (従来式携帯)'],
+  ['ジグー', 'ガラケー フルブラウザ'],
+  ['アジポン', '旧WILLCOM 一部機種'],
+
+  /* ── 特殊 / 環境判定 ─────────────────────────── */
+  ['アンタダレ', '逆引き不可'],
+  ['コンニチワ', 'VPN'],
+  ['ガックシ', '大学'],
+  ['ボンボン', '大学以外の学校'],
+  ['セーフ', '外国の役所'],
+  ['コムイーン', '役所'],
+  ['シャチーク', '会社'],
+  ['グングン', 'アメリカ軍関係'],
+  ['グググレカス', 'Android Chrome プロキシ'],
+  ['ウラウラ', '身代わりの術 (びんたん)'],
+  ['ゲロゲロ', 'ネカフェ「ゲラゲラ」等'],
+
+  /* ── 国コード（逆引きで国名のみ特定） ─────────── */
+  ['JP', '日本 (国名のみ特定)'],
+  ['US', 'アメリカ (国名のみ特定)'],
+  ['CN', '中国 (国名のみ特定)'],
 ]);
 
 /**
- * Known UA hash → browser/client mapping.
- *
- * ワッチョイ後半4文字は CRC32(User-Agent + daily_salt) の下位16bit。
- * 同一日・同一UA文字列なら同じ値になるため、よく見かけるハッシュと
- * 対応するUA文字列の関係がコミュニティで蓄積されている。
- * ※ ハッシュ衝突の可能性があるため推定は参考程度。
+ * Suffix letter → description mapping for ワッチョイ.
+ * 5ch appends W / T / WW to nicknames to indicate WiFi or tethering.
  */
-const UA_HASH_MAP: ReadonlyMap<string, string> = new Map([
-  // 5chブラウザ系
-  ['JaneDoeStyle', 'Jane Style'],
-  ['ChMate', 'ChMate (Android)'],
-  ['twinkle', 'twinkle (iOS)'],
-  ['BB2C', 'BB2C (iOS)'],
-  ['Ciisaa', 'Ciisaa (Android)'],
-  ['Siki', 'Siki (Android)'],
+const SUFFIX_MAP: ReadonlyMap<string, string> = new Map([
+  ['WW', 'モバイルWiFi / テザリング'],
+  ['W', 'WiFi'],
+  ['T', 'テザリング'],
 ]);
-
-/**
- * Heuristic UA category estimation from hash prefix patterns.
- * These are approximate and based on community observations.
- */
-function estimateUaCategory(hash: string): string | null {
-  const h = hash.toLowerCase();
-  // 特徴的なパターン（コミュニティ観測に基づく近似）
-  // NOTE: ハッシュは日替わり salt で変化するため、
-  // ここでは「同一ハッシュ = 同一UA」の性質を説明にとどめる
-  if (/^[0-9a-f]{4}$/.test(h)) {
-    return null; // ハッシュだけでは特定不可
-  }
-  return null;
-}
 
 export interface WatchoiEstimation {
+  /** Connection / carrier type */
   readonly connectionType: string;
+  /** WiFi / tethering suffix description (null if none) */
+  readonly suffixHint: string | null;
+  /** UA hash explanation */
   readonly uaHint: string;
 }
 
 /**
- * Estimate connection type and provide UA hint from ワッチョイ info.
+ * Estimate connection type from ワッチョイ info.
  *
- * ワッチョイ形式: (プレフィックス XXXX-YYYY)
- *   XXXX = CRC32(IPアドレス + daily_salt) の下位16bit
- *   YYYY = CRC32(User-Agent + daily_salt) の下位16bit
+ * ワッチョイ形式: (ニックネーム[サフィックス] XXXX-YYYY [IP])
+ *   ニックネーム = ISP / キャリア / 接続環境
+ *   サフィックス = W (WiFi), T (テザリング), WW (モバイルWiFi)
+ *   XXXX = IP由来ハッシュ (週替わり・板/サーバー依存)
+ *   YYYY = UA由来ハッシュ (週替わり・同一ブラウザ同一バージョンで一致)
+ *
+ * Source: info.5ch.net/index.php/BBS_SLIP
  */
 export function estimateFromWatchoi(info: WatchoiInfo): WatchoiEstimation {
   // Normalize half-width katakana (ﾜｯﾁｮｲ) → full-width (ワッチョイ) for lookup.
-  // 5ch encodes ワッチョイ prefixes in half-width katakana in the name field.
   const normalizedPrefix = info.prefix.normalize('NFKC');
 
-  // Match prefix (try longest match first)
+  // Separate trailing suffix letters (W, WW, T) from the base nickname.
+  let baseName = normalizedPrefix;
+  let suffixHint: string | null = null;
+  // Check longest suffix first (WW before W)
+  for (const [suffix, desc] of SUFFIX_MAP) {
+    if (normalizedPrefix.endsWith(suffix) && normalizedPrefix.length > suffix.length) {
+      baseName = normalizedPrefix.slice(0, -suffix.length);
+      suffixHint = desc;
+      break;
+    }
+  }
+
+  // Match base nickname (try longest match first)
   let connectionType = '不明';
   let bestLen = 0;
   for (const [prefix, connType] of CONNECTION_TYPE_MAP) {
-    if (normalizedPrefix.startsWith(prefix) && prefix.length > bestLen) {
+    if (baseName.startsWith(prefix) && prefix.length > bestLen) {
       connectionType = connType;
       bestLen = prefix.length;
     }
   }
 
-  // UA estimation from the second hash (YYYY part)
-  const uaUpper = info.uaHash.toUpperCase();
-  const knownUa = UA_HASH_MAP.get(info.uaHash);
-  let uaHint: string;
-  if (knownUa !== undefined) {
-    uaHint = knownUa;
-  } else {
-    const category = estimateUaCategory(info.uaHash);
-    uaHint = category ?? `ハッシュ ${uaUpper} (同一日・同一UAなら一致)`;
+  // If no match on base, try the full prefix (some entries include suffix-like chars)
+  if (bestLen === 0) {
+    for (const [prefix, connType] of CONNECTION_TYPE_MAP) {
+      if (normalizedPrefix.startsWith(prefix) && prefix.length > bestLen) {
+        connectionType = connType;
+        bestLen = prefix.length;
+      }
+    }
   }
 
-  return { connectionType, uaHint };
+  // UA hash — weekly rotation means no static reverse lookup is possible.
+  // Same browser + same version = same hash within the week.
+  const uaUpper = info.uaHash.toUpperCase();
+  const uaHint = `ハッシュ ${uaUpper} (同一週・同一ブラウザで一致)`;
+
+  return { connectionType, suffixHint, uaHint };
 }
 
 /* ---------- Thread-level analysis (F16) ---------- */

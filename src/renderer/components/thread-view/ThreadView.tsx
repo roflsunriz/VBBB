@@ -209,13 +209,21 @@ function WatchoiPopup({ info, x, y, onClose }: {
           <tbody>
             <tr><td className="whitespace-nowrap pr-2 font-semibold">ラベル</td><td>{info.label.normalize('NFKC')}</td></tr>
             <tr><td className="whitespace-nowrap pr-2 font-semibold">回線種別</td><td>{estimation.connectionType}</td></tr>
-            <tr><td className="whitespace-nowrap pr-2 font-semibold">IPハッシュ</td><td className="font-mono">{info.ipHash.toUpperCase()}</td></tr>
-            <tr><td className="whitespace-nowrap pr-2 font-semibold">UAハッシュ</td><td className="font-mono">{info.uaHash.toUpperCase()}</td></tr>
-            <tr><td className="whitespace-nowrap pr-2 font-semibold">UA推定</td><td>{estimation.uaHint}</td></tr>
+            {estimation.suffixHint !== null && (
+              <tr><td className="whitespace-nowrap pr-2 font-semibold">接続方法</td><td>{estimation.suffixHint}</td></tr>
+            )}
+            <tr>
+              <td className="whitespace-nowrap pr-2 font-semibold">IPハッシュ</td>
+              <td className="font-mono">{info.ipHash.toUpperCase()}<span className="ml-1 font-sans text-[var(--color-text-muted)]">(同一IP = 同一値)</span></td>
+            </tr>
+            <tr>
+              <td className="whitespace-nowrap pr-2 font-semibold">UAハッシュ</td>
+              <td className="font-mono">{info.uaHash.toUpperCase()}<span className="ml-1 font-sans text-[var(--color-text-muted)]">(同一ブラウザ = 同一値)</span></td>
+            </tr>
           </tbody>
         </table>
         <p className="mt-2 text-[10px] leading-snug text-[var(--color-text-muted)]">
-          ※ ハッシュは日替わり。同一日中は同じIP/UAからの書き込みで一致します。
+          ※ KOROKORO (XXXX-YYYY) は毎週木曜にリセット。同一週・同一板内で有効です。
         </p>
       </div>
     </>
