@@ -26,6 +26,12 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
   }, [url, originalUrl]);
 
+  const videoRef = useCallback((el: HTMLVideoElement | null) => {
+    if (el) {
+      el.volume = 0.1;
+    }
+  }, []);
+
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);
   }, [originalUrl]);
@@ -47,10 +53,10 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
     <span ref={ref} className="my-1 inline-block" style={{ minWidth: `${String(VIDEO_MAX_WIDTH)}px`, minHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}>
       {isVisible ? (
         <video
+          ref={videoRef}
           src={url}
           controls
           preload="metadata"
-          muted
           loop
           playsInline
           onError={handleError}
