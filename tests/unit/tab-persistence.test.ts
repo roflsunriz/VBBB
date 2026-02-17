@@ -38,7 +38,16 @@ describe('serializeTabSav', () => {
       { boardUrl: 'https://b.com/', threadId: '222', title: 'Second' },
     ];
     const result = serializeTabSav(tabs);
-    expect(result).toBe('https://a.com/\t111\tFirst\nhttps://b.com/\t222\tSecond');
+    // scrollTop defaults to 0 when absent
+    expect(result).toBe('https://a.com/\t111\tFirst\t0\nhttps://b.com/\t222\tSecond\t0');
+  });
+
+  it('serializes tabs with scrollTop', () => {
+    const tabs = [
+      { boardUrl: 'https://a.com/', threadId: '111', title: 'First', scrollTop: 500 },
+    ];
+    const result = serializeTabSav(tabs);
+    expect(result).toBe('https://a.com/\t111\tFirst\t500');
   });
 
   it('round-trips correctly', () => {

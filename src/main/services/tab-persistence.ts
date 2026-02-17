@@ -30,11 +30,14 @@ export function parseTabSav(content: string): SavedTab[] {
     if (boardUrl.length === 0 || threadId.length === 0) continue;
     const rawScroll = fields[3];
     const scrollTop = rawScroll !== undefined && rawScroll.length > 0 ? Number(rawScroll) : undefined;
+    // scrollTop 0 is semantically identical to "no saved position" (start from top),
+    // so omit the property entirely to ensure proper round-tripping.
+    const resolvedScroll = scrollTop !== undefined && Number.isFinite(scrollTop) && scrollTop > 0 ? scrollTop : undefined;
     tabs.push({
       boardUrl,
       threadId,
       title,
-      scrollTop: scrollTop !== undefined && Number.isFinite(scrollTop) ? scrollTop : undefined,
+      ...(resolvedScroll !== undefined ? { scrollTop: resolvedScroll } : {}),
     });
   }
   return tabs;
