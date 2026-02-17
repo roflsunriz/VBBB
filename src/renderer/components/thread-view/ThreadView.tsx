@@ -170,6 +170,25 @@ function WatchoiPopup({ info, x, y, onClose }: {
   readonly onClose: () => void;
 }): React.JSX.Element {
   const estimation = estimateFromWatchoi(info);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Clamp popup within viewport
+  useEffect(() => {
+    const el = popupRef.current;
+    if (el === null) return;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let cx = x;
+    let cy = y;
+    if (cx + rect.width > vw) cx = vw - rect.width - 4;
+    if (cy + rect.height > vh) cy = vh - rect.height - 4;
+    if (cx < 0) cx = 4;
+    if (cy < 0) cy = 4;
+    el.style.left = `${String(cx)}px`;
+    el.style.top = `${String(cy)}px`;
+  });
+
   return (
     <>
       <div
@@ -181,18 +200,23 @@ function WatchoiPopup({ info, x, y, onClose }: {
         aria-label="閉じる"
       />
       <div
-        className="fixed z-50 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 shadow-lg"
+        ref={popupRef}
+        className="fixed z-50 min-w-56 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 shadow-lg"
         style={{ left: x, top: y }}
       >
         <h4 className="mb-2 text-xs font-bold text-[var(--color-text-primary)]">ワッチョイ分析</h4>
         <table className="w-full text-xs text-[var(--color-text-secondary)]">
           <tbody>
-            <tr><td className="pr-2 font-semibold">ラベル</td><td>{info.label}</td></tr>
-            <tr><td className="pr-2 font-semibold">回線種別</td><td>{estimation.connectionType}</td></tr>
-            <tr><td className="pr-2 font-semibold">UA推定</td><td>{estimation.uaHint}</td></tr>
-            <tr><td className="pr-2 font-semibold">IPハッシュ</td><td>{info.ipHash}</td></tr>
+            <tr><td className="whitespace-nowrap pr-2 font-semibold">ラベル</td><td>{info.label.normalize('NFKC')}</td></tr>
+            <tr><td className="whitespace-nowrap pr-2 font-semibold">回線種別</td><td>{estimation.connectionType}</td></tr>
+            <tr><td className="whitespace-nowrap pr-2 font-semibold">IPハッシュ</td><td className="font-mono">{info.ipHash.toUpperCase()}</td></tr>
+            <tr><td className="whitespace-nowrap pr-2 font-semibold">UAハッシュ</td><td className="font-mono">{info.uaHash.toUpperCase()}</td></tr>
+            <tr><td className="whitespace-nowrap pr-2 font-semibold">UA推定</td><td>{estimation.uaHint}</td></tr>
           </tbody>
         </table>
+        <p className="mt-2 text-[10px] leading-snug text-[var(--color-text-muted)]">
+          ※ ハッシュは日替わり。同一日中は同じIP/UAからの書き込みで一致します。
+        </p>
       </div>
     </>
   );
@@ -459,14 +483,17 @@ function ResItem({
             <CountBadge count={kotehanCount} onClick={() => { onFilterByKotehan(resKotehan); }} />
           )}
           {resWatchoi !== null && (
-            <button
-              type="button"
-              onClick={handleWatchoiClick}
-              className="ml-0.5 cursor-pointer text-[var(--color-link)] hover:underline"
-              title="ワッチョイ分析"
-            >
+            <>
+              <button
+                type="button"
+                onClick={handleWatchoiClick}
+                className="ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-link)] hover:underline"
+                title="クリックでワッチョイ分析"
+              >
+                {resWatchoi.prefix.normalize('NFKC')}
+              </button>
               <CountBadge count={watchoiCount} onClick={() => { onFilterByWatchoi(resWatchoi.label); }} />
-            </button>
+            </>
           )}
         </span>
         {res.mail.length > 0 && (

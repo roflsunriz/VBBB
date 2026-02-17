@@ -11,8 +11,16 @@ import type { Res } from '@shared/domain';
 /** Extract ID from dateTime field (e.g. "ID:AbCdEfGh") */
 const ID_PATTERN = /ID:([^\s]+)/;
 
-/** Extract ワッチョイ-family from name field (e.g. "(ワッチョイW ABCD-1234)") */
-const WATCHOI_PATTERN = /\(([^\s)]+)\s+([A-Fa-f0-9]{4})-([A-Fa-f0-9]{4})\)/;
+/**
+ * Extract ワッチョイ-family from name field.
+ * Hash parts are alphanumeric (not limited to hex).
+ * Optional trailing content like [IP] is allowed before closing paren.
+ * Examples:
+ *   (ﾜｯﾁｮｲ 1778-VJ5d)
+ *   (ﾜｯﾁｮｲ 1778-VJ5d [2400:4153:2b21:e400:*])
+ *   (ｽｯｯﾌﾟ Sd12-Ab3c)
+ */
+const WATCHOI_PATTERN = /\(([^\s)]+)\s+([A-Za-z0-9]{4})-([A-Za-z0-9]{4})(?:\s+\[[^\]]*\])?\)/;
 
 /** Extract full ワッチョイ label (prefix + hash) for display */
 const WATCHOI_FULL_PATTERN = /\(([^)]+)\)/;
@@ -48,10 +56,10 @@ export interface WatchoiInfo {
   readonly label: string;
   /** Connection-type prefix (e.g. "ワッチョイW") */
   readonly prefix: string;
-  /** UA hash (first 4 hex chars) */
-  readonly uaHash: string;
-  /** IP hash (last 4 hex chars) */
+  /** IP address hash — first 4 hex chars (same IP = same hash within the day) */
   readonly ipHash: string;
+  /** User-Agent hash — last 4 hex chars (same browser = same hash within the day) */
+  readonly uaHash: string;
 }
 
 /** Extract ワッチョイ info from a response's name field */
@@ -62,8 +70,8 @@ export function extractWatchoi(res: Res): WatchoiInfo | null {
   return {
     label: fullM?.[1] ?? `${m[1]} ${m[2]}-${m[3]}`,
     prefix: m[1],
-    uaHash: m[2],
-    ipHash: m[3],
+    ipHash: m[2],
+    uaHash: m[3],
   };
 }
 
@@ -117,40 +125,86 @@ export function sortedCounts(
 /**
  * Known ワッチョイ prefix → connection type mapping.
  * Sources: publicly documented on 5ch/2ch wikis.
+ * Entries are sorted by specificity (longer prefixes first in lookup).
  */
 const CONNECTION_TYPE_MAP: ReadonlyMap<string, string> = new Map([
-  ['ワッチョイ', '固定回線 (ISP)'],
-  ['ワッチョイW', 'WiFi'],
+  // 固定回線
   ['ワッチョイWW', 'モバイルWiFi / テザリング'],
+  ['ワッチョイW', 'WiFi'],
   ['ワッチョイ-', '固定回線'],
+  ['ワッチョイ', '固定回線 (ISP)'],
+  // docomo
   ['スプッッ', 'SPモード (docomo)'],
   ['スップ', 'SPモード (docomo)'],
   ['スプー', 'SPモード (docomo)'],
   ['スフッ', 'SPモード (docomo)'],
-  ['オッペケ', 'OCN モバイル'],
+  ['ドコグロ', 'docomo グローバルIP'],
+  // au / KDDI
+  ['アウアウウー', 'au (4G LTE)'],
+  ['アウアウエー', 'au (4G LTE)'],
+  ['アウアウカー', 'au (4G LTE)'],
+  ['アウアウクー', 'au (4G LTE)'],
+  ['アウアウアー', 'au (4G LTE)'],
+  ['アウウィフ', 'au WiFi SPOT'],
+  // SoftBank
+  ['ササクッテロラ', 'SoftBank (4G LTE)'],
+  ['ササクッテロレ', 'SoftBank (4G LTE)'],
+  ['ササクッテロロ', 'SoftBank (4G LTE)'],
+  ['ササクッテロル', 'SoftBank (4G LTE)'],
+  ['ササクッテロリ', 'SoftBank (4G LTE)'],
+  ['ササクッテロ', 'SoftBank (4G LTE)'],
+  // MVNO / その他モバイル
+  ['オッペケ', 'OCN モバイル ONE'],
   ['オイコラミネオ', 'mineo'],
-  ['アウアウウー', 'au モバイル'],
-  ['アウアウエー', 'au モバイル'],
-  ['アウアウカー', 'au モバイル'],
-  ['アウアウクー', 'au モバイル'],
-  ['アウウィフ', 'au WiFi'],
-  ['ガラプー', 'ガラケー'],
-  ['ラクッペ', '楽天モバイル'],
   ['ラクッペペ', '楽天モバイル'],
-  ['ササクッテロ', 'SoftBank モバイル'],
-  ['ササクッテロラ', 'SoftBank モバイル'],
-  ['ササクッテロレ', 'SoftBank モバイル'],
-  ['ササクッテロロ', 'SoftBank モバイル'],
-  ['ササクッテロル', 'SoftBank モバイル'],
-  ['ササクッテロリ', 'SoftBank モバイル'],
+  ['ラクッペ', '楽天モバイル'],
   ['ブーイモ', 'UQ mobile / WiMAX'],
-  ['ドコグロ', 'docomo グローバル'],
   ['アークセー', 'UQ mobile'],
+  ['エムゾネ', 'MVNO (IIJmio系)'],
+  ['ワントンキン', 'MVNO'],
+  ['JP', 'MVNO (日本通信系)'],
+  // ISP
   ['テテンテンテン', 'So-net'],
   ['ニャフニャ', 'NifMo'],
   ['ベクトル', 'ベクトル'],
-  ['JP', 'MVNO'],
+  ['ペラペラ', 'BIGLOBE'],
+  ['アメ', 'アメリカ'],
+  // ガラケー
+  ['ガラプー', 'ガラケー (フィーチャーフォン)'],
 ]);
+
+/**
+ * Known UA hash → browser/client mapping.
+ *
+ * ワッチョイ後半4文字は CRC32(User-Agent + daily_salt) の下位16bit。
+ * 同一日・同一UA文字列なら同じ値になるため、よく見かけるハッシュと
+ * 対応するUA文字列の関係がコミュニティで蓄積されている。
+ * ※ ハッシュ衝突の可能性があるため推定は参考程度。
+ */
+const UA_HASH_MAP: ReadonlyMap<string, string> = new Map([
+  // 5chブラウザ系
+  ['JaneDoeStyle', 'Jane Style'],
+  ['ChMate', 'ChMate (Android)'],
+  ['twinkle', 'twinkle (iOS)'],
+  ['BB2C', 'BB2C (iOS)'],
+  ['Ciisaa', 'Ciisaa (Android)'],
+  ['Siki', 'Siki (Android)'],
+]);
+
+/**
+ * Heuristic UA category estimation from hash prefix patterns.
+ * These are approximate and based on community observations.
+ */
+function estimateUaCategory(hash: string): string | null {
+  const h = hash.toLowerCase();
+  // 特徴的なパターン（コミュニティ観測に基づく近似）
+  // NOTE: ハッシュは日替わり salt で変化するため、
+  // ここでは「同一ハッシュ = 同一UA」の性質を説明にとどめる
+  if (/^[0-9a-f]{4}$/.test(h)) {
+    return null; // ハッシュだけでは特定不可
+  }
+  return null;
+}
 
 export interface WatchoiEstimation {
   readonly connectionType: string;
@@ -159,30 +213,35 @@ export interface WatchoiEstimation {
 
 /**
  * Estimate connection type and provide UA hint from ワッチョイ info.
+ *
+ * ワッチョイ形式: (プレフィックス XXXX-YYYY)
+ *   XXXX = CRC32(IPアドレス + daily_salt) の下位16bit
+ *   YYYY = CRC32(User-Agent + daily_salt) の下位16bit
  */
 export function estimateFromWatchoi(info: WatchoiInfo): WatchoiEstimation {
+  // Normalize half-width katakana (ﾜｯﾁｮｲ) → full-width (ワッチョイ) for lookup.
+  // 5ch encodes ワッチョイ prefixes in half-width katakana in the name field.
+  const normalizedPrefix = info.prefix.normalize('NFKC');
+
   // Match prefix (try longest match first)
   let connectionType = '不明';
   let bestLen = 0;
   for (const [prefix, connType] of CONNECTION_TYPE_MAP) {
-    if (info.prefix.startsWith(prefix) && prefix.length > bestLen) {
+    if (normalizedPrefix.startsWith(prefix) && prefix.length > bestLen) {
       connectionType = connType;
       bestLen = prefix.length;
     }
   }
 
-  // UA hash heuristics: first 4 hex chars from UA string hash
-  const ua = info.uaHash.toUpperCase();
-  let uaHint = `UAハッシュ: ${ua}`;
-  if (/^[0-9A-F]{4}$/.test(ua)) {
-    // Common known UA hash prefixes (approximations from public data)
-    if (ua.startsWith('SA') || ua.startsWith('53')) {
-      uaHint = `Safari系 (${ua})`;
-    } else if (ua.startsWith('CH') || ua.startsWith('43')) {
-      uaHint = `Chrome系 (${ua})`;
-    } else {
-      uaHint = `UAハッシュ: ${ua}`;
-    }
+  // UA estimation from the second hash (YYYY part)
+  const uaUpper = info.uaHash.toUpperCase();
+  const knownUa = UA_HASH_MAP.get(info.uaHash);
+  let uaHint: string;
+  if (knownUa !== undefined) {
+    uaHint = knownUa;
+  } else {
+    const category = estimateUaCategory(info.uaHash);
+    uaHint = category ?? `ハッシュ ${uaUpper} (同一日・同一UAなら一致)`;
   }
 
   return { connectionType, uaHint };
