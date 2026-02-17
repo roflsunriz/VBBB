@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import type { BBSMenu, Board, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
-import type { BrowsingHistoryEntry, DisplayRange } from '@shared/history';
+import type { BrowsingHistoryEntry, DisplayRange, SavedTab, SessionState } from '@shared/history';
 import type { NgRule } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
 import type { HighlightSettings } from '@shared/settings';
@@ -118,8 +118,8 @@ interface BBSState {
   updateTabKokomade: (tabId: string, kokomade: number) => void;
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
   saveTabs: () => Promise<void>;
-  restoreTabs: () => Promise<void>;
-  restoreSession: () => Promise<void>;
+  restoreTabs: (prefetchedTabs?: readonly SavedTab[]) => Promise<void>;
+  restoreSession: (prefetchedSession?: SessionState) => Promise<void>;
   loadBrowsingHistory: () => Promise<void>;
   clearBrowsingHistory: () => Promise<void>;
   addExternalBoard: (board: Board) => void;
@@ -730,10 +730,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
   },
 
-  restoreTabs: async () => {
+  restoreTabs: async (prefetchedTabs?: readonly SavedTab[]) => {
     try {
-      const savedTabs = await getApi().invoke('tab:load');
-      for (const saved of savedTabs) {
+      const savedTabs = prefetchedTabs ?? await getApi().invoke('tab:load');
+
+      // Open all threads in parallel
+      await Promise.all(savedTabs.map(async (saved) => {
         await get().openThread(saved.boardUrl, saved.threadId, saved.title);
 
         // Apply scrollTop from tab.sav (takes priority over Folder.idx
@@ -747,7 +749,18 @@ export const useBBSStore = create<BBSState>((set, get) => ({
             get().updateTabScroll(opened.id, saved.scrollTop);
           }
         }
-      }
+      }));
+
+      // Re-sort tabs to match the saved order (parallel open is non-deterministic)
+      const tabOrder = new Map(savedTabs.map((s, i) => [`${s.boardUrl}:${s.threadId}`, i]));
+      set((state) => ({
+        tabs: [...state.tabs].sort((a, b) => {
+          const ai = tabOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+          const bi = tabOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+          return ai - bi;
+        }),
+      }));
+
       // Restore active thread tab from session
       const session = await getApi().invoke('session:load');
       if (session.activeThreadTabId !== undefined) {
@@ -762,9 +775,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
   },
 
-  restoreSession: async () => {
+  restoreSession: async (prefetchedSession?: SessionState) => {
     try {
-      const session = await getApi().invoke('session:load');
+      const session = prefetchedSession ?? await getApi().invoke('session:load');
       const { menu } = get();
       if (menu === null) return;
 
@@ -777,14 +790,24 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         return undefined;
       };
 
-      // Restore board tabs (F27)
+      // Restore board tabs (F27) — all boards in parallel
       if (session.boardTabUrls !== undefined && session.boardTabUrls.length > 0) {
-        for (const url of session.boardTabUrls) {
-          const board = findBoard(url);
-          if (board !== undefined) {
-            await get().selectBoard(board);
-          }
-        }
+        const boardTabUrls = session.boardTabUrls;
+        const boards = boardTabUrls
+          .map((url) => findBoard(url))
+          .filter((b): b is Board => b !== undefined);
+        await Promise.all(boards.map((board) => get().selectBoard(board)));
+
+        // Re-sort boardTabs to match the saved order
+        const urlOrder = new Map(boardTabUrls.map((url, i) => [url, i]));
+        set((state) => ({
+          boardTabs: [...state.boardTabs].sort((a, b) => {
+            const ai = urlOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+            const bi = urlOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+            return ai - bi;
+          }),
+        }));
+
         // Restore active board tab
         if (session.activeBoardTabId !== undefined) {
           const { boardTabs } = get();

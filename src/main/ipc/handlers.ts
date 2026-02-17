@@ -5,7 +5,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { AgeSage, BoardType, type Board, type ThreadIndex } from '@shared/domain';
+import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '@shared/domain';
 import type { IpcChannelMap, IpLookupResult } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
@@ -110,48 +110,62 @@ export function registerIpcHandlers(): void {
     return Promise.resolve(dataDir);
   });
 
+  /**
+   * Populate boardCache from a menu and optionally detect board transfers.
+   * Returns the list of new boards for transfer detection.
+   */
+  const populateBoardCache = (menu: BBSMenu): Board[] => {
+    const newBoards: Board[] = [];
+    boardCache.clear();
+    for (const cat of menu.categories) {
+      for (const board of cat.boards) {
+        boardCache.set(board.url, board);
+        newBoards.push(board);
+      }
+    }
+    return newBoards;
+  };
+
+  /**
+   * Fetch BBS menu from network, update cache, and detect board transfers.
+   * Reuses the old board list captured before the fetch for transfer detection.
+   */
+  const fetchAndUpdateMenu = async (oldBoards: Board[]): Promise<BBSMenu> => {
+    const menu = await fetchBBSMenu();
+    await saveBBSMenuCache(dataDir, menu);
+    const newBoards = populateBoardCache(menu);
+
+    if (oldBoards.length > 0) {
+      const transfers = detectTransfers(oldBoards, newBoards);
+      if (transfers.size > 0) {
+        await applyBoardTransfers(transfers, dataDir);
+      }
+    }
+    return menu;
+  };
+
   handle('bbs:fetch-menu', async () => {
+    const oldBoards: Board[] = [];
+    for (const b of boardCache.values()) {
+      oldBoards.push(b);
+    }
+
+    // Cache-first: return cached menu immediately and refresh in background
+    const cached = loadBBSMenuCache(dataDir);
+    if (cached !== null) {
+      populateBoardCache(cached);
+      // Background refresh — do not block the renderer
+      void fetchAndUpdateMenu(Array.from(boardCache.values())).catch((err: unknown) => {
+        logger.error('Background BBS menu refresh failed', err instanceof Error ? err : undefined);
+      });
+      return cached;
+    }
+
+    // No cache — must fetch from network (blocking)
     try {
-      // Collect old boards for transfer detection
-      const oldBoards: Board[] = [];
-      for (const b of boardCache.values()) {
-        oldBoards.push(b);
-      }
-
-      const menu = await fetchBBSMenu();
-      await saveBBSMenuCache(dataDir, menu);
-
-      // Collect new boards and populate cache
-      const newBoards: Board[] = [];
-      boardCache.clear();
-      for (const cat of menu.categories) {
-        for (const board of cat.boards) {
-          boardCache.set(board.url, board);
-          newBoards.push(board);
-        }
-      }
-
-      // Detect and apply board transfers if we had old data
-      if (oldBoards.length > 0) {
-        const transfers = detectTransfers(oldBoards, newBoards);
-        if (transfers.size > 0) {
-          await applyBoardTransfers(transfers, dataDir);
-        }
-      }
-
-      return menu;
+      return await fetchAndUpdateMenu(oldBoards);
     } catch (err) {
       logger.error('Failed to fetch BBS menu', err instanceof Error ? err : undefined);
-      // Try loading from cache
-      const cached = loadBBSMenuCache(dataDir);
-      if (cached !== null) {
-        for (const cat of cached.categories) {
-          for (const board of cat.boards) {
-            boardCache.set(board.url, board);
-          }
-        }
-        return cached;
-      }
       return { categories: [] };
     }
   });

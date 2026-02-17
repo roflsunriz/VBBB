@@ -113,15 +113,27 @@ export function App(): React.JSX.Element {
     if (initRef.current) return;
     initRef.current = true;
 
+    const api = window.electronApi;
+
     const init = async (): Promise<void> => {
-      await Promise.all([
+      // Phase 1: Fetch menu + local data + prefetch session/tab data — all in parallel
+      const [, , , , sessionData, savedTabs] = await Promise.all([
         fetchMenu(),
         fetchFavorites(),
         fetchNgRules(),
         loadPostHistory(),
+        api.invoke('session:load'),
+        api.invoke('tab:load'),
       ]);
-      await restoreSession();
-      await restoreTabs();
+
+      // Phase 2: Restore board sessions and thread tabs in parallel.
+      // restoreSession needs the menu (populated by fetchMenu above).
+      // restoreTabs is independent of restoreSession — openThread
+      // fetches DAT directly and falls back to disk for threadIndices.
+      await Promise.all([
+        restoreSession(sessionData),
+        restoreTabs(savedTabs),
+      ]);
     };
     void init();
   }, [fetchMenu, fetchFavorites, fetchNgRules, loadPostHistory, restoreSession, restoreTabs]);
