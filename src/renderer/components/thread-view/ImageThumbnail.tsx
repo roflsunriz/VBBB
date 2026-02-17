@@ -31,8 +31,9 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
   }, []);
 
   const handleError = useCallback(() => {
+    console.warn(`[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${displayUrl}`);
     setHasError(true);
-  }, []);
+  }, [url, displayUrl]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {

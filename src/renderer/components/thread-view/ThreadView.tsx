@@ -15,13 +15,14 @@ import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
 import { convertAnchorsToLinks } from '../../utils/anchor-parser';
-import { detectImageUrls } from '../../utils/image-detect';
+import { detectImageUrls, detectVideoUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
 import { RefreshOverlay } from '../common/RefreshOverlay';
 import { PostEditor } from '../post-editor/PostEditor';
 import { ProgrammaticPost } from '../post-editor/ProgrammaticPost';
 import { ResPopup } from './ResPopup';
 import { ImageThumbnail } from './ImageThumbnail';
+import { InlineVideo } from './InlineVideo';
 import { ThreadAnalysis } from './ThreadAnalysis';
 import { NgEditor } from '../ng-editor/NgEditor';
 import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
@@ -364,6 +365,8 @@ function ResItem({
 
   // Detect image URLs in the body for inline thumbnails
   const images = useMemo(() => detectImageUrls(res.body), [res.body]);
+  // Detect video URLs in the body for inline players
+  const videos = useMemo(() => detectVideoUrls(res.body), [res.body]);
 
   const handleMouseOver = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -477,6 +480,13 @@ function ResItem({
         <div className="mt-1 flex flex-wrap gap-2">
           {images.map((img) => (
             <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={images.map((i) => i.url)} />
+          ))}
+        </div>
+      )}
+      {videos.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {videos.map((vid) => (
+            <InlineVideo key={vid.url} url={vid.url} originalUrl={vid.originalUrl} />
           ))}
         </div>
       )}

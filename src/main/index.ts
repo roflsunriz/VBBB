@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, session, shell } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { registerIpcHandlers } from './ipc/handlers';
 import { buildAppMenu } from './menu';
@@ -98,6 +98,18 @@ void app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
+
+  // Inject Referer header for Twitter video CDN so <video> elements can load media.
+  // video.twimg.com rejects requests without a valid Referer from x.com.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['https://video.twimg.com/*'] },
+    (details, callback) => {
+      const headers = { ...details.requestHeaders };
+      headers['Referer'] = 'https://x.com/';
+      headers['Origin'] = 'https://x.com';
+      callback({ requestHeaders: headers });
+    },
+  );
 
   registerIpcHandlers();
   createWindow();
