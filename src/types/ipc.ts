@@ -14,7 +14,7 @@ import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
 import type { MenuAction } from './menu';
-import type { LocalSearchQuery, SearchResult } from './search';
+import type { LocalSearchAllQuery, LocalSearchAllResult, LocalSearchQuery, SearchResult } from './search';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -221,6 +221,11 @@ export interface IpcChannelMap {
   'search:local': {
     args: [query: LocalSearchQuery];
     result: readonly SearchResult[];
+  };
+  /** Cross-board local search (all boards / subjects / DAT caches) */
+  'search:local-all': {
+    args: [query: LocalSearchAllQuery];
+    result: readonly LocalSearchAllResult[];
   };
   /** Build remote search URL for ff5ch.syoboi.jp */
   'search:remote-url': {

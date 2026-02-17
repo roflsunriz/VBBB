@@ -19,7 +19,7 @@ import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
 import { getBoardDir, ensureDir } from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
-import { searchLocal } from '../services/local-search';
+import { searchLocal, searchLocalAll } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
 import { loadPostHistory, savePostHistory } from '../services/post-history';
@@ -312,6 +312,10 @@ export function registerIpcHandlers(): void {
   handle('search:local', (query) => {
     const board = lookupBoard(query.boardUrl);
     return Promise.resolve(searchLocal(query, dataDir, board.boardType));
+  });
+
+  handle('search:local-all', async (query) => {
+    return searchLocalAll(query, dataDir);
   });
 
   handle('search:remote-url', (keywords: string) => {

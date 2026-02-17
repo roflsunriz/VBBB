@@ -5,7 +5,8 @@
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mdiMagnify, mdiClose, mdiShieldCheck } from '@mdi/js';
-import type { SearchResult, SearchTarget } from '@shared/search';
+import type { LocalSearchAllResult, SearchTarget } from '@shared/search';
+import { LocalSearchScope } from '@shared/search';
 import { parseAnyThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -40,12 +41,12 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
   const [pattern, setPattern] = useState('');
   const [target, setTarget] = useState<SearchTarget>('all');
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [localResults, setLocalResults] = useState<readonly SearchResult[]>([]);
+  const [scope, setScope] = useState<LocalSearchScope>(LocalSearchScope.All);
+  const [localResults, setLocalResults] = useState<readonly LocalSearchAllResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
 
-  const selectedBoard = useBBSStore((s) => s.selectedBoard);
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
   const webviewRef = useRef<HTMLElement>(null);
@@ -129,13 +130,9 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
     setError(null);
     try {
       if (mode === 'local') {
-        if (selectedBoard === null) {
-          setError('板を選択してください');
-          return;
-        }
-        const results = await window.electronApi.invoke('search:local', {
-          boardUrl: selectedBoard.url,
+        const results = await window.electronApi.invoke('search:local-all', {
           pattern: pattern.trim(),
+          scope,
           target,
           caseSensitive,
         });
@@ -151,7 +148,7 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
     } finally {
       setSearching(false);
     }
-  }, [pattern, mode, target, caseSensitive, selectedBoard]);
+  }, [pattern, mode, scope, target, caseSensitive]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -159,9 +156,29 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
     }
   }, [handleSearch]);
 
-  const handleResultClick = useCallback((boardUrl: string, threadId: string, title: string) => {
-    void openThread(boardUrl, threadId, title);
-  }, [openThread]);
+  const handleResultClick = useCallback((result: LocalSearchAllResult) => {
+    switch (result.kind) {
+      case 'board':
+        void selectBoard({
+          title: result.boardTitle,
+          url: result.boardUrl,
+          bbsId: '',
+          serverUrl: '',
+          boardType: '2ch',
+        });
+        break;
+      case 'subject':
+        void openThread(result.boardUrl, result.threadId, result.threadTitle);
+        break;
+      case 'dat':
+        void openThread(result.boardUrl, result.threadId, result.threadTitle);
+        break;
+      default: {
+        const _never: never = result;
+        void _never;
+      }
+    }
+  }, [openThread, selectBoard]);
 
   return (
     <div className="flex h-full flex-col">
@@ -277,18 +294,30 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
           </button>
         </div>
         {mode === 'local' && (
-          <div className="mt-1 flex items-center gap-2 text-xs">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <select
-              value={target}
-              onChange={(e) => { setTarget(e.target.value as SearchTarget); }}
+              value={scope}
+              onChange={(e) => { setScope(e.target.value as LocalSearchScope); }}
               className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-1 py-0.5 text-xs text-[var(--color-text-primary)]"
             >
-              <option value="all">全て</option>
-              <option value="name">名前</option>
-              <option value="mail">メール</option>
-              <option value="id">ID</option>
-              <option value="body">本文</option>
+              <option value={LocalSearchScope.All}>すべて</option>
+              <option value={LocalSearchScope.Boards}>板名</option>
+              <option value={LocalSearchScope.Subjects}>スレッド名</option>
+              <option value={LocalSearchScope.DatCache}>スレッド内容</option>
             </select>
+            {(scope === LocalSearchScope.DatCache || scope === LocalSearchScope.All) && (
+              <select
+                value={target}
+                onChange={(e) => { setTarget(e.target.value as SearchTarget); }}
+                className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-1 py-0.5 text-xs text-[var(--color-text-primary)]"
+              >
+                <option value="all">全フィールド</option>
+                <option value="name">名前</option>
+                <option value="mail">メール</option>
+                <option value="id">ID</option>
+                <option value="body">本文</option>
+              </select>
+            )}
             <label className="flex items-center gap-1 text-[var(--color-text-muted)]">
               <input
                 type="checkbox"
@@ -315,15 +344,33 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
         {/* Local results */}
         {localResults.map((r, i) => (
           <button
-            key={`${r.threadId}-${String(r.resNumber)}-${String(i)}`}
+            key={`${r.kind}-${r.boardUrl}-${r.kind !== 'board' ? r.threadId : ''}-${r.kind === 'dat' ? String(r.resNumber) : ''}-${String(i)}`}
             type="button"
-            onClick={() => { handleResultClick(r.boardUrl, r.threadId, r.threadTitle); }}
+            onClick={() => { handleResultClick(r); }}
             className="w-full border-b border-[var(--color-border-secondary)] px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
           >
-            <div className="font-medium text-[var(--color-text-primary)]">{r.threadTitle}</div>
-            <div className="text-[var(--color-text-muted)]">
-              <span className="text-[var(--color-accent)]">{r.resNumber}</span>: {r.matchedLine}
-            </div>
+            {r.kind === 'board' && (
+              <>
+                <div className="text-[10px] text-[var(--color-text-muted)]">{r.categoryName}</div>
+                <div className="font-medium text-[var(--color-text-primary)]">{r.boardTitle}</div>
+              </>
+            )}
+            {r.kind === 'subject' && (
+              <>
+                <div className="text-[10px] text-[var(--color-text-muted)]">{r.boardTitle}</div>
+                <div className="font-medium text-[var(--color-text-primary)]">
+                  {r.threadTitle} <span className="text-[var(--color-text-muted)]">({r.count})</span>
+                </div>
+              </>
+            )}
+            {r.kind === 'dat' && (
+              <>
+                <div className="text-[10px] text-[var(--color-text-muted)]">{r.boardTitle} &gt; {r.threadTitle}</div>
+                <div className="text-[var(--color-text-muted)]">
+                  <span className="text-[var(--color-accent)]">{r.resNumber}</span>: {r.matchedLine}
+                </div>
+              </>
+            )}
           </button>
         ))}
 
