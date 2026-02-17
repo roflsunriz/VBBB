@@ -2,11 +2,18 @@
  * Inline video player component.
  * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
  * to prevent layout shift. Only loads video when scrolled into view.
+ *
+ * Keyboard shortcuts (when video is focused):
+ *   K / Space  — Play / Pause | F — Fullscreen | M — Mute
+ *   J / L      — ±10 s seek   | ←/→ — ±5 s     | ↑/↓ — Volume
+ *   0–9        — % seek       | Home/End — Start/End
+ *   , / .      — Frame step   | < / > — Playback rate
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useStatusLogStore } from '../../stores/status-log-store';
+import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -15,10 +22,13 @@ interface InlineVideoProps {
 
 const VIDEO_MAX_WIDTH = 320;
 const VIDEO_MAX_HEIGHT = 240;
+const INITIAL_VOLUME = 0.1;
 
 export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const handleVideoKeyDown = useVideoKeyboard(videoElRef);
 
   const handleError = useCallback(() => {
     console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url} / originalUrl: ${originalUrl}`);
@@ -26,11 +36,15 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
   }, [url, originalUrl]);
 
-  const videoRef = useCallback((el: HTMLVideoElement | null) => {
-    if (el) {
-      el.volume = 0.1;
-    }
-  }, []);
+  const videoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoElRef.current = el;
+      if (el) {
+        el.volume = INITIAL_VOLUME;
+      }
+    },
+    [],
+  );
 
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);
@@ -60,7 +74,8 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
           loop
           playsInline
           onError={handleError}
-          className="rounded border border-[var(--color-border-secondary)]"
+          onKeyDown={handleVideoKeyDown}
+          className="rounded border border-[var(--color-border-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
           style={{ maxWidth: `${String(VIDEO_MAX_WIDTH)}px`, maxHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}
         />
       ) : (
