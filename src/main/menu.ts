@@ -70,12 +70,6 @@ export function buildAppMenu(): void {
         { type: 'separator' },
         { role: 'reload', label: '再読み込み' },
         { role: 'toggleDevTools', label: '開発者ツール' },
-        { type: 'separator' },
-        { role: 'resetZoom', label: 'ズームリセット' },
-        { role: 'zoomIn', label: '拡大' },
-        { role: 'zoomOut', label: '縮小' },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: '全画面表示' },
       ],
     },
     {
