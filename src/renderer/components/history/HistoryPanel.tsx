@@ -4,10 +4,11 @@
  * Displays recently visited threads. Allows re-opening, searching,
  * and clearing history.
  */
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { mdiMagnify, mdiClose, mdiDelete, mdiRefresh } from '@mdi/js';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 export function HistoryPanel(): React.JSX.Element {
   const browsingHistory = useBBSStore((s) => s.browsingHistory);
@@ -16,6 +17,8 @@ export function HistoryPanel(): React.JSX.Element {
   const openThread = useBBSStore((s) => s.openThread);
 
   const [filter, setFilter] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
 
   // Load history on mount
   useEffect(() => {
@@ -67,7 +70,7 @@ export function HistoryPanel(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Header */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
         <span className="text-xs font-medium text-[var(--color-text-secondary)]">
@@ -115,7 +118,7 @@ export function HistoryPanel(): React.JSX.Element {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {filteredHistory.length === 0 && (
           <p className="p-3 text-center text-xs text-[var(--color-text-muted)]">
             {browsingHistory.length === 0 ? '履歴はありません' : '一致する履歴はありません'}

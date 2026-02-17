@@ -32,6 +32,7 @@ import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
 import type { IpLookupResult } from '@shared/ipc';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -773,6 +774,7 @@ export function ThreadView(): React.JSX.Element {
   const removeFavorite = useBBSStore((s) => s.removeFavorite);
   const favorites = useBBSStore((s) => s.favorites);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(scrollRef);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
@@ -1213,7 +1215,7 @@ export function ThreadView(): React.JSX.Element {
   }, []);
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
+    <section className="flex min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Tab bar */}
       <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">

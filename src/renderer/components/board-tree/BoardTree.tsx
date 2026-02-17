@@ -20,6 +20,7 @@ import { AbonType, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 /** Context menu state */
 interface BoardCtxMenu {
@@ -122,6 +123,8 @@ export function BoardTree(): React.JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<BoardCtxMenu | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const ctxMenuRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
 
   // Close context menu on click
   useEffect(() => {
@@ -312,7 +315,7 @@ export function BoardTree(): React.JSX.Element {
   }, [ctxMenu, removeExternalBoard]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Header */}
       <div className="flex h-8 items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2">
         <span className="text-xs font-medium text-[var(--color-text-muted)]">板一覧</span>
@@ -359,7 +362,7 @@ export function BoardTree(): React.JSX.Element {
       )}
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto p-1">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-1">
         {menu === null && !menuLoading && (
           <p className="px-2 py-4 text-center text-xs text-[var(--color-text-muted)]">
             更新ボタンで板一覧を取得

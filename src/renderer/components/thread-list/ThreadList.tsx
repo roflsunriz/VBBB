@@ -14,6 +14,7 @@ import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { RefreshOverlay } from '../common/RefreshOverlay';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate' | 'newCount';
 type SortDir = 'asc' | 'desc';
@@ -100,6 +101,7 @@ export function ThreadList(): React.JSX.Element {
   const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(listScrollRef);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
 
@@ -501,7 +503,7 @@ export function ThreadList(): React.JSX.Element {
   }, [boardTabCtxMenu, boardTabs, addFavorite]);
 
   return (
-    <section className="relative flex h-full min-w-0 flex-1 flex-col">
+    <section className="relative flex h-full min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Board tabs */}
       {boardTabs.length > 0 && (
         <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">

@@ -10,6 +10,7 @@ import { LocalSearchScope } from '@shared/search';
 import { parseAnyThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 type SearchMode = 'local' | 'remote';
 
@@ -103,6 +104,8 @@ export function SearchPanel(): React.JSX.Element {
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
   const webviewRef = useRef<HTMLElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
   const [adBlockEnabled, setAdBlockEnabled] = useState(loadAdBlockEnabled);
   const [adBlockRules, setAdBlockRules] = useState(loadAdBlockRules);
   const [adBlockEditorOpen, setAdBlockEditorOpen] = useState(false);
@@ -239,7 +242,7 @@ export function SearchPanel(): React.JSX.Element {
   }, [openThread, selectBoard]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Mode toggle */}
       <div className="flex border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]">
         <button
@@ -387,7 +390,7 @@ export function SearchPanel(): React.JSX.Element {
       )}
 
       {/* Results */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {searching && (
           <div className="flex items-center justify-center py-4 text-xs text-[var(--color-text-muted)]">検索中...</div>
         )}

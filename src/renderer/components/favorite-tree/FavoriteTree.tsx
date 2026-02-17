@@ -3,12 +3,13 @@
  * Displays bookmarked boards and threads in a tree structure.
  * Supports right-click context menu for deletion.
  */
-import { useEffect, useCallback, useState, useMemo } from 'react';
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete, mdiMagnify, mdiClose } from '@mdi/js';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
 import { parseAnyThreadUrl, parseExternalBoardUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 /** Context menu state for favorite tree */
 interface FavCtxMenu {
@@ -203,6 +204,8 @@ export function FavoriteTree(): React.JSX.Element {
 
   const [searchFilter, setSearchFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<FavCtxMenu | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
 
   const filteredChildren = useMemo(() => {
     const trimmed = searchFilter.trim().toLowerCase();
@@ -269,7 +272,7 @@ export function FavoriteTree(): React.JSX.Element {
   }, [ctxMenu]);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Header */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border-primary)] px-3 py-1.5">
         <MdiIcon path={mdiStar} size={14} className="text-[var(--color-warning)]" />
@@ -299,7 +302,7 @@ export function FavoriteTree(): React.JSX.Element {
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {filteredChildren.length === 0 ? (
           <p className="px-3 py-4 text-center text-xs text-[var(--color-text-muted)]">
             {favorites.children.length === 0 ? 'お気に入りはありません' : '一致するお気に入りはありません'}
