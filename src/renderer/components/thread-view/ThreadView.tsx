@@ -929,7 +929,7 @@ export function ThreadView(): React.JSX.Element {
     if (edgeRefreshLockedRef.current || refreshing) return;
 
     const atTop = container.scrollTop <= 0;
-    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
     const scrollingUp = e.deltaY < 0;
     const scrollingDown = e.deltaY > 0;
 

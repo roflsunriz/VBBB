@@ -335,7 +335,7 @@ export function ThreadList(): React.JSX.Element {
     if (edgeRefreshLockedRef.current || subjectLoading || selectedBoard === null) return;
 
     const atTop = container.scrollTop <= 0;
-    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
     const scrollingUp = e.deltaY < 0;
     const scrollingDown = e.deltaY > 0;
 
