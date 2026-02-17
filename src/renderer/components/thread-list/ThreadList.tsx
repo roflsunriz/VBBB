@@ -5,7 +5,7 @@
  * Supports right-click context menu for favorites and NG.
  */
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh } from '@mdi/js';
+import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel } from '@mdi/js';
 import { AgeSage, type SubjectRecord } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
@@ -16,6 +16,7 @@ import { MdiIcon } from '../common/MdiIcon';
 import { RefreshOverlay } from '../common/RefreshOverlay';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
+import { useTabOrientation } from '../../hooks/use-tab-orientation';
 
 type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate';
 type SortDir = 'asc' | 'desc';
@@ -493,42 +494,85 @@ export function ThreadList(): React.JSX.Element {
     onReorder: reorderBoardTabs,
   });
 
+  const [boardTabOrientation, toggleBoardTabOrientation] = useTabOrientation('vbbb-board-tab-orientation');
+  const isVerticalBoardTabs = boardTabOrientation === 'vertical';
+
+  const boardTabDragIndicator = (i: number): string =>
+    boardTabDragOverIndex === i && boardTabDragSourceIndex !== i
+      ? isVerticalBoardTabs
+        ? ' border-t-2 border-t-[var(--color-accent)]'
+        : ' border-l-2 border-l-[var(--color-accent)]'
+      : '';
+
+  const renderBoardTabItem = (bt: typeof boardTabs[number], i: number): React.ReactNode => (
+    <div
+      key={bt.id}
+      role="tab"
+      tabIndex={0}
+      {...getBoardTabDragProps(i)}
+      onClick={() => { setActiveBoardTab(bt.id); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
+      onContextMenu={(e) => { handleBoardTabContextMenu(e, bt.id); }}
+      className={`group flex cursor-pointer items-center gap-1 text-xs transition-opacity ${
+        isVerticalBoardTabs ? 'rounded px-2 py-1' : 'max-w-36 shrink-0 rounded-t px-2 py-0.5'
+      } ${
+        bt.id === activeBoardTabId
+          ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
+      }${boardTabDragSourceIndex === i ? ' opacity-50' : ''}${boardTabDragIndicator(i)}`}
+      aria-selected={bt.id === activeBoardTabId}
+    >
+      <span className="truncate">{bt.board.title}</span>
+      <button
+        type="button"
+        onClick={(e) => { handleCloseBoardTab(e, bt.id); }}
+        className="ml-0.5 shrink-0 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
+        aria-label="板タブを閉じる"
+      >
+        <MdiIcon path={mdiClose} size={9} />
+      </button>
+    </div>
+  );
+
   return (
-    <section className="relative flex h-full min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
+    <section className={`relative flex h-full min-w-0 flex-1 ${isVerticalBoardTabs ? 'flex-row' : 'flex-col'}`} onKeyDown={handleScrollKeyboard}>
       {/* Board tabs */}
       {boardTabs.length > 0 && (
-        <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
-            {boardTabs.map((bt, i) => (
-              <div
-                key={bt.id}
-                role="tab"
-                tabIndex={0}
-                {...getBoardTabDragProps(i)}
-                onClick={() => { setActiveBoardTab(bt.id); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
-                onContextMenu={(e) => { handleBoardTabContextMenu(e, bt.id); }}
-                className={`group flex max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-0.5 text-xs transition-opacity ${
-                  bt.id === activeBoardTabId
-                    ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
-                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
-                }${boardTabDragSourceIndex === i ? ' opacity-50' : ''}${boardTabDragOverIndex === i && boardTabDragSourceIndex !== i ? ' border-l-2 border-l-[var(--color-accent)]' : ''}`}
-                aria-selected={bt.id === activeBoardTabId}
+        isVerticalBoardTabs ? (
+          <div className="flex w-36 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+            <div className="flex items-center justify-end border-b border-[var(--color-border-secondary)] px-1 py-0.5">
+              <button
+                type="button"
+                onClick={toggleBoardTabOrientation}
+                className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                title="タブを横に表示"
               >
-                <span className="truncate">{bt.board.title}</span>
-                <button
-                  type="button"
-                  onClick={(e) => { handleCloseBoardTab(e, bt.id); }}
-                  className="ml-0.5 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
-                  aria-label="板タブを閉じる"
-                >
-                  <MdiIcon path={mdiClose} size={9} />
-                </button>
-              </div>
-            ))}
+                <MdiIcon path={mdiViewParallel} size={12} />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 py-0.5">
+              {boardTabs.map((bt, i) => renderBoardTabItem(bt, i))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
+              {boardTabs.map((bt, i) => renderBoardTabItem(bt, i))}
+            </div>
+            <button
+              type="button"
+              onClick={toggleBoardTabOrientation}
+              className="mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              title="タブを縦に表示"
+            >
+              <MdiIcon path={mdiViewSequential} size={12} />
+            </button>
+          </div>
+        )
       )}
+
+      {/* Content area */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
 
       {/* Header with board title and refresh */}
       <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
@@ -668,6 +712,8 @@ export function ThreadList(): React.JSX.Element {
       </div>
 
       {edgeRefreshing && <RefreshOverlay />}
+
+      </div>{/* end content area */}
 
       {/* Board tab context menu (F13 + F24) */}
       {boardTabCtxMenu !== null && (

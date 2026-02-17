@@ -16,3 +16,6 @@ export const DEFAULT_HIGHLIGHT_SETTINGS: HighlightSettings = {
   highlightOwnPosts: true,
   highlightRepliesToOwn: true,
 } as const;
+
+/** Tab bar orientation for board and thread tabs */
+export type TabOrientation = 'horizontal' | 'vertical';

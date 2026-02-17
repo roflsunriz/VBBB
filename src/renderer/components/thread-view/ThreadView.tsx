@@ -6,7 +6,7 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage } from '@mdi/js';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage, mdiViewSequential, mdiViewParallel } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
@@ -34,6 +34,7 @@ import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
 import type { IpLookupResult } from '@shared/ipc';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
+import { useTabOrientation } from '../../hooks/use-tab-orientation';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -1295,124 +1296,175 @@ export function ThreadView(): React.JSX.Element {
     onReorder: reorderThreadTabs,
   });
 
+  const [threadTabOrientation, toggleThreadTabOrientation] = useTabOrientation('vbbb-thread-tab-orientation');
+  const isVerticalThreadTabs = threadTabOrientation === 'vertical';
+
+  const threadTabDragIndicator = (i: number): string =>
+    threadTabDragOverIndex === i && threadTabDragSourceIndex !== i
+      ? isVerticalThreadTabs
+        ? ' border-t-2 border-t-[var(--color-accent)]'
+        : ' border-l-2 border-l-[var(--color-accent)]'
+      : '';
+
+  const renderThreadTabItem = (tab: typeof tabs[number], i: number): React.ReactNode => (
+    <div
+      key={tab.id}
+      role="tab"
+      tabIndex={0}
+      {...getThreadTabDragProps(i)}
+      onClick={() => { setActiveTab(tab.id); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
+      onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
+      className={`group flex cursor-pointer items-center gap-1 text-xs transition-opacity ${
+        isVerticalThreadTabs ? 'rounded px-2 py-1' : 'max-w-48 shrink-0 rounded-t px-2 py-1'
+      } ${
+        tab.id === activeTabId
+          ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
+      }${threadTabDragSourceIndex === i ? ' opacity-50' : ''}${threadTabDragIndicator(i)}`}
+      aria-selected={tab.id === activeTabId}
+    >
+      <span className="truncate">{tab.title}</span>
+      <button
+        type="button"
+        onClick={(e) => { handleCloseTab(e, tab.id); }}
+        className="ml-1 shrink-0 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
+        aria-label="タブを閉じる"
+      >
+        <MdiIcon path={mdiClose} size={10} />
+      </button>
+    </div>
+  );
+
+  const actionButtons = activeTab !== undefined ? (
+    <div className={`flex items-center gap-1 ${isVerticalThreadTabs ? 'px-2' : 'mr-2'}`}>
+      <button
+        type="button"
+        onClick={() => { void handleRefreshCurrentThread(); }}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          refreshing ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title="スレッドを更新"
+      >
+        <MdiIcon path={refreshing ? mdiLoading : mdiRefresh} size={14} className={refreshing ? 'animate-spin' : ''} />
+      </button>
+      <button
+        type="button"
+        onClick={handleToggleInlineMedia}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          inlineMediaEnabled ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title={inlineMediaEnabled ? 'インライン画像/動画: ON' : 'インライン画像/動画: OFF'}
+      >
+        <MdiIcon path={mdiImage} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={handleToggleRelativeTime}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title={showRelativeTime ? '相対時刻: ON' : '相対時刻: OFF'}
+      >
+        <MdiIcon path={mdiClockOutline} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={handleToggleHighlight}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          highlightSettings.highlightOwnPosts ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]' : ''
+        }`}
+        title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
+      >
+        <MdiIcon path={mdiFormatColorHighlight} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={handleToggleAnalysis}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          analysisOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title="スレッド分析"
+      >
+        <MdiIcon path={mdiChartBar} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={toggleNgEditor}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
+        }`}
+        title="NG管理"
+      >
+        <MdiIcon path={mdiShieldOff} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={handleTogglePostEditor}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title="書き込み"
+      >
+        <MdiIcon path={mdiPencil} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={handleToggleProgPost}
+        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+          progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+        }`}
+        title="プログラマティック書き込み"
+      >
+        <MdiIcon path={mdiRobot} size={14} />
+      </button>
+    </div>
+  ) : null;
+
   return (
-    <section className="flex min-w-0 flex-1 flex-col" onKeyDown={handleScrollKeyboard}>
+    <section className={`flex min-w-0 flex-1 ${isVerticalThreadTabs ? 'flex-row' : 'flex-col'}`} onKeyDown={handleScrollKeyboard}>
       {/* Tab bar */}
-      <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
-          {tabs.map((tab, i) => (
-            <div
-              key={tab.id}
-              role="tab"
-              tabIndex={0}
-              {...getThreadTabDragProps(i)}
-              onClick={() => { setActiveTab(tab.id); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
-              onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
-              className={`group flex max-w-48 shrink-0 cursor-pointer items-center gap-1 rounded-t px-2 py-1 text-xs transition-opacity ${
-                tab.id === activeTabId
-                  ? 'bg-[var(--color-bg-active)] text-[var(--color-text-primary)]'
-                  : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
-              }${threadTabDragSourceIndex === i ? ' opacity-50' : ''}${threadTabDragOverIndex === i && threadTabDragSourceIndex !== i ? ' border-l-2 border-l-[var(--color-accent)]' : ''}`}
-              aria-selected={tab.id === activeTabId}
-            >
-              <span className="truncate">{tab.title}</span>
-              <button
-                type="button"
-                onClick={(e) => { handleCloseTab(e, tab.id); }}
-                className="ml-1 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
-                aria-label="タブを閉じる"
-              >
-                <MdiIcon path={mdiClose} size={10} />
-              </button>
-            </div>
-          ))}
-        </div>
-        {activeTab !== undefined && (
-          <div className="mr-2 flex items-center gap-1">
+      {isVerticalThreadTabs ? (
+        <div className="flex w-36 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+          <div className="flex items-center justify-end border-b border-[var(--color-border-secondary)] px-1 py-0.5">
             <button
               type="button"
-              onClick={() => { void handleRefreshCurrentThread(); }}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                refreshing ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title="スレッドを更新"
+              onClick={toggleThreadTabOrientation}
+              className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              title="タブを横に表示"
             >
-              <MdiIcon path={refreshing ? mdiLoading : mdiRefresh} size={14} className={refreshing ? 'animate-spin' : ''} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleInlineMedia}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                inlineMediaEnabled ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title={inlineMediaEnabled ? 'インライン画像/動画: ON' : 'インライン画像/動画: OFF'}
-            >
-              <MdiIcon path={mdiImage} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleRelativeTime}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title={showRelativeTime ? '相対時刻: ON' : '相対時刻: OFF'}
-            >
-              <MdiIcon path={mdiClockOutline} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleHighlight}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                highlightSettings.highlightOwnPosts ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]' : ''
-              }`}
-              title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
-            >
-              <MdiIcon path={mdiFormatColorHighlight} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleAnalysis}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                analysisOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title="スレッド分析"
-            >
-              <MdiIcon path={mdiChartBar} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={toggleNgEditor}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
-              }`}
-              title="NG管理"
-            >
-              <MdiIcon path={mdiShieldOff} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={handleTogglePostEditor}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title="書き込み"
-            >
-              <MdiIcon path={mdiPencil} size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={handleToggleProgPost}
-              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-              }`}
-              title="プログラマティック書き込み"
-            >
-              <MdiIcon path={mdiRobot} size={14} />
+              <MdiIcon path={mdiViewParallel} size={12} />
             </button>
           </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 py-0.5">
+            {tabs.map((tab, i) => renderThreadTabItem(tab, i))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
+            {tabs.map((tab, i) => renderThreadTabItem(tab, i))}
+          </div>
+          <button
+            type="button"
+            onClick={toggleThreadTabOrientation}
+            className="mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            title="タブを縦に表示"
+          >
+            <MdiIcon path={mdiViewSequential} size={12} />
+          </button>
+          {actionButtons}
+        </div>
+      )}
+
+      {/* Main content column */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Action buttons bar (separate when vertical tabs) */}
+        {isVerticalThreadTabs && actionButtons !== null && (
+          <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+            {actionButtons}
+          </div>
         )}
-      </div>
 
       {/* Content */}
       <div className="relative flex min-h-0 flex-1 flex-col">
@@ -1534,6 +1586,8 @@ export function ThreadView(): React.JSX.Element {
         )}
         {edgeRefreshing && <RefreshOverlay />}
       </div>
+
+      </div>{/* end main content column */}
 
       {/* Thread tab context menu (F12) */}
       {tabCtxMenu !== null && (
