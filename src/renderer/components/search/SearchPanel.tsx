@@ -15,19 +15,70 @@ type SearchMode = 'local' | 'remote';
 
 const FF5CH_TOP_URL = 'https://ff5ch.syoboi.jp/';
 
-/** F6: Default ad block CSS rules for ff5ch.syoboi.jp */
+/** F6: Default ad block CSS rules for ff5ch.syoboi.jp and 5ch.net pages.
+ * Lines starting with '!' are treated as comments (AdBlock filter list convention).
+ */
 const AD_BLOCK_KEY = 'vbbb-adblock-enabled';
 const AD_BLOCK_RULES_KEY = 'vbbb-adblock-rules';
 const DEFAULT_AD_RULES = [
-  'iframe[src*="ad"]',
-  'div[class*="ad"]',
-  'div[id*="ad"]',
+  // --- ff5ch.syoboi.jp specific ---
+  '! === ff5ch.syoboi.jp ===',
+  '#ad_5ch_inline',
+  '#ad_5ch_header',
+  '.inlineAd',
+  'aside',
+  // --- 5ch.net thread pages ---
+  '! === 5ch.net ===',
+  '#fixedDivLeft',
+  '#fixedDivRight',
+  '#topright',
+  '#upliftsquare',
+  '.vm-placement',
+  '#vm-av',
+  'div[data-format="isvideo"]',
+  '.upliftcontrol',
+  // --- Google Ads ---
+  '! === Google Ads ===',
   'ins.adsbygoogle',
+  '[data-ad-slot]',
+  '[data-ad-client]',
+  'iframe[src*="doubleclick"]',
+  'iframe[src*="googlesyndication"]',
+  'iframe[src*="googleads"]',
+  // --- Ad-Stir (used by ff5ch) ---
+  '! === Ad-Stir ===',
+  'div[id*="adstir"]',
+  'div[class*="adstir"]',
+  'iframe[src*="ad-stir"]',
+  'iframe[src*="adstir"]',
+  // --- Amazon Ads ---
+  '! === Amazon Ads ===',
+  'iframe[src*="amazon-adsystem"]',
+  // --- Browsi (used by 5ch) ---
+  '! === Browsi ===',
+  'div[id*="browsi"]',
+  'div[class*="browsi"]',
+  // --- Generic ad patterns ---
+  '! === Generic ===',
   '.advertisement',
   '.ad-banner',
   '[data-ad]',
+  '[aria-label="Advertisement"]',
   'div[class*="sponsor"]',
   'div[class*="promo"]',
+  'div[class*="ad-container"]',
+  'div[class*="ad-wrapper"]',
+  'div[class*="ad-slot"]',
+  'div[class*="ad_unit"]',
+  'div[id*="ad-container"]',
+  'div[id*="ad-wrapper"]',
+  'div[id*="ad_box"]',
+  'div[id*="ad_unit"]',
+  // --- Generic ad iframes ---
+  '! === iframes ===',
+  'iframe[src*="ad."]',
+  'iframe[src*="/ads/"]',
+  'iframe[src*="banner"]',
 ].join('\n');
 
 function loadAdBlockEnabled(): boolean {
@@ -56,13 +107,13 @@ export function SearchPanel(): React.JSX.Element {
   const [adBlockRules, setAdBlockRules] = useState(loadAdBlockRules);
   const [adBlockEditorOpen, setAdBlockEditorOpen] = useState(false);
 
-  // F6: Build CSS from ad block rules
+  // F6: Build CSS from ad block rules (lines starting with '!' are comments)
   const adBlockCss = useMemo(() => {
     if (!adBlockEnabled) return '';
     return adBlockRules
       .split('\n')
       .map((r) => r.trim())
-      .filter((r) => r.length > 0)
+      .filter((r) => r.length > 0 && !r.startsWith('!'))
       .map((r) => `${r} { display: none !important; }`)
       .join('\n');
   }, [adBlockEnabled, adBlockRules]);
@@ -238,6 +289,7 @@ export function SearchPanel(): React.JSX.Element {
         <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] p-2">
           <p className="mb-1 text-[10px] text-[var(--color-text-muted)]">
             CSSセレクタを1行に1つ入力してください。マッチした要素が非表示になります。
+            「!」で始まる行はコメントとして無視されます。
           </p>
           <textarea
             value={adBlockRules}
@@ -245,7 +297,7 @@ export function SearchPanel(): React.JSX.Element {
               setAdBlockRules(e.target.value);
               try { localStorage.setItem(AD_BLOCK_RULES_KEY, e.target.value); } catch { /* ignore */ }
             }}
-            rows={5}
+            rows={12}
             className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 font-mono text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none"
           />
           <button
