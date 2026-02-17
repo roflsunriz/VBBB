@@ -501,7 +501,7 @@ export function ThreadList(): React.JSX.Element {
   }, [boardTabCtxMenu, boardTabs, addFavorite]);
 
   return (
-    <section className="flex h-full min-w-0 flex-1 flex-col">
+    <section className="relative flex h-full min-w-0 flex-1 flex-col">
       {/* Board tabs */}
       {boardTabs.length > 0 && (
         <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
@@ -602,9 +602,8 @@ export function ThreadList(): React.JSX.Element {
       </div>
 
       {/* Thread rows */}
-      <div className="relative min-h-0 flex-1">
-        <div ref={listScrollRef} className="absolute inset-0 overflow-y-auto" onWheel={handleListWheel}>
-          {selectedBoard === null && (
+      <div ref={listScrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleListWheel}>
+        {selectedBoard === null && (
           <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">板を選択してください</p>
         )}
         {sortedSubjects.map((subject, i) => {
@@ -673,9 +672,9 @@ export function ThreadList(): React.JSX.Element {
             </button>
           );
         })}
-        </div>
-        {edgeRefreshing && <RefreshOverlay />}
       </div>
+
+      {edgeRefreshing && <RefreshOverlay />}
 
       {/* Board tab context menu (F13 + F24) */}
       {boardTabCtxMenu !== null && (

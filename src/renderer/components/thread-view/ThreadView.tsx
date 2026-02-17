@@ -1065,7 +1065,7 @@ export function ThreadView(): React.JSX.Element {
       </div>
 
       {/* Content */}
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {activeTab === undefined ? (
           <div className="flex flex-1 items-center justify-center">
             <p className="text-xs text-[var(--color-text-muted)]">スレッドを選択してください</p>
@@ -1095,9 +1095,8 @@ export function ThreadView(): React.JSX.Element {
             )}
 
             {/* Responses */}
-            <div className="relative min-h-0 flex-1">
-              <div ref={scrollRef} className="absolute inset-0 overflow-y-auto" onWheel={handleThreadWheel}>
-                {activeTab.responses.map((res) => {
+            <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
+              {activeTab.responses.map((res) => {
                 // F31: skip non-matching responses when filter is active
                 if (filteredResNumbers !== null && !filteredResNumbers.has(res.number)) return null;
 
@@ -1132,8 +1131,6 @@ export function ThreadView(): React.JSX.Element {
                   </div>
                 );
               })}
-              </div>
-              {edgeRefreshing && <RefreshOverlay />}
             </div>
 
             {/* F16: Thread Analysis Panel */}
@@ -1159,6 +1156,7 @@ export function ThreadView(): React.JSX.Element {
             )}
           </>
         )}
+        {edgeRefreshing && <RefreshOverlay />}
       </div>
 
       {/* Thread tab context menu (F12) */}
