@@ -580,8 +580,23 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     try {
       const result: DatFetchResult = await getApi().invoke('bbs:fetch-dat', boardUrl, threadId);
 
-      const { threadIndices } = get();
-      const idx = threadIndices.find((i) => i.fileName === `${threadId}.dat`);
+      const datFileName = `${threadId}.dat`;
+
+      // Try in-memory threadIndices first (fast path for same-board tabs)
+      let idx = get().threadIndices.find((i) => i.fileName === datFileName);
+
+      // Fallback: read Folder.idx from disk. This covers the case where the
+      // thread was previously closed (scrollTop persisted to Folder.idx) but
+      // the in-memory threadIndices belongs to a different board or is stale.
+      if (idx === undefined) {
+        try {
+          const diskIndices = await getApi().invoke('bbs:get-thread-index', boardUrl);
+          idx = diskIndices.find((i) => i.fileName === datFileName);
+        } catch {
+          // ignore — proceed with defaults
+        }
+      }
+
       const kokomade = idx?.kokomade ?? -1;
       const scrollTop = idx?.scrollTop ?? 0;
 
@@ -676,15 +691,37 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       boardUrl: t.boardUrl,
       threadId: t.threadId,
       title: t.title,
+      scrollTop: t.scrollTop,
     }));
     await getApi().invoke('tab:save', savedTabs);
+
+    // Also persist scrollTop to Folder.idx for each open tab
+    for (const t of tabs) {
+      if (t.scrollTop > 0) {
+        void getApi().invoke('bbs:update-thread-index', t.boardUrl, t.threadId, {
+          scrollTop: t.scrollTop,
+        });
+      }
+    }
   },
 
   restoreTabs: async () => {
     try {
       const savedTabs = await getApi().invoke('tab:load');
-      for (const tab of savedTabs) {
-        await get().openThread(tab.boardUrl, tab.threadId, tab.title);
+      for (const saved of savedTabs) {
+        await get().openThread(saved.boardUrl, saved.threadId, saved.title);
+
+        // Apply scrollTop from tab.sav (takes priority over Folder.idx
+        // which may be stale if the tab was never explicitly closed).
+        if (saved.scrollTop !== undefined && saved.scrollTop > 0) {
+          const { tabs } = get();
+          const opened = tabs.find(
+            (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
+          );
+          if (opened !== undefined) {
+            get().updateTabScroll(opened.id, saved.scrollTop);
+          }
+        }
       }
       // Restore active thread tab from session
       const session = await getApi().invoke('session:load');

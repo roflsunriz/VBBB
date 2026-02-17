@@ -7,6 +7,8 @@ export interface SavedTab {
   readonly boardUrl: string;
   readonly threadId: string;
   readonly title: string;
+  /** Scroll position (pixels from top). Absent in legacy tab.sav files. */
+  readonly scrollTop?: number | undefined;
 }
 
 /** A browsing history entry */

@@ -999,19 +999,40 @@ export function ThreadView(): React.JSX.Element {
     }
   }, [highlightSettings, setHighlightSettings]);
 
-  // Restore scroll position when tab changes
+  // Restore scroll position when tab changes.
+  // Uses retry logic because layout may not be complete after the first rAF,
+  // especially for threads with many responses.
   const activeTabScrollTop = activeTab?.scrollTop ?? 0;
   useEffect(() => {
-    if (scrollRef.current !== null) {
-      if (activeTabScrollTop > 0) {
-        const container = scrollRef.current;
-        requestAnimationFrame(() => {
-          container.scrollTo(0, activeTabScrollTop);
-        });
-      } else {
-        scrollRef.current.scrollTo(0, 0);
-      }
+    const container = scrollRef.current;
+    if (container === null) return;
+
+    if (activeTabScrollTop <= 0) {
+      container.scrollTo(0, 0);
+      return;
     }
+
+    let cancelled = false;
+    let retries = 0;
+    const maxRetries = 10;
+    const retryDelay = 50;
+
+    const tryScroll = (): void => {
+      if (cancelled) return;
+      container.scrollTo(0, activeTabScrollTop);
+      // Verify scroll actually reached the target (layout may not be ready)
+      if (Math.abs(container.scrollTop - activeTabScrollTop) > 2 && retries < maxRetries) {
+        retries += 1;
+        setTimeout(tryScroll, retryDelay);
+      }
+    };
+
+    // Double rAF ensures at least one full paint cycle before scrolling
+    requestAnimationFrame(() => {
+      requestAnimationFrame(tryScroll);
+    });
+
+    return () => { cancelled = true; };
   }, [activeTabId, activeTabScrollTop]);
 
   // Save scroll position on scroll (debounced)

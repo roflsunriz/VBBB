@@ -15,6 +15,8 @@ const SESSION_FILE = 'session.json';
 
 /**
  * Parse tab.sav content into SavedTab array.
+ * Format: boardUrl \t threadId \t title [\t scrollTop]
+ * The 4th field (scrollTop) is optional for backward compatibility.
  */
 export function parseTabSav(content: string): SavedTab[] {
   const tabs: SavedTab[] = [];
@@ -26,17 +28,25 @@ export function parseTabSav(content: string): SavedTab[] {
     const threadId = fields[1] ?? '';
     const title = fields[2] ?? '';
     if (boardUrl.length === 0 || threadId.length === 0) continue;
-    tabs.push({ boardUrl, threadId, title });
+    const rawScroll = fields[3];
+    const scrollTop = rawScroll !== undefined && rawScroll.length > 0 ? Number(rawScroll) : undefined;
+    tabs.push({
+      boardUrl,
+      threadId,
+      title,
+      scrollTop: scrollTop !== undefined && Number.isFinite(scrollTop) ? scrollTop : undefined,
+    });
   }
   return tabs;
 }
 
 /**
  * Serialize SavedTab array to tab.sav format.
+ * Format: boardUrl \t threadId \t title \t scrollTop
  */
 export function serializeTabSav(tabs: readonly SavedTab[]): string {
   return tabs
-    .map((t) => `${t.boardUrl}\t${t.threadId}\t${t.title}`)
+    .map((t) => `${t.boardUrl}\t${t.threadId}\t${t.title}\t${String(t.scrollTop ?? 0)}`)
     .join('\n');
 }
 

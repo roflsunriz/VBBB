@@ -5,7 +5,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { BoardType, type Board } from '@shared/domain';
+import { AgeSage, BoardType, type Board, type ThreadIndex } from '@shared/domain';
 import type { IpcChannelMap, IpLookupResult } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
@@ -210,17 +210,42 @@ export function registerIpcHandlers(): void {
   handle('bbs:update-thread-index', async (boardUrl: string, threadId: string, updates) => {
     const board = lookupBoard(boardUrl);
     const boardDir = getBoardDir(dataDir, board.url);
+    ensureDir(boardDir);
     const indices = loadFolderIdx(boardDir);
     const datFileName = `${threadId}.dat`;
-    const updated = indices.map((idx) => {
-      if (idx.fileName !== datFileName) return idx;
-      return {
-        ...idx,
-        ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
-        ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
+    const existing = indices.find((idx) => idx.fileName === datFileName);
+
+    if (existing !== undefined) {
+      // Update existing entry
+      const updated = indices.map((idx) => {
+        if (idx.fileName !== datFileName) return idx;
+        return {
+          ...idx,
+          ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
+          ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
+        };
+      });
+      await saveFolderIdx(boardDir, updated);
+    } else {
+      // Create a minimal new entry (for external/favorite threads without Folder.idx entry)
+      const newEntry: ThreadIndex = {
+        no: indices.length + 1,
+        fileName: datFileName,
+        title: '',
+        count: 0,
+        size: 0,
+        roundDate: null,
+        lastModified: null,
+        kokomade: updates.kokomade ?? -1,
+        newReceive: 0,
+        unRead: false,
+        scrollTop: updates.scrollTop ?? 0,
+        allResCount: 0,
+        newResCount: 0,
+        ageSage: AgeSage.None,
       };
-    });
-    await saveFolderIdx(boardDir, updated);
+      await saveFolderIdx(boardDir, [...indices, newEntry]);
+    }
   });
 
   handle('bbs:get-kotehan', (boardUrl: string) => {
