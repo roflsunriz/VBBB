@@ -263,9 +263,20 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set({ menuLoading: true, menuError: null, statusMessage: '板一覧を取得中...' });
     pushStatus('board', 'info', '板一覧を取得中...');
     try {
-      const menu = await getApi().invoke('bbs:fetch-menu');
-      set({ menu, menuLoading: false, statusMessage: `${String(menu.categories.length)} カテゴリを読み込みました` });
-      pushStatus('board', 'success', `板一覧取得完了: ${String(menu.categories.length)} カテゴリ`);
+      const fetched = await getApi().invoke('bbs:fetch-menu');
+
+      // Guard: do not overwrite a valid menu with an empty one.
+      // This can happen when the server returns a CAPTCHA/error page
+      // that produces zero categories after parsing.
+      const current = get().menu;
+      if (fetched.categories.length === 0 && current !== null && current.categories.length > 0) {
+        pushStatus('board', 'warn', `板一覧取得結果が空 (0 カテゴリ) — 既存メニュー (${String(current.categories.length)} カテゴリ) を維持します`);
+        set({ menuLoading: false, statusMessage: '板一覧の取得結果が空のため既存データを維持' });
+        return;
+      }
+
+      set({ menu: fetched, menuLoading: false, statusMessage: `${String(fetched.categories.length)} カテゴリを読み込みました` });
+      pushStatus('board', 'success', `板一覧取得完了: ${String(fetched.categories.length)} カテゴリ`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ menuLoading: false, menuError: message, statusMessage: '板一覧の取得に失敗しました' });

@@ -68,7 +68,6 @@ export function buildAppMenu(): void {
           },
         },
         { type: 'separator' },
-        { role: 'reload', label: '再読み込み' },
         { role: 'toggleDevTools', label: '開発者ツール' },
       ],
     },

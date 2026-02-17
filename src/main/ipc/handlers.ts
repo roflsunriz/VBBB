@@ -131,9 +131,22 @@ export async function registerIpcHandlers(): Promise<void> {
   /**
    * Fetch BBS menu from network, update cache, and detect board transfers.
    * Reuses the old board list captured before the fetch for transfer detection.
+   *
+   * Guards against cache corruption: if the fetched menu contains no categories
+   * (e.g. server returned a CAPTCHA/error page with HTTP 200) but a non-empty
+   * cache already exists, the cache and in-memory boardCache are left untouched.
    */
   const fetchAndUpdateMenu = async (oldBoards: Board[]): Promise<BBSMenu> => {
     const menu = await fetchBBSMenu();
+
+    // Guard: do not overwrite a good cache with an empty menu.
+    // This protects against 5ch returning non-standard HTML (CAPTCHA, error page)
+    // that parseBBSMenuHtml cannot extract boards from.
+    if (menu.categories.length === 0 && oldBoards.length > 0) {
+      logger.warn('Fetched BBS menu has 0 categories but boardCache has entries — skipping cache save to prevent corruption');
+      return menu;
+    }
+
     await saveBBSMenuCache(dataDir, menu);
     const newBoards = populateBoardCache(menu);
 
