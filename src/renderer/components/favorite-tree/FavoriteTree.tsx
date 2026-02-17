@@ -3,8 +3,8 @@
  * Displays bookmarked boards and threads in a tree structure.
  * Supports right-click context menu for deletion.
  */
-import { useEffect, useCallback, useState } from 'react';
-import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete } from '@mdi/js';
+import { useEffect, useCallback, useState, useMemo } from 'react';
+import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete, mdiMagnify, mdiClose } from '@mdi/js';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
 import { parseAnyThreadUrl, parseExternalBoardUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
@@ -176,13 +176,39 @@ function toggleFolderExpand(nodes: readonly FavNode[], folderId: string): readon
   });
 }
 
+/** Recursively filter favorite tree nodes by search term */
+function filterFavNodes(nodes: readonly FavNode[], lower: string): readonly FavNode[] {
+  const result: FavNode[] = [];
+  for (const node of nodes) {
+    if (node.kind === 'item') {
+      if (node.title.toLowerCase().includes(lower)) {
+        result.push(node);
+      }
+    } else {
+      const titleMatch = node.title.toLowerCase().includes(lower);
+      const filteredChildren = titleMatch ? node.children : filterFavNodes(node.children, lower);
+      if (titleMatch || filteredChildren.length > 0) {
+        result.push({ ...node, children: filteredChildren, expanded: true });
+      }
+    }
+  }
+  return result;
+}
+
 export function FavoriteTree(): React.JSX.Element {
   const favorites = useBBSStore((s) => s.favorites);
   const fetchFavorites = useBBSStore((s) => s.fetchFavorites);
   const saveFavorites = useBBSStore((s) => s.saveFavorites);
   const removeFavorite = useBBSStore((s) => s.removeFavorite);
 
+  const [searchFilter, setSearchFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<FavCtxMenu | null>(null);
+
+  const filteredChildren = useMemo(() => {
+    const trimmed = searchFilter.trim().toLowerCase();
+    if (trimmed.length === 0) return favorites.children;
+    return filterFavNodes(favorites.children, trimmed);
+  }, [favorites.children, searchFilter]);
 
   useEffect(() => {
     void fetchFavorites();
@@ -250,14 +276,36 @@ export function FavoriteTree(): React.JSX.Element {
         <span className="text-xs font-medium text-[var(--color-text-primary)]">お気に入り</span>
       </div>
 
+      {/* Search */}
+      <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
+        <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => { setSearchFilter(e.target.value); }}
+          placeholder="お気に入りを検索..."
+          className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+        />
+        {searchFilter.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setSearchFilter(''); }}
+            className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            aria-label="検索をクリア"
+          >
+            <MdiIcon path={mdiClose} size={11} />
+          </button>
+        )}
+      </div>
+
       {/* Tree */}
       <div className="flex-1 overflow-y-auto">
-        {favorites.children.length === 0 ? (
+        {filteredChildren.length === 0 ? (
           <p className="px-3 py-4 text-center text-xs text-[var(--color-text-muted)]">
-            お気に入りはありません
+            {favorites.children.length === 0 ? 'お気に入りはありません' : '一致するお気に入りはありません'}
           </p>
         ) : (
-          favorites.children.map((node) => (
+          filteredChildren.map((node) => (
             <FavNodeRow key={node.id} node={node} depth={0} onToggle={handleToggle} onRemove={handleRemove} onContextMenu={handleContextMenu} />
           ))
         )}

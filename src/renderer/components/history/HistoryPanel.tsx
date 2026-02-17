@@ -5,7 +5,7 @@
  * and clearing history.
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { mdiMagnify, mdiDelete, mdiRefresh } from '@mdi/js';
+import { mdiMagnify, mdiClose, mdiDelete, mdiRefresh } from '@mdi/js';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -102,6 +102,16 @@ export function HistoryPanel(): React.JSX.Element {
           placeholder="履歴を検索..."
           className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         />
+        {filter.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setFilter(''); }}
+            className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+            aria-label="検索をクリア"
+          >
+            <MdiIcon path={mdiClose} size={11} />
+          </button>
+        )}
       </div>
 
       {/* List */}
