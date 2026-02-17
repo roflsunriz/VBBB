@@ -594,6 +594,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
       // Try in-memory threadIndices first (fast path for same-board tabs)
       let idx = get().threadIndices.find((i) => i.fileName === datFileName);
+      let idxSource: 'memory' | 'disk' | 'none' = idx !== undefined ? 'memory' : 'none';
 
       // Fallback: read Folder.idx from disk. This covers the case where the
       // thread was previously closed (scrollTop persisted to Folder.idx) but
@@ -602,6 +603,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         try {
           const diskIndices = await getApi().invoke('bbs:get-thread-index', boardUrl);
           idx = diskIndices.find((i) => i.fileName === datFileName);
+          if (idx !== undefined) idxSource = 'disk';
         } catch {
           // ignore — proceed with defaults
         }
@@ -609,6 +611,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
       const kokomade = idx?.kokomade ?? -1;
       const scrollTop = idx?.scrollTop ?? 0;
+
+      pushStatus('thread', 'info', `[kokomade] openThread: threadId=${threadId}, source=${idxSource}, kokomade=${String(kokomade)}, resCount=${String(result.responses.length)}`);
 
       // If the incoming title is mechanical/placeholder, resolve from DAT #1 title.
       let resolvedTitle = title;
@@ -668,10 +672,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     const { tabs } = get();
     const closingTab = tabs.find((t) => t.id === tabId);
 
-    // Persist scrollTop before closing
+    // Persist scrollTop and kokomade before closing
     if (closingTab !== undefined) {
       void getApi().invoke('bbs:update-thread-index', closingTab.boardUrl, closingTab.threadId, {
         scrollTop: closingTab.scrollTop,
+        kokomade: closingTab.kokomade,
       });
     }
 
@@ -696,11 +701,36 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   updateTabKokomade: (tabId: string, kokomade: number) => {
-    set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, kokomade } : t)),
-    }));
-    // Also persist to Folder.idx
     const tab = get().tabs.find((t) => t.id === tabId);
+
+    // Skip if the value hasn't changed (avoid unnecessary state updates / IPC on scroll)
+    if (tab !== undefined && tab.kokomade === kokomade) return;
+
+    pushStatus('thread', 'info', `[kokomade] update: ${tab?.threadId ?? tabId} kokomade=${String(tab?.kokomade ?? -1)}->${String(kokomade)}`);
+
+    set((state) => {
+      const updatedTabs = state.tabs.map((t) => (t.id === tabId ? { ...t, kokomade } : t));
+
+      if (tab === undefined) {
+        return { tabs: updatedTabs };
+      }
+
+      // Keep in-memory threadIndices in sync so that closing and
+      // re-opening the same tab preserves the kokomade position.
+      const datFileName = `${tab.threadId}.dat`;
+      const updateIdx = (indices: readonly ThreadIndex[]): readonly ThreadIndex[] =>
+        indices.map((i) => (i.fileName === datFileName ? { ...i, kokomade } : i));
+
+      return {
+        tabs: updatedTabs,
+        threadIndices: updateIdx(state.threadIndices),
+        boardTabs: state.boardTabs.map((bt) =>
+          bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+        ),
+      };
+    });
+
+    // Also persist to Folder.idx
     if (tab !== undefined) {
       void getApi().invoke('bbs:update-thread-index', tab.boardUrl, tab.threadId, { kokomade });
     }

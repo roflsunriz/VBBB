@@ -1031,9 +1031,11 @@ export function ThreadView(): React.JSX.Element {
     overscan: 5,
   });
 
-  // Stable ref to virtualizer for use in callbacks without deps churn
+  // Stable refs for use in callbacks without deps churn
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
+  const displayResponsesRef = useRef(displayResponses);
+  displayResponsesRef.current = displayResponses;
 
   // Scroll to a specific res number using the virtualizer
   const scrollToResNumber = useCallback((resNumber: number) => {
@@ -1123,7 +1125,12 @@ export function ThreadView(): React.JSX.Element {
     return () => { cancelled = true; };
   }, [activeTabId, activeTabScrollTop]);
 
-  // Save scroll position on scroll (debounced)
+  // Track the last visible response number at the viewport bottom.
+  // Updated cheaply on scroll (ref only, no state update / IPC).
+  // The value is committed to kokomade only on tab switch or tab close.
+  const lastVisibleResRef = useRef(-1);
+
+  // Save scroll position on scroll (debounced) and track last visible res in ref
   useEffect(() => {
     const container = scrollRef.current;
     if (container === null || activeTabId === null) return;
@@ -1135,6 +1142,21 @@ export function ThreadView(): React.JSX.Element {
         if (activeTabId !== null) {
           updateTabScroll(activeTabId, container.scrollTop);
         }
+
+        // Lightweight: just update the ref, no state change
+        const viewportBottom = container.scrollTop + container.clientHeight;
+        const items = virtualizerRef.current.getVirtualItems();
+        const responses = displayResponsesRef.current;
+        let lastVisible = -1;
+        for (const item of items) {
+          if (item.start < viewportBottom) {
+            const res = responses[item.index];
+            if (res !== undefined) {
+              lastVisible = res.number;
+            }
+          }
+        }
+        lastVisibleResRef.current = lastVisible;
       }, 300);
     };
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -1150,12 +1172,54 @@ export function ThreadView(): React.JSX.Element {
     setAaOverrides((prev) => prev.size > 0 ? new Map<number, boolean>() : prev);
   }, [activeTabId]);
 
+  // Seed lastVisibleResRef after layout settles on tab open/switch.
+  // This covers the case where no scroll event fires (e.g. scrollTop === 0).
+  useEffect(() => {
+    if (activeTabId === null) return;
+    lastVisibleResRef.current = -1;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const container = scrollRef.current;
+      if (container === null) return;
+      const viewportBottom = container.scrollTop + container.clientHeight;
+      const items = virtualizerRef.current.getVirtualItems();
+      const responses = displayResponsesRef.current;
+      let lastVisible = -1;
+      for (const item of items) {
+        if (item.start < viewportBottom) {
+          const res = responses[item.index];
+          if (res !== undefined) {
+            lastVisible = res.number;
+          }
+        }
+      }
+      lastVisibleResRef.current = lastVisible;
+    }, 800);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [activeTabId]);
+
+  // Commit kokomade when leaving a tab (switch or component unmount).
+  // The cleanup captures the outgoing tabId and persists the ref value.
+  useEffect(() => {
+    const tabId = activeTabId;
+    return () => {
+      if (tabId !== null && lastVisibleResRef.current >= 1) {
+        updateTabKokomade(tabId, lastVisibleResRef.current);
+      }
+    };
+  }, [activeTabId, updateTabKokomade]);
+
   const handleCloseTab = useCallback(
     (e: React.MouseEvent, tabId: string) => {
       e.stopPropagation();
+      // Flush kokomade before the tab is removed from state
+      if (lastVisibleResRef.current >= 1) {
+        updateTabKokomade(tabId, lastVisibleResRef.current);
+      }
       closeTab(tabId);
     },
-    [closeTab],
+    [closeTab, updateTabKokomade],
   );
 
   const handleAnchorHover = useCallback((nums: readonly number[], x: number, y: number) => {
