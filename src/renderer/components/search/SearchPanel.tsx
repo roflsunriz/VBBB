@@ -36,7 +36,7 @@ function loadAdBlockRules(): string {
   try { return localStorage.getItem(AD_BLOCK_RULES_KEY) ?? DEFAULT_AD_RULES; } catch { return DEFAULT_AD_RULES; }
 }
 
-export function SearchPanel({ onClose }: { readonly onClose: () => void }): React.JSX.Element {
+export function SearchPanel(): React.JSX.Element {
   const [mode, setMode] = useState<SearchMode>('local');
   const [pattern, setPattern] = useState('');
   const [target, setTarget] = useState<SearchTarget>('all');
@@ -182,14 +182,6 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-2 py-1">
-        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">検索</span>
-        <button type="button" onClick={onClose} className="rounded p-0.5 hover:bg-[var(--color-bg-hover)]" aria-label="閉じる">
-          <MdiIcon path={mdiClose} size={12} />
-        </button>
-      </div>
-
       {/* Mode toggle */}
       <div className="flex border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]">
         <button

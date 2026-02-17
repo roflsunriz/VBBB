@@ -652,8 +652,22 @@ export function ThreadView(): React.JSX.Element {
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
   const togglePostEditor = useBBSStore((s) => s.togglePostEditor);
+  const closePostEditor = useBBSStore((s) => s.closePostEditor);
   const [progPostOpen, setProgPostOpen] = useState(false);
-  const handleToggleProgPost = useCallback(() => { setProgPostOpen((p) => !p); }, []);
+
+  const handleTogglePostEditor = useCallback(() => {
+    togglePostEditor();
+    setProgPostOpen(false);
+  }, [togglePostEditor]);
+
+  const handleToggleProgPost = useCallback(() => {
+    setProgPostOpen((p) => {
+      if (!p) { closePostEditor(); }
+      return !p;
+    });
+  }, [closePostEditor]);
+
+  const handleCloseProgPost = useCallback(() => { setProgPostOpen(false); }, []);
   const openPostEditorWithQuote = useBBSStore((s) => s.openPostEditorWithQuote);
   const ngRules = useBBSStore((s) => s.ngRules);
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
@@ -1095,7 +1109,7 @@ export function ThreadView(): React.JSX.Element {
             </button>
             <button
               type="button"
-              onClick={togglePostEditor}
+              onClick={handleTogglePostEditor}
               className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
                 postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
               }`}
@@ -1205,7 +1219,7 @@ export function ThreadView(): React.JSX.Element {
 
             {/* F26: Programmatic post editor */}
             {progPostOpen && (
-              <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} />
+              <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} onClose={handleCloseProgPost} />
             )}
           </>
         )}

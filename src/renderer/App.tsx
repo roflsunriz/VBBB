@@ -181,7 +181,6 @@ export function App(): React.JSX.Element {
   const switchToFavorites = useCallback(() => { setLeftTab('favorites'); }, []);
   const switchToSearch = useCallback(() => { setLeftTab('search'); }, []);
   const switchToHistory = useCallback(() => { setLeftTab('history'); }, []);
-  const closeSearch = useCallback(() => { setLeftTab('boards'); }, []);
   const closeModal = useCallback(() => { setActiveModal(null); }, []);
 
   const handleRefreshBoards = useCallback(() => {
@@ -372,7 +371,7 @@ export function App(): React.JSX.Element {
           <div className="flex-1 overflow-hidden">
             {leftTab === 'boards' && <BoardTree />}
             {leftTab === 'favorites' && <FavoriteTree />}
-            {leftTab === 'search' && <SearchPanel onClose={closeSearch} />}
+            {leftTab === 'search' && <SearchPanel />}
             {leftTab === 'history' && <HistoryPanel />}
           </div>
         </aside>

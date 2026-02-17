@@ -5,7 +5,7 @@
  * Displays Samba timer countdown when posting interval is restricted.
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { mdiSend, mdiLoading, mdiTimerSand, mdiTree, mdiHelpCircleOutline } from '@mdi/js';
+import { mdiSend, mdiLoading, mdiTimerSand, mdiTree, mdiHelpCircleOutline, mdiClose } from '@mdi/js';
 import type { DonguriState } from '@shared/auth';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -263,7 +263,19 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   return (
     <>
     <TopResizeHandle onResize={handlePanelResize} />
-    <div className="overflow-auto bg-[var(--color-bg-secondary)] p-3" style={{ height: panelHeight }}>
+    <div className="flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]" style={{ height: panelHeight }}>
+      <div className="flex shrink-0 items-center justify-between px-3 py-1">
+        <span className="text-xs font-semibold text-[var(--color-text-secondary)]">書き込み</span>
+        <button
+          type="button"
+          onClick={() => { closePostEditor(); }}
+          className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          aria-label="閉じる"
+        >
+          <MdiIcon path={mdiClose} size={12} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto px-3 pb-3">
       {/* F35: IP privacy warning */}
       {hasExposedIps === true && (
         <div className="mb-2 flex items-center gap-2 rounded border border-[var(--color-error)] bg-[var(--color-error)]/10 px-3 py-1.5">
@@ -511,6 +523,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
           {resultMessage}
         </p>
       )}
+      </div>
     </div>
     </>
   );

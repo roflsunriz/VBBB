@@ -10,13 +10,14 @@
  * Each condition can be toggled on/off independently.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { mdiPlay, mdiStop, mdiPlus, mdiDelete } from '@mdi/js';
+import { mdiPlay, mdiStop, mdiPlus, mdiDelete, mdiClose } from '@mdi/js';
 import { MdiIcon } from '../common/MdiIcon';
 import { TopResizeHandle } from '../common/TopResizeHandle';
 
 interface ProgrammaticPostProps {
   readonly boardUrl: string;
   readonly threadId: string;
+  readonly onClose: () => void;
 }
 
 interface BatchEntry {
@@ -26,7 +27,7 @@ interface BatchEntry {
   message: string;
 }
 
-export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps): React.JSX.Element {
+export function ProgrammaticPost({ boardUrl, threadId, onClose }: ProgrammaticPostProps): React.JSX.Element {
   // --- Condition toggles ---
   const [useSchedule, setUseSchedule] = useState(false);
   const [useInterval, setUseInterval] = useState(false);
@@ -192,11 +193,22 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
   return (
     <>
     <TopResizeHandle onResize={handlePanelResize} />
-    <div className="overflow-auto bg-[var(--color-bg-secondary)] p-3" style={{ height: panelHeight }}>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-xs font-bold text-[var(--color-text-primary)]">プログラマティック書き込み</span>
-        <span className="text-[10px] text-[var(--color-text-muted)]">({boardUrl} / {threadId})</span>
+    <div className="flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]" style={{ height: panelHeight }}>
+      <div className="flex shrink-0 items-center justify-between px-3 py-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-[var(--color-text-secondary)]">プログラマティック書き込み</span>
+          <span className="text-[10px] text-[var(--color-text-muted)]">({boardUrl} / {threadId})</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          aria-label="閉じる"
+        >
+          <MdiIcon path={mdiClose} size={12} />
+        </button>
       </div>
+      <div className="flex-1 overflow-auto px-3 pb-3">
 
       {/* Condition toggles */}
       <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -344,6 +356,7 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
           ))}
         </div>
       )}
+      </div>
     </div>
     </>
   );
