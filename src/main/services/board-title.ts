@@ -40,7 +40,7 @@ function extractTagText(html: string, tagName: string): string | null {
 }
 
 function getReadEncoding(board: Board): 'Shift_JIS' | 'EUC-JP' {
-  return board.boardType === BoardType.JBBS ? 'EUC-JP' : 'Shift_JIS';
+  return board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
 }
 
 export function extractBoardTitleFromBoardInfoHtml(html: string): string | null {
@@ -123,7 +123,7 @@ export function extractBoardTitleFromBoardTopHtml(html: string): string | null {
   return null;
 }
 
-async function fetchHtml(url: string, encoding: 'Shift_JIS' | 'EUC-JP'): Promise<string | null> {
+async function fetchHtml(url: string, encoding: 'Shift_JIS' | 'EUC-JP' | 'UTF-8'): Promise<string | null> {
   try {
     const response = await httpFetch({
       url,
@@ -144,7 +144,8 @@ async function resolveByBoardInfo(board: Board): Promise<string | null> {
   const dir = board.jbbsDir?.trim();
   if (dir === undefined || dir.length === 0) return null;
   const url = `${board.serverUrl}bbs/board_info.cgi/${dir}/${board.bbsId}/`;
-  const html = await fetchHtml(url, getReadEncoding(board));
+  // board_info.cgi serves UTF-8 (verified by response charset), even for external boards.
+  const html = await fetchHtml(url, 'UTF-8');
   if (html === null) return null;
   return extractBoardTitleFromBoardInfoHtml(html);
 }

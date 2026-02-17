@@ -167,7 +167,7 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
   const localPath = join(boardDir, `${threadId}.dat`);
   const datUrl = getDatUrl(board, threadId);
 
-  const encoding = board.boardType === BoardType.JBBS ? 'EUC-JP' : 'Shift_JIS';
+  const encoding = board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
   const localExists = existsSync(localPath);
   let localSize = 0;
   if (localExists) {
@@ -271,7 +271,7 @@ async function fetchDatFull(board: Board, threadId: string, dataDir: string): Pr
   const boardDir = getBoardDir(dataDir, board.url);
   const localPath = join(boardDir, `${threadId}.dat`);
   const datUrl = getDatUrl(board, threadId);
-  const encoding = board.boardType === BoardType.JBBS ? 'EUC-JP' : 'Shift_JIS';
+  const encoding = board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
   const replaceRules = loadReplaceRules(dataDir);
 
   const response = await httpFetch({

@@ -10,7 +10,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Board, DatFetchResult, Res } from '@shared/domain';
-import { DatFetchStatus } from '@shared/domain';
+import { BoardType, DatFetchStatus } from '@shared/domain';
 import { createLogger } from '../../logger';
 import { decodeBuffer } from '../encoding';
 import { atomicWriteFile, getBoardDir, readFileSafe } from '../file-io';
@@ -20,11 +20,10 @@ const logger = createLogger('jbbs-dat');
 
 /**
  * Get the encoding for a JBBS board's DAT responses.
- * JBBS (まちBBS) uses EUC-JP for both read and write.
- * Shitaraba uses Shift_JIS for read, EUC-JP for write.
+ * JBBS/したらば uses EUC-JP for read and write.
  */
 function getReadEncoding(board: Board): 'EUC-JP' | 'Shift_JIS' {
-  return board.boardType === 'jbbs' ? 'EUC-JP' : 'Shift_JIS';
+  return board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
 }
 
 /**

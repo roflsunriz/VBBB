@@ -4,7 +4,7 @@
  * But URL construction differs.
  */
 import { join } from 'node:path';
-import type { Board, SubjectFetchResult, SubjectRecord } from '@shared/domain';
+import { BoardType, type Board, type SubjectFetchResult, type SubjectRecord } from '@shared/domain';
 import { createLogger } from '../../logger';
 import { decodeBuffer } from '../encoding';
 import { atomicWriteFile, getBoardDir, readFileSafe } from '../file-io';
@@ -14,10 +14,10 @@ const logger = createLogger('jbbs-subject');
 
 /**
  * Get the encoding for reading JBBS subject.txt.
- * JBBS (まちBBS) uses EUC-JP; Shitaraba uses Shift_JIS.
+ * JBBS/したらば uses EUC-JP.
  */
 function getReadEncoding(board: Board): 'EUC-JP' | 'Shift_JIS' {
-  return board.boardType === 'jbbs' ? 'EUC-JP' : 'Shift_JIS';
+  return board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
 }
 
 /**

@@ -148,7 +148,7 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
     }
   }
 
-  const encoding = board.boardType === BoardType.JBBS ? 'EUC-JP' : 'Shift_JIS';
+  const encoding = board.boardType === BoardType.Type2ch ? 'Shift_JIS' : 'EUC-JP';
 
   logger.info(`Fetching ${subjectUrl}`);
 

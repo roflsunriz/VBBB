@@ -21,9 +21,9 @@ export type AgeSage = (typeof AgeSage)[keyof typeof AgeSage];
 export const BoardType = {
   /** 5ch / 2ch (Shift_JIS) */
   Type2ch: '2ch',
-  /** Shitaraba (Shift_JIS read, EUC-JP write) */
+  /** Shitaraba (EUC-JP) */
   Shitaraba: 'shitaraba',
-  /** JBBS / Machi BBS (EUC-JP) */
+  /** JBBS (EUC-JP) */
   JBBS: 'jbbs',
 } as const;
 export type BoardType = (typeof BoardType)[keyof typeof BoardType];
