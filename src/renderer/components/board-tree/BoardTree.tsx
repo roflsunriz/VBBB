@@ -3,7 +3,7 @@
  * Displays categories and boards in a collapsible tree.
  * Supports right-click context menu for favorites and board NG.
  */
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   mdiFolderOpen,
   mdiFolder,
@@ -121,6 +121,7 @@ export function BoardTree(): React.JSX.Element {
 
   const [ctxMenu, setCtxMenu] = useState<BoardCtxMenu | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
 
   // Close context menu on click
   useEffect(() => {
@@ -128,6 +129,23 @@ export function BoardTree(): React.JSX.Element {
     const handler = (): void => { setCtxMenu(null); };
     document.addEventListener('click', handler);
     return () => { document.removeEventListener('click', handler); };
+  }, [ctxMenu]);
+
+  // Clamp context menu position within viewport
+  useEffect(() => {
+    const el = ctxMenuRef.current;
+    if (ctxMenu === null || el === null) return;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = ctxMenu.x;
+    let y = ctxMenu.y;
+    if (x + rect.width > vw) x = vw - rect.width - 4;
+    if (y + rect.height > vh) y = vh - rect.height - 4;
+    if (x < 0) x = 4;
+    if (y < 0) y = 4;
+    el.style.left = `${String(x)}px`;
+    el.style.top = `${String(y)}px`;
   }, [ctxMenu]);
 
   // Build favorite board URL set and URL-to-ID map
@@ -363,6 +381,7 @@ export function BoardTree(): React.JSX.Element {
       {/* Board context menu */}
       {ctxMenu !== null && (
         <div
+          ref={ctxMenuRef}
           className="fixed z-50 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           role="menu"
