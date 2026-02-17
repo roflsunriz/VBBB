@@ -1,8 +1,11 @@
 /**
  * Inline video player component.
- * Renders video URLs as compact <video> elements with native controls.
+ * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
+ * to prevent layout shift. Only loads video when scrolled into view.
  */
 import { useState, useCallback } from 'react';
+import { MediaPlaceholder } from './MediaPlaceholder';
+import { useLazyLoad } from '../../hooks/use-lazy-load';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -14,6 +17,7 @@ const VIDEO_MAX_HEIGHT = 240;
 
 export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
+  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
 
   const handleError = useCallback(() => {
     console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url} / originalUrl: ${originalUrl}`);
@@ -38,18 +42,22 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
   }
 
   return (
-    <span className="my-1 inline-block">
-      <video
-        src={url}
-        controls
-        preload="metadata"
-        muted
-        loop
-        playsInline
-        onError={handleError}
-        className="rounded border border-[var(--color-border-secondary)]"
-        style={{ maxWidth: `${String(VIDEO_MAX_WIDTH)}px`, maxHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}
-      />
+    <span ref={ref} className="my-1 inline-block" style={{ minWidth: `${String(VIDEO_MAX_WIDTH)}px`, minHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}>
+      {isVisible ? (
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          muted
+          loop
+          playsInline
+          onError={handleError}
+          className="rounded border border-[var(--color-border-secondary)]"
+          style={{ maxWidth: `${String(VIDEO_MAX_WIDTH)}px`, maxHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}
+        />
+      ) : (
+        <MediaPlaceholder width={VIDEO_MAX_WIDTH} height={VIDEO_MAX_HEIGHT} mediaType="video" />
+      )}
     </span>
   );
 }

@@ -4,6 +4,7 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { BoardType } from '@shared/domain';
@@ -324,6 +325,7 @@ function ResItem({
   onAddNgWord,
   onFilterById,
   onFilterByWatchoi,
+  onScrollToResNumber,
   onFilterByKotehan,
 }: {
   readonly res: Res;
@@ -342,6 +344,7 @@ function ResItem({
   readonly onAddNgWord: (selectedText: string) => void;
   readonly onFilterById: (id: string) => void;
   readonly onFilterByWatchoi: (label: string) => void;
+  readonly onScrollToResNumber: (resNumber: number) => void;
   readonly onFilterByKotehan: (name: string) => void;
 }): React.JSX.Element | null {
   // Transparent abon: completely hidden
@@ -454,18 +457,18 @@ function ResItem({
       return;
     }
 
-    // Handle anchor links (>>N)
+    // Handle anchor links (>>N) — use virtualizer-based scroll
     if (!target.classList.contains('anchor-link')) return;
 
     e.preventDefault();
     const href = target.getAttribute('href');
     if (href === null) return;
 
-    const targetEl = document.querySelector(href);
-    if (targetEl !== null) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const anchorMatch = /^#res-(\d+)$/.exec(href);
+    if (anchorMatch?.[1] !== undefined) {
+      onScrollToResNumber(Number(anchorMatch[1]));
     }
-  }, []);
+  }, [onScrollToResNumber]);
 
   const highlightClass =
     highlightType === 'own'
@@ -955,6 +958,45 @@ export function ThreadView(): React.JSX.Element {
     return set;
   }, [filterKey, activeTab]);
 
+  // Build the display-ready response list (filtered or full)
+  const displayResponses = useMemo(() => {
+    if (activeTab === undefined) return [];
+    if (filteredResNumbers === null) return activeTab.responses;
+    return activeTab.responses.filter((res) => filteredResNumbers.has(res.number));
+  }, [activeTab, filteredResNumbers]);
+
+  // Map resNumber -> index in displayResponses for virtual scroll navigation
+  const resNumberToIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    for (let i = 0; i < displayResponses.length; i++) {
+      const res = displayResponses[i];
+      if (res !== undefined) {
+        map.set(res.number, i);
+      }
+    }
+    return map;
+  }, [displayResponses]);
+
+  // Virtual scrolling for the response list
+  const virtualizer = useVirtualizer({
+    count: displayResponses.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+  });
+
+  // Stable ref to virtualizer for use in callbacks without deps churn
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+
+  // Scroll to a specific res number using the virtualizer
+  const scrollToResNumber = useCallback((resNumber: number) => {
+    const index = resNumberToIndex.get(resNumber);
+    if (index !== undefined) {
+      virtualizerRef.current.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+    }
+  }, [resNumberToIndex]);
+
   // Pre-compute NG results for all responses in active tab
   const ngResults = useMemo(() => {
     if (activeTab === undefined || ngRules.length === 0) return new Map<number, NgFilterResult>();
@@ -1093,13 +1135,10 @@ export function ThreadView(): React.JSX.Element {
     }
   }, [activeTabId, updateTabKokomade]);
 
-  // F16: Scroll to a specific response number
+  // F16: Scroll to a specific response number (virtualizer-based)
   const handleScrollToRes = useCallback((resNumber: number) => {
-    const el = document.getElementById(`res-${String(resNumber)}`);
-    if (el !== null) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, []);
+    scrollToResNumber(resNumber);
+  }, [scrollToResNumber]);
 
   const handleAddNgWord = useCallback((selectedText: string) => {
     if (activeTab === undefined) return;
@@ -1288,45 +1327,65 @@ export function ThreadView(): React.JSX.Element {
               </div>
             )}
 
-            {/* Responses */}
+            {/* Responses — virtual scrolling */}
             <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
-              {activeTab.responses.map((res) => {
-                // F31: skip non-matching responses when filter is active
-                if (filteredResNumbers !== null && !filteredResNumbers.has(res.number)) return null;
+              <div
+                style={{
+                  height: `${String(virtualizer.getTotalSize())}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const res = displayResponses[virtualRow.index];
+                  if (res === undefined) return null;
 
-                const resIdVal = extractId(res);
-                const resWatchoiVal = extractWatchoi(res);
-                const resKotehanVal = extractKotehan(res);
+                  const resIdVal = extractId(res);
+                  const resWatchoiVal = extractWatchoi(res);
+                  const resKotehanVal = extractKotehan(res);
 
-                return (
-                  <div key={res.number}>
-                    {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
-                      <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
-                        <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
-                      </div>
-                    )}
-                    <ResItem
-                      res={res}
-                      ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
-                      highlightType={getHighlightType(res.number)}
-                      showRelativeTime={showRelativeTime}
-                      inlineMediaEnabled={inlineMediaEnabled}
-                      allThreadImageUrls={allThreadImageUrls}
-                      idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
-                      watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
-                      kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
-                      onAnchorHover={handleAnchorHover}
-                      onAnchorLeave={handleAnchorLeave}
-                      onResNumberClick={handleResNumberClick}
-                      onSetKokomade={handleSetKokomade}
-                      onAddNgWord={handleAddNgWord}
-                      onFilterById={handleFilterById}
-                      onFilterByWatchoi={handleFilterByWatchoi}
-                      onFilterByKotehan={handleFilterByKotehan}
-                    />
-                  </div>
-                );
-              })}
+                  return (
+                    <div
+                      key={res.number}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${String(virtualRow.start)}px)`,
+                      }}
+                    >
+                      {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
+                        <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
+                          <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
+                        </div>
+                      )}
+                      <ResItem
+                        res={res}
+                        ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
+                        highlightType={getHighlightType(res.number)}
+                        showRelativeTime={showRelativeTime}
+                        inlineMediaEnabled={inlineMediaEnabled}
+                        allThreadImageUrls={allThreadImageUrls}
+                        idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
+                        watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
+                        kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
+                        onAnchorHover={handleAnchorHover}
+                        onAnchorLeave={handleAnchorLeave}
+                        onResNumberClick={handleResNumberClick}
+                        onSetKokomade={handleSetKokomade}
+                        onAddNgWord={handleAddNgWord}
+                        onScrollToResNumber={scrollToResNumber}
+                        onFilterById={handleFilterById}
+                        onFilterByWatchoi={handleFilterByWatchoi}
+                        onFilterByKotehan={handleFilterByKotehan}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* F16: Thread Analysis Panel */}

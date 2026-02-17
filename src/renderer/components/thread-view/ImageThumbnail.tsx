@@ -1,10 +1,12 @@
 /**
  * Inline image thumbnail component.
- * Renders image URLs as lazy-loaded thumbnails.
- * Click opens a full-featured image modal.
+ * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
+ * to prevent layout shift. Click opens a full-featured image modal.
  */
 import { useState, useCallback } from 'react';
 import { ImageModal } from './ImageModal';
+import { MediaPlaceholder } from './MediaPlaceholder';
+import { useLazyLoad } from '../../hooks/use-lazy-load';
 
 interface ImageThumbnailProps {
   readonly url: string;
@@ -19,6 +21,7 @@ const THUMBNAIL_MAX_HEIGHT = 200;
 export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnailProps): React.JSX.Element {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -52,25 +55,29 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
 
   return (
     <>
-      <span className="my-1 inline-block">
-        <button
-          type="button"
-          onClick={handleClick}
-          onKeyDown={handleKeyDown}
-          className="cursor-pointer border-none bg-transparent p-0"
-          title="クリックで画像ビューアを開く"
-          aria-label="画像ビューアを開く"
-        >
-          <img
-            src={displayUrl}
-            alt={url}
-            loading="lazy"
-            onError={handleError}
-            className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"
-            style={{ maxWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`, maxHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px` }}
-            referrerPolicy="no-referrer"
-          />
-        </button>
+      <span ref={ref} className="my-1 inline-block" style={{ minWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`, minHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px` }}>
+        {isVisible ? (
+          <button
+            type="button"
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            className="cursor-pointer border-none bg-transparent p-0"
+            title="クリックで画像ビューアを開く"
+            aria-label="画像ビューアを開く"
+          >
+            <img
+              src={displayUrl}
+              alt={url}
+              loading="lazy"
+              onError={handleError}
+              className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"
+              style={{ maxWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`, maxHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px` }}
+              referrerPolicy="no-referrer"
+            />
+          </button>
+        ) : (
+          <MediaPlaceholder width={THUMBNAIL_MAX_WIDTH} height={THUMBNAIL_MAX_HEIGHT} mediaType="image" />
+        )}
       </span>
 
       {modalOpen && <ImageModal url={url} allImageUrls={allImageUrls} onClose={handleCloseModal} />}

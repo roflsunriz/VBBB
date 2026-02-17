@@ -51,6 +51,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@mdi/js": "^7.4.47",
+    "@tanstack/react-virtual": "^3.13.18",
     "@xmldom/xmldom": "^0.8.11",
     "dompurify": "^3.3.1",
     "https-proxy-agent": "^7.0.6",
