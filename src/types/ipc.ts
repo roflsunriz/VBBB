@@ -332,6 +332,22 @@ export interface IpcChannelMap {
     args: [content: string];
     result: { saved: boolean; path: string };
   };
+  /** Lookup IP address WhoIs/geolocation via ip-api.com (main process) */
+  'ip:lookup': {
+    args: [ip: string];
+    result: IpLookupResult;
+  };
+}
+
+/** IP WhoIs/geolocation lookup result */
+export interface IpLookupResult {
+  readonly ip: string;
+  readonly country: string;
+  readonly region: string;
+  readonly city: string;
+  readonly isp: string;
+  readonly org: string;
+  readonly as: string;
 }
 
 /** All IPC channel names */

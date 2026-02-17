@@ -6,7 +6,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { BoardType, type Board } from '@shared/domain';
-import type { IpcChannelMap } from '@shared/ipc';
+import type { IpcChannelMap, IpLookupResult } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
 import { clearLogBuffer, createLogger, getLogBuffer } from '../logger';
@@ -19,6 +19,7 @@ import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
 import { getBoardDir, ensureDir } from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
+import { httpFetch } from '../services/http-client';
 import { searchLocal, searchLocalAll } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
@@ -566,6 +567,33 @@ export function registerIpcHandlers(): void {
 
     await writeFile(result.filePath, content, 'utf-8');
     return { saved: true, path: result.filePath };
+  });
+
+  handle('ip:lookup', async (ip: string): Promise<IpLookupResult> => {
+    // Normalize BBS masked IPv6 (e.g. "240b:11:442:d510:*" → "240b:11:442:d510::")
+    const lookupIp = ip.endsWith(':*') ? `${ip.slice(0, -1)}:` : ip;
+    const response = await httpFetch({
+      url: `http://ip-api.com/json/${encodeURIComponent(lookupIp)}?lang=ja&fields=country,regionName,city,isp,org,as,query`,
+      method: 'GET',
+      acceptGzip: true,
+    }, { maxRetries: 1, initialDelayMs: 500, maxDelayMs: 2000, retryableStatuses: [429, 503] });
+    if (response.status !== 200) {
+      throw new Error(`IP API error: ${String(response.status)}`);
+    }
+    const data: unknown = JSON.parse(response.body.toString('utf-8'));
+    if (typeof data !== 'object' || data === null) {
+      throw new Error('Invalid API response');
+    }
+    const d = data as Record<string, unknown>;
+    return {
+      ip,
+      country: typeof d['country'] === 'string' ? d['country'] : '',
+      region: typeof d['regionName'] === 'string' ? d['regionName'] : '',
+      city: typeof d['city'] === 'string' ? d['city'] : '',
+      isp: typeof d['isp'] === 'string' ? d['isp'] : '',
+      org: typeof d['org'] === 'string' ? d['org'] : '',
+      as: typeof d['as'] === 'string' ? d['as'] : '',
+    };
   });
 
   logger.info('IPC handlers registered');

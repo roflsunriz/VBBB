@@ -27,8 +27,8 @@ import { ThreadAnalysis } from './ThreadAnalysis';
 import { NgEditor } from '../ng-editor/NgEditor';
 import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
-import { extractIps, threadHasExposedIps, fetchIpInfo } from '../../utils/ip-detect';
-import type { IpInfo } from '../../utils/ip-detect';
+import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
+import type { IpLookupResult } from '@shared/ipc';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -205,15 +205,16 @@ function IpPopup({ ip, x, y, onClose }: {
   readonly y: number;
   readonly onClose: () => void;
 }): React.JSX.Element {
-  const [info, setInfo] = useState<IpInfo | null>(null);
+  const [info, setInfo] = useState<IpLookupResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const result = await fetchIpInfo(ip);
+        const result = await window.electronApi.invoke('ip:lookup', ip);
         if (!cancelled) { setInfo(result); setLoading(false); }
       } catch (err) {
         if (!cancelled) { setError(err instanceof Error ? err.message : String(err)); setLoading(false); }
@@ -221,6 +222,23 @@ function IpPopup({ ip, x, y, onClose }: {
     })();
     return () => { cancelled = true; };
   }, [ip]);
+
+  // Clamp popup within viewport
+  useEffect(() => {
+    const el = popupRef.current;
+    if (el === null) return;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let cx = x;
+    let cy = y;
+    if (cx + rect.width > vw) cx = vw - rect.width - 4;
+    if (cy + rect.height > vh) cy = vh - rect.height - 4;
+    if (cx < 0) cx = 4;
+    if (cy < 0) cy = 4;
+    el.style.left = `${String(cx)}px`;
+    el.style.top = `${String(cy)}px`;
+  });
 
   return (
     <>
@@ -233,6 +251,7 @@ function IpPopup({ ip, x, y, onClose }: {
         aria-label="閉じる"
       />
       <div
+        ref={popupRef}
         className="fixed z-50 min-w-52 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3 shadow-lg"
         style={{ left: x, top: y }}
       >
