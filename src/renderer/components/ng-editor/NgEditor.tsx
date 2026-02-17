@@ -9,6 +9,7 @@ import { AbonType, NgMatchMode, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { TopResizeHandle } from '../common/TopResizeHandle';
 
 function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -134,8 +135,19 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
     }
   }, [handleAdd]);
 
+  const isInline = onClose === undefined;
+  const [panelHeight, setPanelHeight] = useState(256);
+  const handlePanelResize = useCallback((deltaY: number) => {
+    setPanelHeight((prev) => Math.max(160, Math.min(window.innerHeight * 0.7, prev - deltaY)));
+  }, []);
+
   return (
-    <div className="flex h-64 min-h-40 max-h-[70vh] resize-y flex-col overflow-hidden border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <>
+    {isInline && <TopResizeHandle onResize={handlePanelResize} />}
+    <div
+      className={`flex flex-col overflow-hidden border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]${isInline ? '' : ' h-64 min-h-40 max-h-[70vh]'}`}
+      style={isInline ? { height: panelHeight } : undefined}
+    >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-3 py-1.5">
         <h3 className="text-xs font-medium text-[var(--color-text-primary)]">NG ルール管理</h3>
@@ -230,5 +242,6 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import { mdiSend, mdiLoading, mdiTimerSand, mdiTree, mdiHelpCircleOutline } from
 import type { DonguriState } from '@shared/auth';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+import { TopResizeHandle } from '../common/TopResizeHandle';
 
 interface PostEditorProps {
   readonly boardUrl: string;
@@ -81,6 +82,11 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const [donguriPassword, setDonguriPassword] = useState('');
   const [donguriActionMessage, setDonguriActionMessage] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [panelHeight, setPanelHeight] = useState(256);
+  const handlePanelResize = useCallback((deltaY: number) => {
+    setPanelHeight((prev) => Math.max(160, Math.min(window.innerHeight * 0.7, prev - deltaY)));
+  }, []);
 
   useEffect(() => {
     setName(kotehan.name);
@@ -255,7 +261,9 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
   const isDisabled = posting || message.trim().length === 0;
 
   return (
-    <div className="h-64 min-h-40 max-h-[70vh] resize-y overflow-auto border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
+    <>
+    <TopResizeHandle onResize={handlePanelResize} />
+    <div className="overflow-auto bg-[var(--color-bg-secondary)] p-3" style={{ height: panelHeight }}>
       {/* F35: IP privacy warning */}
       {hasExposedIps === true && (
         <div className="mb-2 flex items-center gap-2 rounded border border-[var(--color-error)] bg-[var(--color-error)]/10 px-3 py-1.5">
@@ -504,5 +512,6 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         </p>
       )}
     </div>
+    </>
   );
 }

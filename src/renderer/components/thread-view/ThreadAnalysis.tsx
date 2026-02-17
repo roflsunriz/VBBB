@@ -10,6 +10,7 @@ import type { Res } from '@shared/domain';
 import type { CountEntry, ThreadAnalysisResult } from '../../utils/thread-analysis';
 import { analyzeThread } from '../../utils/thread-analysis';
 import { MdiIcon } from '../common/MdiIcon';
+import { TopResizeHandle } from '../common/TopResizeHandle';
 
 /* ---------- Sub-components ---------- */
 
@@ -97,8 +98,15 @@ export function ThreadAnalysis({ responses, onClose, onScrollToRes }: ThreadAnal
     void window.electronApi.invoke('shell:open-external', url);
   }, []);
 
+  const [panelHeight, setPanelHeight] = useState(320);
+  const handlePanelResize = useCallback((deltaY: number) => {
+    setPanelHeight((prev) => Math.max(128, Math.min(window.innerHeight * 0.7, prev - deltaY)));
+  }, []);
+
   return (
-    <div className="flex h-80 min-h-32 max-h-[70vh] resize-y flex-col overflow-hidden border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
+    <>
+    <TopResizeHandle onResize={handlePanelResize} />
+    <div className="flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]" style={{ height: panelHeight }}>
       {/* Header */}
       <div className="flex items-center border-b border-[var(--color-border-secondary)] px-3 py-1">
         <span className="text-xs font-bold text-[var(--color-text-primary)]">スレッド分析</span>
@@ -211,5 +219,6 @@ export function ThreadAnalysis({ responses, onClose, onScrollToRes }: ThreadAnal
         </CollapsibleSection>
       </div>
     </div>
+    </>
   );
 }

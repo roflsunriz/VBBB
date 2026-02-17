@@ -12,6 +12,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { mdiPlay, mdiStop, mdiPlus, mdiDelete } from '@mdi/js';
 import { MdiIcon } from '../common/MdiIcon';
+import { TopResizeHandle } from '../common/TopResizeHandle';
 
 interface ProgrammaticPostProps {
   readonly boardUrl: string;
@@ -53,6 +54,11 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef(false);
+
+  const [panelHeight, setPanelHeight] = useState(288);
+  const handlePanelResize = useCallback((deltaY: number) => {
+    setPanelHeight((prev) => Math.max(176, Math.min(window.innerHeight * 0.7, prev - deltaY)));
+  }, []);
 
   const addLog = useCallback((msg: string) => {
     const ts = new Date().toLocaleTimeString('ja-JP');
@@ -184,7 +190,9 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
   ]);
 
   return (
-    <div className="h-72 min-h-44 max-h-[70vh] resize-y overflow-auto border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-3">
+    <>
+    <TopResizeHandle onResize={handlePanelResize} />
+    <div className="overflow-auto bg-[var(--color-bg-secondary)] p-3" style={{ height: panelHeight }}>
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs font-bold text-[var(--color-text-primary)]">プログラマティック書き込み</span>
         <span className="text-[10px] text-[var(--color-text-muted)]">({boardUrl} / {threadId})</span>
@@ -337,5 +345,6 @@ export function ProgrammaticPost({ boardUrl, threadId }: ProgrammaticPostProps):
         </div>
       )}
     </div>
+    </>
   );
 }
