@@ -266,7 +266,7 @@ describe('feature 11: webview-thread-open', () => {
     const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'), 'utf-8');
     expect(src).toContain('will-navigate');
     expect(src).toContain('new-window');
-    expect(src).toContain('parseThreadUrl');
+    expect(src).toContain('parseAnyThreadUrl');
   });
 
   it('SearchPanel imports parseThreadUrl from shared module', () => {

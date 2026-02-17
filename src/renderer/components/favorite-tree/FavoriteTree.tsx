@@ -6,6 +6,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete } from '@mdi/js';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
+import { parseAnyThreadUrl, parseExternalBoardUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -34,29 +35,36 @@ function FavItemRow({
 
   const handleClick = useCallback(() => {
     if (item.type === 'board') {
-      const url = new URL(item.url);
-      const segments = url.pathname.split('/').filter((s) => s.length > 0);
-      const bbsId = segments[segments.length - 1] ?? '';
-      void selectBoard({
-        title: item.title,
-        url: item.url,
-        bbsId,
-        serverUrl: `${url.protocol}//${url.host}/`,
-        boardType: item.boardType,
-      });
-    } else {
+      const external = parseExternalBoardUrl(item.url);
+      if (external !== null) {
+        void selectBoard({
+          ...external.board,
+          title: item.title,
+        });
+        return;
+      }
+
       try {
         const url = new URL(item.url);
         const segments = url.pathname.split('/').filter((s) => s.length > 0);
-        const readIdx = segments.indexOf('read.cgi');
-        if (readIdx !== -1 && readIdx + 2 < segments.length) {
-          const bbsId = segments[readIdx + 1] ?? '';
-          const threadId = segments[readIdx + 2] ?? '';
-          const boardUrl = `${url.protocol}//${url.host}/${bbsId}/`;
-          void openThread(boardUrl, threadId, item.title);
-        }
+        const bbsId = segments[segments.length - 1] ?? '';
+        void selectBoard({
+          title: item.title,
+          url: item.url,
+          bbsId,
+          serverUrl: `${url.protocol}//${url.host}/`,
+          boardType: item.boardType,
+        });
       } catch {
         // Invalid URL
+      }
+    } else {
+      const parsed = parseAnyThreadUrl(item.url);
+      if (parsed !== null) {
+        void (async () => {
+          await selectBoard(parsed.board);
+          await openThread(parsed.board.url, parsed.threadId, '');
+        })();
       }
     }
   }, [item, selectBoard, openThread]);

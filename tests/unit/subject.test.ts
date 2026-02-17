@@ -52,6 +52,14 @@ describe('parseSubjectLine', () => {
     expect(result).not.toBeNull();
     expect(result?.count).toBe(0);
   });
+
+  it('normalizes .cgi filename to .dat', () => {
+    const result = parseSubjectLine('1182428917.cgi,東京23区スレ (999)');
+    expect(result).not.toBeNull();
+    expect(result?.fileName).toBe('1182428917.dat');
+    expect(result?.title).toBe('東京23区スレ');
+    expect(result?.count).toBe(999);
+  });
 });
 
 describe('parseSubjectTxt', () => {

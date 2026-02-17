@@ -14,6 +14,38 @@ import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('dat');
 
+function parseMachiCompatibleDat(parts: readonly string[]): Res | null {
+  if (parts.length < 6) return null;
+
+  const resNumberRaw = parts[0];
+  const sequenceRaw = parts[1];
+  if (resNumberRaw === undefined || sequenceRaw === undefined) return null;
+  if (!/^\d+$/.test(resNumberRaw) || !/^\d+$/.test(sequenceRaw)) return null;
+
+  const resNumber = parseInt(resNumberRaw, 10);
+  if (Number.isNaN(resNumber) || resNumber < 1) return null;
+
+  const name = parts[2] ?? '';
+  const mail = parts[3] ?? '';
+  const dateTime = parts[4] ?? '';
+  let body = parts[5] ?? '';
+  const title = parts[6] ?? '';
+
+  body = body.replace(/^\s+/, '');
+  if (body.length === 0) {
+    body = '&nbsp;';
+  }
+
+  return {
+    number: resNumber,
+    name,
+    mail,
+    dateTime,
+    body,
+    title,
+  };
+}
+
 /**
  * Parse a single DAT line (5ch/2ch format).
  * Format: "Name<>Mail<>DateTime<>Body<>Title"
@@ -34,6 +66,11 @@ export function parseDatLine(line: string, lineNumber: number): Res | null {
     converted = converted.replace(/,/g, '<>');
     converted = converted.replace(/\x00FWCOMMA\x00/g, ',');
     parts = converted.split('<>');
+  }
+
+  const machiCompatible = parseMachiCompatibleDat(parts);
+  if (machiCompatible !== null) {
+    return machiCompatible;
   }
 
   const name = parts[0] ?? '';

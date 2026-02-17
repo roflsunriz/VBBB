@@ -13,6 +13,7 @@ import { clearLogBuffer, createLogger, getLogBuffer } from '../logger';
 import { menuEmitter } from '../menu';
 import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
+import { resolveBoardTitle } from '../services/board-title';
 import { fetchDat } from '../services/dat';
 import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
@@ -69,8 +70,8 @@ function lookupBoard(boardUrl: string): Board {
   const hostname = url.hostname.toLowerCase();
 
   // Detect JBBS boards
-  const isJBBS = hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor');
-  const isShitaraba = !isJBBS && hostname.includes('shitaraba');
+  const isShitaraba = hostname.includes('jbbs.shitaraba');
+  const isJBBS = hostname.includes('jbbs.livedoor');
 
   if (isJBBS || isShitaraba) {
     const jbbsDir = segments.length >= 2 ? (segments[segments.length - 2] ?? '') : '';
@@ -160,6 +161,11 @@ export function registerIpcHandlers(): void {
       return plugin.fetchSubject(board, dataDir);
     }
     return fetchSubject(board, dataDir);
+  });
+
+  handle('bbs:resolve-board-title', async (boardUrl: string) => {
+    const board = lookupBoard(boardUrl);
+    return resolveBoardTitle(board);
   });
 
   handle('bbs:fetch-dat', async (boardUrl: string, threadId: string) => {

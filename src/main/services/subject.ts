@@ -31,10 +31,17 @@ export function parseSubjectLine(line: string): SubjectRecord | null {
   }
   if (parts.length < 2) return null;
 
-  const fileName = parts[0]?.trim();
+  let fileName = parts[0]?.trim();
   const rest = parts.slice(1).join(delimiter).trim();
 
-  if (fileName === undefined || rest === undefined || !fileName.endsWith('.dat')) return null;
+  if (fileName === undefined || rest === undefined) return null;
+
+  // Machi/JBBS-compatible subject lines may use ".cgi" filenames.
+  // Normalize to ".dat" so downstream handling remains consistent.
+  if (fileName.endsWith('.cgi')) {
+    fileName = fileName.replace(/\.cgi$/, '.dat');
+  }
+  if (!fileName.endsWith('.dat')) return null;
 
   // Extract count from end: (123), (123), <123>
   let title = rest;

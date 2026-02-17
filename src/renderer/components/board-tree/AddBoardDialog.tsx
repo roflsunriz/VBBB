@@ -35,7 +35,7 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
 
     // If a thread URL was provided, open the thread too
     if (parsed.threadId !== undefined) {
-      void openThread(parsed.board.url, parsed.threadId, parsed.threadTitle ?? parsed.threadId);
+      void openThread(parsed.board.url, parsed.threadId, '');
     }
 
     setResult(`${parsed.board.title} を追加しました${parsed.threadId !== undefined ? ' (スレッドを開きます)' : ''}`);
@@ -99,8 +99,10 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
         <ul className="ml-3 list-disc space-y-0.5">
           <li>https://jbbs.shitaraba.jp/game/12345/</li>
           <li>https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/</li>
+          <li>https://jbbs.shitaraba.jp/game/12345/dat/1234567890.dat</li>
           <li>https://machi.to/hokkaidou/</li>
           <li>https://machi.to/bbs/read.cgi/hokkaidou/1234567890/</li>
+          <li>https://machi.to/hokkaidou/dat/1234567890.dat</li>
         </ul>
       </div>
     </div>

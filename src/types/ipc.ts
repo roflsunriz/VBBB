@@ -27,6 +27,11 @@ export interface IpcChannelMap {
     args: [boardUrl: string];
     result: SubjectFetchResult;
   };
+  /** Resolve external board title from stable sources */
+  'bbs:resolve-board-title': {
+    args: [boardUrl: string];
+    result: string | null;
+  };
   /** Fetch DAT (スレ本文) */
   'bbs:fetch-dat': {
     args: [boardUrl: string, threadId: string];

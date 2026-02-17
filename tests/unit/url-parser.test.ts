@@ -4,7 +4,7 @@
  *         parseExternalBoardUrl (feature 10: add board dialog)
  */
 import { describe, it, expect } from 'vitest';
-import { parseThreadUrl, parseExternalBoardUrl } from '../../src/types/url-parser';
+import { parseThreadUrl, parseExternalBoardUrl, parseAnyThreadUrl } from '../../src/types/url-parser';
 import { BoardType } from '../../src/types/domain';
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,6 @@ describe('parseExternalBoardUrl', () => {
     expect(result?.board.bbsId).toBe('12345');
     expect(result?.board.jbbsDir).toBe('game');
     expect(result?.threadId).toBe('1234567890');
-    expect(result?.threadTitle).toContain('game/12345');
   });
 
   // JBBS board (livedoor)
@@ -127,6 +126,22 @@ describe('parseExternalBoardUrl', () => {
     expect(result?.threadId).toBe('1234567890');
   });
 
+  it('parses a Shitaraba dat URL as thread', () => {
+    const result = parseExternalBoardUrl('https://jbbs.shitaraba.jp/game/12345/dat/1234567890.dat');
+    expect(result).not.toBeNull();
+    expect(result?.board.boardType).toBe(BoardType.Shitaraba);
+    expect(result?.board.bbsId).toBe('12345');
+    expect(result?.threadId).toBe('1234567890');
+  });
+
+  it('parses a Machi dat URL as thread', () => {
+    const result = parseExternalBoardUrl('https://machi.to/tokyo/dat/1182428917.dat');
+    expect(result).not.toBeNull();
+    expect(result?.board.boardType).toBe(BoardType.Type2ch);
+    expect(result?.board.bbsId).toBe('tokyo');
+    expect(result?.threadId).toBe('1182428917');
+  });
+
   // Error cases
   it('returns null for unsupported URL', () => {
     expect(parseExternalBoardUrl('https://www.google.com/')).toBeNull();
@@ -157,5 +172,42 @@ describe('parseExternalBoardUrl', () => {
     // "game" is segment[0], but segment[1] is undefined
     // pathSegments = ['game'] -> length < 2 -> null
     expect(result).toBeNull();
+  });
+});
+
+describe('parseAnyThreadUrl', () => {
+  it('parses 5ch read.cgi thread URL', () => {
+    const result = parseAnyThreadUrl('https://eagle.5ch.net/test/read.cgi/livejupiter/1234567890/');
+    expect(result).not.toBeNull();
+    expect(result?.board.url).toBe('https://eagle.5ch.net/livejupiter/');
+    expect(result?.board.boardType).toBe(BoardType.Type2ch);
+    expect(result?.threadId).toBe('1234567890');
+    expect(result?.titleHint).toBe('');
+  });
+
+  it('parses Shitaraba read.cgi thread URL', () => {
+    const result = parseAnyThreadUrl('https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/');
+    expect(result).not.toBeNull();
+    expect(result?.board.url).toBe('https://jbbs.shitaraba.jp/game/12345/');
+    expect(result?.board.boardType).toBe(BoardType.Shitaraba);
+    expect(result?.threadId).toBe('1234567890');
+  });
+
+  it('parses Machi read.cgi thread URL', () => {
+    const result = parseAnyThreadUrl('https://machi.to/bbs/read.cgi/tokyo/1182428917/');
+    expect(result).not.toBeNull();
+    expect(result?.board.url).toBe('https://machi.to/tokyo/');
+    expect(result?.threadId).toBe('1182428917');
+  });
+
+  it('parses dat URL', () => {
+    const result = parseAnyThreadUrl('https://machi.to/tokyo/dat/1182428917.dat');
+    expect(result).not.toBeNull();
+    expect(result?.board.url).toBe('https://machi.to/tokyo/');
+    expect(result?.threadId).toBe('1182428917');
+  });
+
+  it('returns null for board URL without thread', () => {
+    expect(parseAnyThreadUrl('https://machi.to/tokyo/')).toBeNull();
   });
 });

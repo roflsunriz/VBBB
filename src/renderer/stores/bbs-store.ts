@@ -161,6 +161,47 @@ function getApi(): Window['electronApi'] {
 /** Guards against concurrent openThread calls for the same thread */
 const pendingThreadOpens = new Set<string>();
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'");
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isPlaceholderTitle(title: string, threadId: string): boolean {
+  const normalized = title.trim();
+  if (normalized.length === 0) return true;
+  if (/^\d{9,}$/.test(normalized)) return true;
+
+  const cleanThreadId = threadId.trim();
+  if (cleanThreadId.length === 0) return false;
+  const escapedThreadId = escapeRegExp(cleanThreadId);
+  const slugPattern = '[A-Za-z0-9._-]+';
+  const machinePatterns = [
+    new RegExp(`^${slugPattern}/${slugPattern}\\s*-\\s*${escapedThreadId}$`),
+    new RegExp(`^${slugPattern}\\s*-\\s*${escapedThreadId}$`),
+    new RegExp(`^${slugPattern}/${escapedThreadId}$`),
+  ];
+  return machinePatterns.some((pattern) => pattern.test(normalized));
+}
+
+function isExternalBoardUrl(boardUrl: string): boolean {
+  try {
+    const hostname = new URL(boardUrl).hostname.toLowerCase();
+    return hostname.includes('jbbs.shitaraba') ||
+      hostname.includes('jbbs.livedoor') ||
+      hostname.includes('machi.to');
+  } catch {
+    return false;
+  }
+}
+
 export const useBBSStore = create<BBSState>((set, get) => ({
   menu: null,
   menuLoading: false,
@@ -226,9 +267,41 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   selectBoard: async (board: Board) => {
     const boardTabId = board.url;
+    const maybeResolveExternalBoardTitle = async (targetBoardUrl: string): Promise<void> => {
+      if (!isExternalBoardUrl(targetBoardUrl)) return;
+      try {
+        const resolvedTitle = await getApi().invoke('bbs:resolve-board-title', targetBoardUrl);
+        if (resolvedTitle === null || resolvedTitle.trim().length === 0) return;
+
+        set((state) => ({
+          boardTabs: state.boardTabs.map((tab) =>
+            tab.board.url === targetBoardUrl
+              ? { ...tab, board: { ...tab.board, title: resolvedTitle } }
+              : tab,
+          ),
+          selectedBoard:
+            state.selectedBoard !== null && state.selectedBoard.url === targetBoardUrl
+              ? { ...state.selectedBoard, title: resolvedTitle }
+              : state.selectedBoard,
+          externalBoards: state.externalBoards.map((externalBoard) =>
+            externalBoard.url === targetBoardUrl
+              ? { ...externalBoard, title: resolvedTitle }
+              : externalBoard,
+          ),
+        }));
+
+        try {
+          localStorage.setItem('vbbb-external-boards', JSON.stringify(get().externalBoards));
+        } catch {
+          // Ignore storage errors
+        }
+      } catch {
+        // Ignore title resolution errors
+      }
+    };
 
     // F20: Auto-add external boards to the external category
-    if (board.boardType === 'jbbs' || board.boardType === 'shitaraba') {
+    if (isExternalBoardUrl(board.url)) {
       get().addExternalBoard(board);
     }
 
@@ -248,6 +321,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       // Refresh kotehan/samba for this board
       void get().fetchKotehan(board.url);
       void get().fetchSambaInfo(board.url);
+      void maybeResolveExternalBoardTitle(board.url);
       return;
     }
 
@@ -270,6 +344,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       subjectError: null,
       statusMessage: `${board.title} のスレッド一覧を取得中...`,
     }));
+    void maybeResolveExternalBoardTitle(board.url);
 
     // Persist selected board for session restore
     void getApi().invoke('session:save', { selectedBoardUrl: board.url });
@@ -497,7 +572,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
     pendingThreadOpens.add(tabId);
 
-    set({ statusMessage: `${title} を読み込み中...` });
+    const loadingTitle = title.trim().length > 0 ? title : threadId;
+    set({ statusMessage: `${loadingTitle} を読み込み中...` });
 
     try {
       const result: DatFetchResult = await getApi().invoke('bbs:fetch-dat', boardUrl, threadId);
@@ -507,22 +583,16 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       const kokomade = idx?.kokomade ?? -1;
       const scrollTop = idx?.scrollTop ?? 0;
 
-      // F8: If the provided title is empty or looks like a raw thread ID, try to
-      // extract a proper title from the first response's title field (DAT line 1).
+      // If the incoming title is mechanical/placeholder, resolve from DAT #1 title.
       let resolvedTitle = title;
-      if (
-        (resolvedTitle.trim().length === 0 || /^\d{9,}$/.test(resolvedTitle.trim())) &&
-        result.responses.length > 0
-      ) {
+      if (isPlaceholderTitle(resolvedTitle, threadId) && result.responses.length > 0) {
         const firstRes = result.responses[0];
         if (firstRes !== undefined && firstRes.title.trim().length > 0) {
-          resolvedTitle = firstRes.title
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#039;/g, "'");
+          resolvedTitle = decodeHtmlEntities(firstRes.title);
         }
+      }
+      if (resolvedTitle.trim().length === 0) {
+        resolvedTitle = threadId;
       }
 
       const newTab: ThreadTab = {
@@ -538,10 +608,10 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       set((state) => ({
         tabs: [...state.tabs, newTab],
         activeTabId: tabId,
-        statusMessage: `${title}: ${String(result.responses.length)} レス`,
+        statusMessage: `${resolvedTitle}: ${String(result.responses.length)} レス`,
       }));
 
-      void getApi().invoke('history:add', boardUrl, threadId, title);
+      void getApi().invoke('history:add', boardUrl, threadId, resolvedTitle);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ statusMessage: `読み込み失敗: ${message}` });

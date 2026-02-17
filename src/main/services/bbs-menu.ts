@@ -17,7 +17,10 @@ const logger = createLogger('bbs-menu');
  */
 function detectBoardType(url: string): BoardType {
   const hostname = new URL(url).hostname.toLowerCase();
-  if (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) {
+  if (hostname.includes('jbbs.shitaraba')) {
+    return BoardType.Shitaraba;
+  }
+  if (hostname.includes('jbbs.livedoor')) {
     return BoardType.JBBS;
   }
   if (hostname.includes('shitaraba')) {

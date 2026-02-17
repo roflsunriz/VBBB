@@ -6,7 +6,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mdiMagnify, mdiClose, mdiShieldCheck } from '@mdi/js';
 import type { SearchResult, SearchTarget } from '@shared/search';
-import { parseThreadUrl } from '@shared/url-parser';
+import { parseAnyThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -46,6 +46,7 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
 
   const selectedBoard = useBBSStore((s) => s.selectedBoard);
+  const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
   const webviewRef = useRef<HTMLElement>(null);
   const [adBlockEnabled, setAdBlockEnabled] = useState(loadAdBlockEnabled);
@@ -81,15 +82,18 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
     return () => { wv.removeEventListener('dom-ready', handleDomReady); };
   }, [remoteUrl, adBlockCss]);
 
-  // F7: Intercept navigation in webview to open 5ch threads natively (blocking webView)
+  // F7: Intercept navigation in webview to open 5ch/external threads natively
   useEffect(() => {
     const wv = webviewRef.current;
     if (wv === null || remoteUrl === null) return;
 
     const tryOpenThread = (url: string): boolean => {
-      const parsed = parseThreadUrl(url);
+      const parsed = parseAnyThreadUrl(url);
       if (parsed !== null) {
-        void openThread(parsed.boardUrl, parsed.threadId, parsed.title);
+        void (async () => {
+          await selectBoard(parsed.board);
+          await openThread(parsed.board.url, parsed.threadId, parsed.titleHint);
+        })();
         return true;
       }
       return false;
@@ -117,7 +121,7 @@ export function SearchPanel({ onClose }: { readonly onClose: () => void }): Reac
       wv.removeEventListener('will-navigate', handleNavigation);
       wv.removeEventListener('new-window', handleNewWindow);
     };
-  }, [remoteUrl, openThread]);
+  }, [remoteUrl, openThread, selectBoard]);
 
   const handleSearch = useCallback(async () => {
     if (pattern.trim().length === 0) return;

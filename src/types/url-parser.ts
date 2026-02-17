@@ -11,12 +11,18 @@ import { BoardType } from './domain';
 
 /** 5ch thread URL pattern: /test/read.cgi/<board>/<threadId>/ */
 const THREAD_URL_PATTERN = /\/test\/read\.cgi\/([^/]+)\/(\d+)/;
+const DAT_FILE_PATTERN = /^(\d+)\.dat$/;
 
 /** Parsed 5ch thread URL result */
 export interface ParsedThreadUrl {
   readonly boardUrl: string;
   readonly threadId: string;
   readonly title: string;
+}
+
+interface ParsedThreadPathParts {
+  readonly boardPathSegments: readonly string[];
+  readonly threadId: string;
 }
 
 /**
@@ -42,6 +48,141 @@ export function parseThreadUrl(rawUrl: string): ParsedThreadUrl | null {
   const threadId = match[2];
   const boardUrl = `${url.protocol}//${url.host}/${boardId}/`;
   return { boardUrl, threadId, title: `${boardId}/${threadId}` };
+}
+
+/**
+ * Parsed thread URL result for all supported formats (5ch/external/dat).
+ * titleHint is intentionally empty so openThread can resolve title from DAT.
+ */
+export interface ParsedAnyThreadUrl {
+  readonly board: Board;
+  readonly threadId: string;
+  readonly titleHint: string;
+}
+
+function parseFromReadCgi(url: URL): ParsedThreadPathParts | null {
+  const pathSegments = url.pathname.split('/').filter((s) => s.length > 0);
+  const hostname = url.hostname.toLowerCase();
+
+  // 5ch: /test/read.cgi/<boardId>/<threadId>/
+  const fiveChMatch = THREAD_URL_PATTERN.exec(url.pathname);
+  if (fiveChMatch?.[1] !== undefined && fiveChMatch[2] !== undefined) {
+    return {
+      boardPathSegments: [fiveChMatch[1]],
+      threadId: fiveChMatch[2],
+    };
+  }
+
+  // Shitaraba / JBBS: /bbs/read.cgi/<dir>/<boardId>/<threadId>/
+  if ((hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
+      pathSegments[0] === 'bbs' &&
+      pathSegments[1] === 'read.cgi' &&
+      pathSegments.length >= 5) {
+    const dir = pathSegments[2];
+    const bbsId = pathSegments[3];
+    const threadId = pathSegments[4];
+    if (dir !== undefined && bbsId !== undefined && threadId !== undefined) {
+      return {
+        boardPathSegments: [dir, bbsId],
+        threadId,
+      };
+    }
+  }
+
+  // Machi BBS: /bbs/read.cgi/<boardId>/<threadId>/
+  if (hostname.includes('machi.to') &&
+      pathSegments[0] === 'bbs' &&
+      pathSegments[1] === 'read.cgi' &&
+      pathSegments.length >= 4) {
+    const bbsId = pathSegments[2];
+    const threadId = pathSegments[3];
+    if (bbsId !== undefined && threadId !== undefined) {
+      return {
+        boardPathSegments: [bbsId],
+        threadId,
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseFromDatPath(url: URL): ParsedThreadPathParts | null {
+  const pathSegments = url.pathname.split('/').filter((s) => s.length > 0);
+  const datIndex = pathSegments.lastIndexOf('dat');
+  if (datIndex <= 0) return null;
+
+  const datFileName = pathSegments[datIndex + 1];
+  if (datFileName === undefined) return null;
+  const match = DAT_FILE_PATTERN.exec(datFileName);
+  if (match?.[1] === undefined) return null;
+
+  return {
+    boardPathSegments: pathSegments.slice(0, datIndex),
+    threadId: match[1],
+  };
+}
+
+function detectBoardTypeByHost(hostname: string): BoardType {
+  if (hostname.includes('jbbs.shitaraba')) return BoardType.Shitaraba;
+  if (hostname.includes('jbbs.livedoor')) return BoardType.JBBS;
+  return BoardType.Type2ch;
+}
+
+function buildBoard(url: URL, boardPathSegments: readonly string[]): Board | null {
+  if (boardPathSegments.length === 0) return null;
+
+  const hostname = url.hostname.toLowerCase();
+  const boardType = detectBoardTypeByHost(hostname);
+  const bbsId = boardPathSegments[boardPathSegments.length - 1];
+  if (bbsId === undefined || bbsId.length === 0) return null;
+
+  if ((boardType === BoardType.Shitaraba || boardType === BoardType.JBBS) && boardPathSegments.length >= 2) {
+    const jbbsDir = boardPathSegments[boardPathSegments.length - 2];
+    if (jbbsDir === undefined || jbbsDir.length === 0) return null;
+
+    return {
+      title: `${jbbsDir}/${bbsId}`,
+      url: `${url.protocol}//${url.host}/${jbbsDir}/${bbsId}/`,
+      bbsId,
+      serverUrl: `${url.protocol}//${url.host}/`,
+      boardType,
+      jbbsDir,
+    };
+  }
+
+  const boardPath = boardPathSegments.join('/');
+  return {
+    title: bbsId,
+    url: `${url.protocol}//${url.host}/${boardPath}/`,
+    bbsId,
+    serverUrl: `${url.protocol}//${url.host}/`,
+    boardType: BoardType.Type2ch,
+  };
+}
+
+/**
+ * Parse thread URL from read.cgi or dat/*.dat across 5ch/external boards.
+ */
+export function parseAnyThreadUrl(rawUrl: string): ParsedAnyThreadUrl | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return null;
+  }
+
+  const parsedPath = parseFromReadCgi(url) ?? parseFromDatPath(url);
+  if (parsedPath === null) return null;
+
+  const board = buildBoard(url, parsedPath.boardPathSegments);
+  if (board === null) return null;
+
+  return {
+    board,
+    threadId: parsedPath.threadId,
+    titleHint: '',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,44 +219,24 @@ export function parseExternalBoardUrl(rawUrl: string): ParsedExternalBoardUrl | 
 
   // Shitaraba / JBBS
   if (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) {
-    const isShitaraba = hostname.includes('shitaraba');
-    const boardType = isShitaraba ? BoardType.Shitaraba : BoardType.JBBS;
-
-    // Thread URL: /bbs/read.cgi/<dir>/<boardId>/<threadId>/
-    if (pathSegments[0] === 'bbs' && pathSegments[1] === 'read.cgi' && pathSegments.length >= 5) {
-      const jbbsDir = pathSegments[2] ?? '';
-      const bbsId = pathSegments[3] ?? '';
-      const threadId = pathSegments[4] ?? '';
-      const boardUrl = `${url.protocol}//${url.host}/${jbbsDir}/${bbsId}/`;
+    const parsedThread = parseFromReadCgi(url) ?? parseFromDatPath(url);
+    if (parsedThread !== null) {
+      const board = buildBoard(url, parsedThread.boardPathSegments);
+      if (board === null) return null;
       return {
-        board: {
-          title: `${jbbsDir}/${bbsId}`,
-          url: boardUrl,
-          bbsId,
-          serverUrl: `${url.protocol}//${url.host}/`,
-          boardType,
-          jbbsDir,
-        },
-        threadId,
-        threadTitle: `${jbbsDir}/${bbsId} - ${threadId}`,
+        board,
+        threadId: parsedThread.threadId,
       };
     }
 
     // Board URL: /<dir>/<boardId>/
-    if (pathSegments.length >= 2) {
-      const jbbsDir = pathSegments[0] ?? '';
-      const bbsId = pathSegments[1] ?? '';
-      const boardUrl = `${url.protocol}//${url.host}/${jbbsDir}/${bbsId}/`;
-      return {
-        board: {
-          title: `${jbbsDir}/${bbsId}`,
-          url: boardUrl,
-          bbsId,
-          serverUrl: `${url.protocol}//${url.host}/`,
-          boardType,
-          jbbsDir,
-        },
-      };
+    if (pathSegments.length >= 2 && pathSegments[0] !== 'bbs') {
+      const dir = pathSegments[0];
+      const bbsId = pathSegments[1];
+      if (dir === undefined || bbsId === undefined) return null;
+      const board = buildBoard(url, [dir, bbsId]);
+      if (board === null) return null;
+      return { board };
     }
 
     return null;
@@ -123,37 +244,23 @@ export function parseExternalBoardUrl(rawUrl: string): ParsedExternalBoardUrl | 
 
   // Machi BBS (machi.to) - treated as 2ch-compatible
   if (hostname.includes('machi.to')) {
-    // Thread URL: /bbs/read.cgi/<boardId>/<threadId>/
-    if (pathSegments[0] === 'bbs' && pathSegments[1] === 'read.cgi' && pathSegments.length >= 4) {
-      const bbsId = pathSegments[2] ?? '';
-      const threadId = pathSegments[3] ?? '';
-      const boardUrl = `${url.protocol}//${url.host}/${bbsId}/`;
+    const parsedThread = parseFromReadCgi(url) ?? parseFromDatPath(url);
+    if (parsedThread !== null) {
+      const board = buildBoard(url, parsedThread.boardPathSegments);
+      if (board === null) return null;
       return {
-        board: {
-          title: bbsId,
-          url: boardUrl,
-          bbsId,
-          serverUrl: `${url.protocol}//${url.host}/`,
-          boardType: BoardType.Type2ch,
-        },
-        threadId,
-        threadTitle: `${bbsId} - ${threadId}`,
+        board,
+        threadId: parsedThread.threadId,
       };
     }
 
     // Board URL: /<boardId>/
-    if (pathSegments.length >= 1) {
-      const bbsId = pathSegments[0] ?? '';
-      const boardUrl = `${url.protocol}//${url.host}/${bbsId}/`;
-      return {
-        board: {
-          title: bbsId,
-          url: boardUrl,
-          bbsId,
-          serverUrl: `${url.protocol}//${url.host}/`,
-          boardType: BoardType.Type2ch,
-        },
-      };
+    if (pathSegments.length >= 1 && pathSegments[0] !== 'bbs') {
+      const bbsId = pathSegments[0];
+      if (bbsId === undefined) return null;
+      const board = buildBoard(url, [bbsId]);
+      if (board === null) return null;
+      return { board };
     }
 
     return null;
