@@ -41,18 +41,19 @@ export function hasBoardPlugin(boardType: BoardType): boolean {
 
 /**
  * Initialize all board plugins.
- * Called at startup to register JBBS/Shitaraba plugins.
+ * MUST be awaited before the renderer window is created; otherwise IPC
+ * requests for JBBS/Machi boards may arrive before the plugins are
+ * registered, causing fetchDat to use the wrong URL/format.
  */
-export function initializeBoardPlugins(): void {
+export async function initializeBoardPlugins(): Promise<void> {
   // Dynamic import to avoid circular dependencies
-  // These are registered in the IPC handler initialization
-  void import('./jbbs-plugin').then(({ createJBBSPlugin }) => {
-    const jbbsPlugin = createJBBSPlugin();
-    registerBoardPlugin(BoardType.JBBS, jbbsPlugin);
-    registerBoardPlugin(BoardType.Shitaraba, jbbsPlugin);
-  });
-  void import('./machi-plugin').then(({ createMachiPlugin }) => {
-    const machiPlugin = createMachiPlugin();
-    registerBoardPlugin(BoardType.MachiBBS, machiPlugin);
-  });
+  const [{ createJBBSPlugin }, { createMachiPlugin }] = await Promise.all([
+    import('./jbbs-plugin'),
+    import('./machi-plugin'),
+  ]);
+  const jbbsPlugin = createJBBSPlugin();
+  registerBoardPlugin(BoardType.JBBS, jbbsPlugin);
+  registerBoardPlugin(BoardType.Shitaraba, jbbsPlugin);
+  const machiPlugin = createMachiPlugin();
+  registerBoardPlugin(BoardType.MachiBBS, machiPlugin);
 }

@@ -102,8 +102,9 @@ function lookupBoard(boardUrl: string): Board {
 
 /**
  * Register all IPC handlers.
+ * Must be awaited so that board plugins are loaded before the window is created.
  */
-export function registerIpcHandlers(): void {
+export async function registerIpcHandlers(): Promise<void> {
   const dataDir = getDataDir();
   ensureDir(dataDir);
 
@@ -473,8 +474,8 @@ export function registerIpcHandlers(): void {
     });
   });
 
-  // Initialize board plugins
-  initializeBoardPlugins();
+  // Initialize board plugins (must complete before the renderer window is created)
+  await initializeBoardPlugins();
 
   // Initialize cookie store on startup
   loadCookies(dataDir);

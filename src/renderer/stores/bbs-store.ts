@@ -735,10 +735,27 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   restoreTabs: async (prefetchedTabs?: readonly SavedTab[]) => {
     try {
       const savedTabs = prefetchedTabs ?? await getApi().invoke('tab:load');
+      pushStatus('thread', 'info', `[restoreTabs] tab.sav から ${String(savedTabs.length)} 件のタブを読み込み`);
+      for (const s of savedTabs) {
+        pushStatus('thread', 'info', `[restoreTabs]   - ${s.title} (board=${s.boardUrl}, thread=${s.threadId})`);
+      }
 
       // Open all threads in parallel
       await Promise.all(savedTabs.map(async (saved) => {
-        await get().openThread(saved.boardUrl, saved.threadId, saved.title);
+        try {
+          await get().openThread(saved.boardUrl, saved.threadId, saved.title);
+          const { tabs } = get();
+          const opened = tabs.find(
+            (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
+          );
+          if (opened !== undefined) {
+            pushStatus('thread', 'success', `[restoreTabs] 復元成功: ${saved.title} (${String(opened.responses.length)} レス)`);
+          } else {
+            pushStatus('thread', 'error', `[restoreTabs] 復元失敗: openThread 後にタブが見つからない: ${saved.title}`);
+          }
+        } catch (err) {
+          pushStatus('thread', 'error', `[restoreTabs] 復元例外: ${saved.title}: ${err instanceof Error ? err.message : String(err)}`);
+        }
 
         // Apply scrollTop from tab.sav (takes priority over Folder.idx
         // which may be stale if the tab was never explicitly closed).
@@ -763,6 +780,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         }),
       }));
 
+      const finalTabs = get().tabs;
+      pushStatus('thread', 'info', `[restoreTabs] 完了: ${String(finalTabs.length)}/${String(savedTabs.length)} タブ復元`);
+
       // Restore active thread tab from session
       const session = await getApi().invoke('session:load');
       if (session.activeThreadTabId !== undefined) {
@@ -772,33 +792,64 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           set({ activeTabId: target.id });
         }
       }
-    } catch {
-      // Silently ignore restore errors
+    } catch (err) {
+      pushStatus('thread', 'error', `[restoreTabs] 全体例外: ${err instanceof Error ? err.message : String(err)}`);
     }
   },
 
   restoreSession: async (prefetchedSession?: SessionState) => {
     try {
       const session = prefetchedSession ?? await getApi().invoke('session:load');
-      const { menu } = get();
-      if (menu === null) return;
+      const { menu, externalBoards } = get();
 
-      // Helper: find a Board from the menu by URL
+      pushStatus('board', 'info', `[restoreSession] session.json 読み込み完了`);
+      pushStatus('board', 'info', `[restoreSession]   selectedBoardUrl=${session.selectedBoardUrl ?? '(null)'}`);
+      pushStatus('board', 'info', `[restoreSession]   boardTabUrls=${session.boardTabUrls !== undefined ? JSON.stringify(session.boardTabUrls) : '(undefined)'}`);
+      pushStatus('board', 'info', `[restoreSession]   activeBoardTabId=${session.activeBoardTabId ?? '(undefined)'}`);
+      pushStatus('board', 'info', `[restoreSession]   menu=${menu !== null ? `${String(menu.categories.length)} categories` : '(null)'}`);
+      pushStatus('board', 'info', `[restoreSession]   externalBoards=${String(externalBoards.length)} 件: [${externalBoards.map((b) => b.url).join(', ')}]`);
+
+      if (menu === null) {
+        pushStatus('board', 'warn', '[restoreSession] menu が null のため復元中断');
+        return;
+      }
+
+      // Helper: find a Board from the menu or external boards by URL
       const findBoard = (url: string): Board | undefined => {
         for (const cat of menu.categories) {
           const b = cat.boards.find((board) => board.url === url);
-          if (b !== undefined) return b;
+          if (b !== undefined) {
+            pushStatus('board', 'info', `[restoreSession] findBoard: "${url}" → メニュー "${cat.name}" で発見`);
+            return b;
+          }
         }
+        // Also search external boards (JBBS/Shitaraba, Machi BBS, etc.)
+        const ext = externalBoards.find((b) => b.url === url);
+        if (ext !== undefined) {
+          pushStatus('board', 'info', `[restoreSession] findBoard: "${url}" → externalBoards で発見 (title="${ext.title}")`);
+          return ext;
+        }
+        pushStatus('board', 'error', `[restoreSession] findBoard: "${url}" → メニュー (${String(menu.categories.length)} cats) にも externalBoards (${String(externalBoards.length)} 件) にも見つからない`);
         return undefined;
       };
 
       // Restore board tabs (F27) — all boards in parallel
       if (session.boardTabUrls !== undefined && session.boardTabUrls.length > 0) {
         const boardTabUrls = session.boardTabUrls;
+        pushStatus('board', 'info', `[restoreSession] ${String(boardTabUrls.length)} 件の板タブを復元開始`);
         const boards = boardTabUrls
           .map((url) => findBoard(url))
           .filter((b): b is Board => b !== undefined);
-        await Promise.all(boards.map((board) => get().selectBoard(board)));
+        pushStatus('board', 'info', `[restoreSession] findBoard で ${String(boards.length)}/${String(boardTabUrls.length)} 件が見つかった`);
+
+        await Promise.all(boards.map(async (board) => {
+          try {
+            await get().selectBoard(board);
+            pushStatus('board', 'success', `[restoreSession] selectBoard 成功: ${board.title} (${board.url})`);
+          } catch (err) {
+            pushStatus('board', 'error', `[restoreSession] selectBoard 失敗: ${board.title} (${board.url}): ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }));
 
         // Re-sort boardTabs to match the saved order
         const urlOrder = new Map(boardTabUrls.map((url, i) => [url, i]));
@@ -810,23 +861,32 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           }),
         }));
 
+        const finalBoardTabs = get().boardTabs;
+        pushStatus('board', 'info', `[restoreSession] 板タブ復元完了: ${String(finalBoardTabs.length)} 件 [${finalBoardTabs.map((t) => t.board.title).join(', ')}]`);
+
         // Restore active board tab
         if (session.activeBoardTabId !== undefined) {
           const { boardTabs } = get();
           const target = boardTabs.find((t) => t.id === session.activeBoardTabId);
           if (target !== undefined) {
             get().setActiveBoardTab(target.id);
+            pushStatus('board', 'info', `[restoreSession] アクティブ板タブ復元: ${target.board.title}`);
+          } else {
+            pushStatus('board', 'warn', `[restoreSession] アクティブ板タブ "${session.activeBoardTabId}" が復元後の板タブに見つからない`);
           }
         }
       } else if (session.selectedBoardUrl !== null) {
         // Backward compatibility: restore single board
+        pushStatus('board', 'info', `[restoreSession] 単一板復元モード: ${session.selectedBoardUrl}`);
         const board = findBoard(session.selectedBoardUrl);
         if (board !== undefined) {
           await get().selectBoard(board);
         }
+      } else {
+        pushStatus('board', 'info', '[restoreSession] 復元対象の板タブなし');
       }
-    } catch {
-      // Silently ignore session restore errors
+    } catch (err) {
+      pushStatus('board', 'error', `[restoreSession] 全体例外: ${err instanceof Error ? err.message : String(err)}`);
     }
   },
 

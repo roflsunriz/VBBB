@@ -92,7 +92,7 @@ function createWindow(): BrowserWindow {
   return mainWindow;
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.vbbb.app');
 
   app.on('browser-window-created', (_, window) => {
@@ -111,7 +111,9 @@ void app.whenReady().then(() => {
     },
   );
 
-  registerIpcHandlers();
+  // Await IPC handler registration (including board plugin initialisation)
+  // so that JBBS/Machi plugins are available before the renderer sends requests.
+  await registerIpcHandlers();
   createWindow();
   buildAppMenu();
 
