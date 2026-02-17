@@ -4,7 +4,7 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading } from '@mdi/js';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage } from '@mdi/js';
 import type { Res } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
@@ -261,6 +261,7 @@ function ResItem({
   ngResult,
   highlightType,
   showRelativeTime,
+  inlineMediaEnabled,
   idCount,
   watchoiCount,
   kotehanCount,
@@ -277,6 +278,7 @@ function ResItem({
   readonly ngResult: NgFilterResult;
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
+  readonly inlineMediaEnabled: boolean;
   readonly idCount: number;
   readonly watchoiCount: number;
   readonly kotehanCount: number;
@@ -476,14 +478,14 @@ function ResItem({
         onClick={handleClick}
         role="presentation"
       />
-      {images.length > 0 && (
+      {inlineMediaEnabled && images.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {images.map((img) => (
             <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={images.map((i) => i.url)} />
           ))}
         </div>
       )}
-      {videos.length > 0 && (
+      {inlineMediaEnabled && videos.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {videos.map((vid) => (
             <InlineVideo key={vid.url} url={vid.url} originalUrl={vid.originalUrl} />
@@ -809,6 +811,18 @@ export function ThreadView(): React.JSX.Element {
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const handleToggleAnalysis = useCallback(() => { setAnalysisOpen((p) => !p); }, []);
 
+  // Inline media (image/video) toggle — persisted in localStorage
+  const [inlineMediaEnabled, setInlineMediaEnabled] = useState(() => {
+    try { return localStorage.getItem('vbbb-inline-media') !== 'false'; } catch { return true; }
+  });
+  const handleToggleInlineMedia = useCallback(() => {
+    setInlineMediaEnabled((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('vbbb-inline-media', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
   // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
   const [filterKey, setFilterKey] = useState<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
 
@@ -1079,6 +1093,16 @@ export function ThreadView(): React.JSX.Element {
             </button>
             <button
               type="button"
+              onClick={handleToggleInlineMedia}
+              className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                inlineMediaEnabled ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+              }`}
+              title={inlineMediaEnabled ? 'インライン画像/動画: ON' : 'インライン画像/動画: OFF'}
+            >
+              <MdiIcon path={mdiImage} size={14} />
+            </button>
+            <button
+              type="button"
               onClick={handleToggleRelativeTime}
               className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
                 showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
@@ -1193,6 +1217,7 @@ export function ThreadView(): React.JSX.Element {
                       ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
                       highlightType={getHighlightType(res.number)}
                       showRelativeTime={showRelativeTime}
+                      inlineMediaEnabled={inlineMediaEnabled}
                       idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
                       watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
                       kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
