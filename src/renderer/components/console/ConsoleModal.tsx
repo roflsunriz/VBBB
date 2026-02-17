@@ -3,9 +3,9 @@
  * Displays structured log entries from the main process for debugging.
  * Features: level filter, auto-scroll, clear, copy-all.
  */
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { mdiClose, mdiContentCopy, mdiContentSave, mdiDeleteOutline, mdiRefresh, mdiFilterOutline } from '@mdi/js';
-import type { DiagLogEntry, DiagLogLevel } from '@shared/diagnostic';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { mdiClose, mdiContentCopy, mdiContentSave, mdiDeleteOutline, mdiRefresh, mdiFilterOutline, mdiMagnify } from '@mdi/js';
+import type { DiagLogEntry, DiagLogLevel, DiagSearchField } from '@shared/diagnostic';
 import { MdiIcon } from '../common/MdiIcon';
 
 interface ConsoleModalProps {
@@ -43,6 +43,8 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
   const [autoScroll, setAutoScroll] = useState(true);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [searchField, setSearchField] = useState<DiagSearchField>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchLogs = useCallback(async () => {
@@ -77,12 +79,39 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     }
   }, []);
 
+  const filteredLogs = useMemo(() => {
+    let result: readonly DiagLogEntry[] = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
+    const query = searchText.trim().toLowerCase();
+    if (query !== '') {
+      result = result.filter((entry) => {
+        switch (searchField) {
+          case 'tag':
+            return entry.tag.toLowerCase().includes(query);
+          case 'message':
+            return entry.message.toLowerCase().includes(query);
+          case 'timestamp':
+            return formatTimestamp(entry.timestamp).includes(query);
+          case 'all':
+            return (
+              entry.tag.toLowerCase().includes(query) ||
+              entry.message.toLowerCase().includes(query) ||
+              formatTimestamp(entry.timestamp).includes(query)
+            );
+          default: {
+            const _exhaustive: never = searchField;
+            return _exhaustive;
+          }
+        }
+      });
+    }
+    return result;
+  }, [logs, filter, searchText, searchField]);
+
   const formatLogsToText = useCallback((): string => {
-    const filtered = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
-    return filtered
+    return filteredLogs
       .map((l) => `[${formatTimestamp(l.timestamp)}] [${l.tag}] ${LEVEL_LABELS[l.level]}: ${l.message}`)
       .join('\n');
-  }, [logs, filter]);
+  }, [filteredLogs]);
 
   const handleCopyAll = useCallback(async () => {
     const text = formatLogsToText();
@@ -116,8 +145,6 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     setAutoScroll(atBottom);
   }, []);
 
-  const filteredLogs = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
-
   return (
     <div className="flex h-full flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
@@ -141,6 +168,44 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
             <option value="warn">WARN</option>
             <option value="error">ERROR</option>
           </select>
+        </div>
+
+        <div className="mx-2 h-4 w-px bg-[var(--color-border-primary)]" />
+
+        {/* Search */}
+        <div className="flex items-center gap-1">
+          <MdiIcon path={mdiMagnify} size={12} className="text-[var(--color-text-muted)]" />
+          <select
+            value={searchField}
+            onChange={(e) => { setSearchField(e.target.value as DiagSearchField); }}
+            className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
+            aria-label="検索対象フィールド"
+          >
+            <option value="all">全フィールド</option>
+            <option value="tag">タグ</option>
+            <option value="message">メッセージ</option>
+            <option value="timestamp">時刻</option>
+          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => { setSearchText(e.target.value); }}
+              placeholder="検索..."
+              className="w-36 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 pr-5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+              aria-label="ログ検索"
+            />
+            {searchText !== '' && (
+              <button
+                type="button"
+                onClick={() => { setSearchText(''); }}
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                title="検索をクリア"
+              >
+                <MdiIcon path={mdiClose} size={10} />
+              </button>
+            )}
+          </div>
         </div>
 
         <span className="text-xs text-[var(--color-text-muted)]">

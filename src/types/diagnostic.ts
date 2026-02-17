@@ -11,6 +11,15 @@ export const DiagLogLevel = {
 } as const;
 export type DiagLogLevel = (typeof DiagLogLevel)[keyof typeof DiagLogLevel];
 
+/** Search scope for the diagnostic console filter */
+export const DiagSearchField = {
+  All: 'all',
+  Tag: 'tag',
+  Message: 'message',
+  Timestamp: 'timestamp',
+} as const;
+export type DiagSearchField = (typeof DiagSearchField)[keyof typeof DiagSearchField];
+
 /** A single diagnostic log entry */
 export interface DiagLogEntry {
   /** ISO 8601 timestamp */
