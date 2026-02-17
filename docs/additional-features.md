@@ -2,7 +2,8 @@
 
 ## VBBBに追加すべき機能の一覧
 
+- Empty (Reserved for future use)
 
 ## 上記機能の実装後の直すべき細かな改善点やバグ修正などの一覧
 
-- したらば掲示板に書き込もうとするとgrtError。403エラー。SlevoとgikoNaviG2ソースコードにヒントがあるかもしれないので参照して修正する。まちBBSに書き込もうとすると404エラー。SlevoとgikoNaviG2のソースコードはワークスペース内にあるので適宜参照してください。gikoNaviG2のリリースは2024年で止まっているので参考にするならSlevoの方がいいかも。
+- Empty (Reserved for future use)
