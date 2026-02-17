@@ -5,6 +5,7 @@
  */
 import { join } from 'node:path';
 import { BoardType, type Board, type SubjectFetchResult, type SubjectRecord } from '@shared/domain';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../../logger';
 import { decodeBuffer } from '../encoding';
 import { atomicWriteFile, getBoardDir, readFileSafe } from '../file-io';
@@ -68,6 +69,9 @@ export function parseJBBSSubjectLine(line: string): SubjectRecord | null {
       break;
     }
   }
+
+  // Decode numeric character references (e.g. &#127825; → 🍎) in thread titles
+  title = decodeHtmlEntities(title);
 
   return { fileName, title, count };
 }

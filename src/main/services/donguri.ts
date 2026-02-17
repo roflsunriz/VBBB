@@ -8,6 +8,7 @@
 import type { DonguriState } from '@shared/auth';
 import { DonguriStatus } from '@shared/auth';
 import { PostResultType } from '@shared/domain';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
 import { buildCookieHeader, getCookie, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
 import { decodeBuffer } from './encoding';
@@ -30,14 +31,7 @@ interface DonguriLoginResult {
 }
 
 function normalizeText(raw: string): string {
-  return raw
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+  return decodeHtmlEntities(raw.replace(/<[^>]*>/g, ''))
     .replace(/\s+/g, ' ')
     .trim();
 }

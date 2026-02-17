@@ -5,6 +5,7 @@
 import type { EncodingType } from '@shared/api';
 import { type Board, BoardType, type PostParams, type PostResult, PostResultType } from '@shared/domain';
 import { MAX_POST_RETRIES } from '@shared/file-format';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
 import { buildCookieHeader, getCookiesForUrl, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
 import { handleDonguriPostResult } from './donguri';
@@ -109,23 +110,8 @@ function getPostUrl(board: Board): string {
   return `${board.serverUrl}test/bbs.cgi?guid=ON`;
 }
 
-/**
- * Decode common HTML entities found in hidden field values.
- */
-function htmlDecode(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x([0-9a-fA-F]+);/g, (_match, hex: string) =>
-      String.fromCharCode(parseInt(hex, 16)),
-    )
-    .replace(/&#(\d+);/g, (_match, dec: string) =>
-      String.fromCharCode(parseInt(dec, 10)),
-    );
-}
+// htmlDecode is replaced by the shared decodeHtmlEntities from @shared/html-entities
+const htmlDecode = decodeHtmlEntities;
 
 /**
  * Extracted submit button metadata.

@@ -7,23 +7,13 @@
  */
 import type { Board } from '@shared/domain';
 import { BoardType } from '@shared/domain';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
 import { decodeBuffer } from './encoding';
 import { httpFetch } from './http-client';
 
 const logger = createLogger('board-title');
 const MACHI_BBS_MENU_URL = 'https://machi.to/bbsmenu.html';
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-}
 
 function normalizeText(text: string): string {
   return decodeHtmlEntities(text.replace(/<[^>]*>/g, ''))

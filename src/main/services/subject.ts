@@ -4,6 +4,7 @@
 import { join } from 'node:path';
 import { AgeSage, type Board, BoardType, type SubjectFetchResult, type SubjectRecord, type ThreadIndex } from '@shared/domain';
 import { KOKOMADE_UNSET, ZERO_DATE_HEX, FOLDER_IDX_VERSION, SOH } from '@shared/file-format';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { SubjectLineSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { decodeBuffer, encodeString, sanitizeForIdx, unsanitizeFromIdx } from './encoding';
@@ -61,6 +62,9 @@ export function parseSubjectLine(line: string): SubjectRecord | null {
       break;
     }
   }
+
+  // Decode numeric character references (e.g. &#127825; → 🍎) in thread titles
+  title = decodeHtmlEntities(title);
 
   const validated = SubjectLineSchema.safeParse({ fileName, title, count });
   if (!validated.success) return null;

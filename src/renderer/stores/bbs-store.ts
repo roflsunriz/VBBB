@@ -8,6 +8,7 @@ import type { BrowsingHistoryEntry, DisplayRange } from '@shared/history';
 import type { NgRule } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
 import type { HighlightSettings } from '@shared/settings';
+import { decodeHtmlEntities } from '@shared/html-entities';
 import { DEFAULT_HIGHLIGHT_SETTINGS } from '@shared/settings';
 import type { StatusLogCategory, StatusLogLevel } from '@shared/status-log';
 import { useStatusLogStore } from './status-log-store';
@@ -165,14 +166,7 @@ function getApi(): Window['electronApi'] {
 /** Guards against concurrent openThread calls for the same thread */
 const pendingThreadOpens = new Set<string>();
 
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'");
-}
+// decodeHtmlEntities is imported from @shared/html-entities
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
