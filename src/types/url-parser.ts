@@ -123,6 +123,59 @@ function parseFromDatPath(url: URL): ParsedThreadPathParts | null {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Permalink builder (reverse of parsing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a permalink URL for a specific response.
+ *
+ * Examples:
+ *   5ch:       https://hayabusa9.5ch.net/test/read.cgi/news/1234567890/123
+ *   Shitaraba: https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/123
+ *   Machi:     https://machi.to/bbs/read.cgi/hokkaidou/1234567890/123
+ */
+export function buildResPermalink(boardUrl: string, threadId: string, resNumber: number): string {
+  let url: URL;
+  try {
+    url = new URL(boardUrl);
+  } catch {
+    return '';
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  const pathSegments = url.pathname.split('/').filter((s) => s.length > 0);
+  const resStr = String(resNumber);
+
+  // Shitaraba / JBBS: boardUrl = "https://jbbs.shitaraba.jp/<dir>/<boardId>/"
+  if (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) {
+    if (pathSegments.length >= 2) {
+      const dir = pathSegments[0];
+      const bbsId = pathSegments[1];
+      if (dir !== undefined && bbsId !== undefined) {
+        return `${url.protocol}//${url.host}/bbs/read.cgi/${dir}/${bbsId}/${threadId}/${resStr}`;
+      }
+    }
+    return '';
+  }
+
+  // Machi BBS: boardUrl = "https://machi.to/<boardId>/"
+  if (hostname.includes('machi.to')) {
+    const bbsId = pathSegments[pathSegments.length - 1];
+    if (bbsId !== undefined && bbsId.length > 0) {
+      return `${url.protocol}//${url.host}/bbs/read.cgi/${bbsId}/${threadId}/${resStr}`;
+    }
+    return '';
+  }
+
+  // 5ch / bbspink / default: boardUrl = "https://<host>/<boardId>/"
+  const bbsId = pathSegments[pathSegments.length - 1];
+  if (bbsId !== undefined && bbsId.length > 0) {
+    return `${url.protocol}//${url.host}/test/read.cgi/${bbsId}/${threadId}/${resStr}`;
+  }
+  return '';
+}
+
 export function detectBoardTypeByHost(hostname: string): BoardType {
   if (hostname.includes('jbbs.shitaraba')) return BoardType.Shitaraba;
   if (hostname.includes('jbbs.livedoor')) return BoardType.JBBS;

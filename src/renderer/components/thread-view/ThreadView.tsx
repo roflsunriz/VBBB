@@ -12,7 +12,7 @@ import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
-import { detectBoardTypeByHost } from '@shared/url-parser';
+import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
@@ -313,6 +313,8 @@ function IpPopup({ ip, x, y, onClose }: {
 
 function ResItem({
   res,
+  boardUrl,
+  threadId,
   ngResult,
   highlightType,
   showRelativeTime,
@@ -334,6 +336,8 @@ function ResItem({
   onToggleAaFont,
 }: {
   readonly res: Res;
+  readonly boardUrl: string;
+  readonly threadId: string;
   readonly ngResult: NgFilterResult;
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
@@ -589,13 +593,19 @@ function ResItem({
           </button>
           <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
           {/* F18: Copy options */}
-          {([
-            { label: '名前をコピー', value: res.name.replace(/<[^>]+>/g, '') },
-            { label: '本文をコピー', value: res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&') },
-            { label: 'URLをコピー', value: (() => { const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return urls.join('\n'); })() },
-            { label: '名前+本文+URL', value: (() => { const n = res.name.replace(/<[^>]+>/g, ''); const b = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&'); const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return `${n}\n${b}${urls.length > 0 ? `\n${urls.join('\n')}` : ''}`; })() },
-            { label: '本文+URL', value: (() => { const b = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&'); const urls: string[] = []; res.body.replace(/https?:\/\/[^\s<>"']+/g, (u) => { urls.push(u); return u; }); return `${b}${urls.length > 0 ? `\n${urls.join('\n')}` : ''}`; })() },
-          ] as const).map((opt) => (
+          {(() => {
+            const plainName = res.name.replace(/<[^>]+>/g, '');
+            const plainBody = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+            const permalink = buildResPermalink(boardUrl, threadId, res.number);
+            const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
+            return [
+              { label: '名前をコピー', value: header },
+              { label: '本文をコピー', value: plainBody },
+              { label: 'URLをコピー', value: permalink },
+              { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
+              { label: '本文+URL', value: `${plainBody}\n${permalink}` },
+            ] as const;
+          })().map((opt) => (
             <button
               key={opt.label}
               type="button"
@@ -1399,6 +1409,8 @@ export function ThreadView(): React.JSX.Element {
                       )}
                       <ResItem
                         res={res}
+                        boardUrl={activeTab.boardUrl}
+                        threadId={activeTab.threadId}
                         ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
                         highlightType={getHighlightType(res.number)}
                         showRelativeTime={showRelativeTime}
