@@ -118,7 +118,7 @@ interface BBSState {
   updateTabKokomade: (tabId: string, kokomade: number) => void;
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
   saveTabs: () => Promise<void>;
-  restoreTabs: (prefetchedTabs?: readonly SavedTab[]) => Promise<void>;
+  restoreTabs: (prefetchedTabs?: readonly SavedTab[], activeThreadTabId?: string) => Promise<void>;
   restoreSession: (prefetchedSession?: SessionState) => Promise<void>;
   loadBrowsingHistory: () => Promise<void>;
   clearBrowsingHistory: () => Promise<void>;
@@ -762,7 +762,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     }
   },
 
-  restoreTabs: async (prefetchedTabs?: readonly SavedTab[]) => {
+  restoreTabs: async (prefetchedTabs?: readonly SavedTab[], activeThreadTabId?: string) => {
     try {
       const savedTabs = prefetchedTabs ?? await getApi().invoke('tab:load');
       pushStatus('thread', 'info', `[restoreTabs] tab.sav から ${String(savedTabs.length)} 件のタブを読み込み`);
@@ -813,13 +813,20 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       const finalTabs = get().tabs;
       pushStatus('thread', 'info', `[restoreTabs] 完了: ${String(finalTabs.length)}/${String(savedTabs.length)} タブ復元`);
 
-      // Restore active thread tab from session
-      const session = await getApi().invoke('session:load');
-      if (session.activeThreadTabId !== undefined) {
+      // Restore active thread tab from the prefetched session data.
+      // Previously this did a fresh session:load IPC call, but that was
+      // racy: restoreSession (running in parallel) calls selectBoard which
+      // overwrites session.json with only { selectedBoardUrl }, clobbering
+      // the saved activeThreadTabId.  Using the caller-provided value
+      // avoids this race condition.
+      if (activeThreadTabId !== undefined) {
         const { tabs } = get();
-        const target = tabs.find((t) => t.id === session.activeThreadTabId);
+        const target = tabs.find((t) => t.id === activeThreadTabId);
         if (target !== undefined) {
           set({ activeTabId: target.id });
+          pushStatus('thread', 'info', `[restoreTabs] アクティブスレッドタブ復元: ${target.title}`);
+        } else {
+          pushStatus('thread', 'warn', `[restoreTabs] アクティブスレッドタブ "${activeThreadTabId}" が復元後のタブに見つからない`);
         }
       }
     } catch (err) {

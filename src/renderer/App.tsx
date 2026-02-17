@@ -138,9 +138,12 @@ export function App(): React.JSX.Element {
       // restoreSession needs the menu (populated by fetchMenu above).
       // restoreTabs is independent of restoreSession — openThread
       // fetches DAT directly and falls back to disk for threadIndices.
+      // Pass activeThreadTabId from the prefetched session to restoreTabs
+      // so it doesn't need to re-read session.json (which may be
+      // clobbered by selectBoard calls inside restoreSession).
       await Promise.all([
         restoreSession(sessionData),
-        restoreTabs(savedTabs),
+        restoreTabs(savedTabs, sessionData.activeThreadTabId),
       ]);
     };
     void init();
