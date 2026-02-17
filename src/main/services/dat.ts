@@ -14,22 +14,28 @@ import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('dat');
 
-function parseMachiCompatibleDat(parts: readonly string[]): Res | null {
+function isLikelyMachiDateTime(value: string): boolean {
+  return /^\d{4}\/\d{2}\/\d{2}\([^)]*\)\s+\d{2}:\d{2}:\d{2}/.test(value);
+}
+
+function parseMachiOfflawDat(parts: readonly string[]): Res | null {
   if (parts.length < 6) return null;
 
   const resNumberRaw = parts[0];
-  const sequenceRaw = parts[1];
-  if (resNumberRaw === undefined || sequenceRaw === undefined) return null;
-  if (!/^\d+$/.test(resNumberRaw) || !/^\d+$/.test(sequenceRaw)) return null;
+  if (resNumberRaw === undefined || !/^\d+$/.test(resNumberRaw)) return null;
 
   const resNumber = parseInt(resNumberRaw, 10);
   if (Number.isNaN(resNumber) || resNumber < 1) return null;
 
-  const name = parts[2] ?? '';
-  const mail = parts[3] ?? '';
-  const dateTime = parts[4] ?? '';
-  let body = parts[5] ?? '';
-  const title = parts[6] ?? '';
+  const name = parts[1] ?? '';
+  const mail = parts[2] ?? '';
+  const dateTime = parts[3] ?? '';
+  if (!isLikelyMachiDateTime(dateTime)) return null;
+  let body = parts[4] ?? '';
+
+  const hasTitleField = parts.length >= 7;
+  const title = hasTitleField ? (parts[5] ?? '') : '';
+  const idCandidate = hasTitleField ? parts[6] : parts[5];
 
   body = body.replace(/^\s+/, '');
   if (body.length === 0) {
@@ -43,6 +49,7 @@ function parseMachiCompatibleDat(parts: readonly string[]): Res | null {
     dateTime,
     body,
     title,
+    id: idCandidate !== undefined && idCandidate.length > 0 ? idCandidate : undefined,
   };
 }
 
@@ -68,9 +75,9 @@ export function parseDatLine(line: string, lineNumber: number): Res | null {
     parts = converted.split('<>');
   }
 
-  const machiCompatible = parseMachiCompatibleDat(parts);
-  if (machiCompatible !== null) {
-    return machiCompatible;
+  const machiOfflaw = parseMachiOfflawDat(parts);
+  if (machiOfflaw !== null) {
+    return machiOfflaw;
   }
 
   const name = parts[0] ?? '';
@@ -117,7 +124,18 @@ export function parseDat(content: string): Res[] {
  * Get the DAT URL for a thread.
  */
 function getDatUrl(board: Board, threadId: string): string {
+  if (isMachiBoard(board)) {
+    return `${board.serverUrl}bbs/offlaw.cgi/${board.bbsId}/${threadId}/`;
+  }
   return `${board.url}dat/${threadId}.dat`;
+}
+
+function isMachiBoard(board: Board): boolean {
+  try {
+    return new URL(board.url).hostname.toLowerCase().includes('machi.to');
+  } catch {
+    return false;
+  }
 }
 
 /**

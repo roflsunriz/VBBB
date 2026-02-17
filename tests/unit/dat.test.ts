@@ -53,15 +53,17 @@ describe('parseDatLine', () => {
     expect(res?.body).toContain('&gt;&gt;123');
   });
 
-  it('parses machi-compatible line with leading response numbers', () => {
-    const line = '837<>852<>東京都名無区民<>sage<>2025/08/09(土) 11:00:23 ID:hVU73KcA<>本文テスト<>';
+  it('parses machi offlaw line correctly', () => {
+    const line = '1<>スロウライダー<><>2007/06/21(木) 21:28:37 ID:y9R9FVbw<>前スレ<br>本文<>◇◆【酉の市】足立区花畑 ８【発祥の地】◆◇<>6D68-DA39-5033';
     const res = parseDatLine(line, 1);
     expect(res).not.toBeNull();
-    expect(res?.number).toBe(837);
-    expect(res?.name).toBe('東京都名無区民');
-    expect(res?.mail).toBe('sage');
-    expect(res?.dateTime).toContain('2025/08/09');
-    expect(res?.body).toBe('本文テスト');
+    expect(res?.number).toBe(1);
+    expect(res?.name).toBe('スロウライダー');
+    expect(res?.mail).toBe('');
+    expect(res?.dateTime).toContain('2007/06/21');
+    expect(res?.body).toContain('前スレ');
+    expect(res?.title).toBe('◇◆【酉の市】足立区花畑 ８【発祥の地】◆◇');
+    expect(res?.id).toBe('6D68-DA39-5033');
   });
 });
 
@@ -93,14 +95,14 @@ describe('parseDat', () => {
     expect(results).toHaveLength(2);
   });
 
-  it('keeps response numbers from machi-compatible DAT', () => {
+  it('keeps response numbers from machi offlaw DAT', () => {
     const content = [
-      '837<>852<>東京都名無区民<>sage<>2025/08/09(土) 11:00:23 ID:hVU73KcA<>本文1<>',
-      '838<>853<>東京都名無区民<>sage<>2025/08/09(土) 11:01:23 ID:hVU73KcA<>本文2<>',
+      '2<>東京都名無区<><>2007/06/23(土) 08:46:56 ID:f/Z6X5rc<>二日遅れの２げと<>CE5A-DA39-35B1',
+      '4<>東京都名無区<><>2007/07/14(土) 21:07:59 ID:7dkDAO6o<>本文2<>FFEA-DA39-2232',
     ].join('\n');
     const results = parseDat(content);
     expect(results).toHaveLength(2);
-    expect(results[0]?.number).toBe(837);
-    expect(results[1]?.number).toBe(838);
+    expect(results[0]?.number).toBe(2);
+    expect(results[1]?.number).toBe(4);
   });
 });
