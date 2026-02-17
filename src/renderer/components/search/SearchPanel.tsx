@@ -4,7 +4,7 @@
  * Remote search renders results in a webview.
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { mdiMagnify, mdiClose, mdiShieldCheck } from '@mdi/js';
+import { mdiMagnify, mdiClose, mdiShieldCheck, mdiHome } from '@mdi/js';
 import type { LocalSearchAllResult, SearchTarget } from '@shared/search';
 import { LocalSearchScope } from '@shared/search';
 import { parseAnyThreadUrl } from '@shared/url-parser';
@@ -12,6 +12,8 @@ import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 
 type SearchMode = 'local' | 'remote';
+
+const FF5CH_TOP_URL = 'https://ff5ch.syoboi.jp/';
 
 /** F6: Default ad block CSS rules for ff5ch.syoboi.jp */
 const AD_BLOCK_KEY = 'vbbb-adblock-enabled';
@@ -95,6 +97,11 @@ export function SearchPanel(): React.JSX.Element {
           await selectBoard(parsed.board);
           await openThread(parsed.board.url, parsed.threadId, parsed.titleHint);
         })();
+        // Navigate webview back to search top page after opening a thread
+        const webviewEl = wv as unknown as { src: string };
+        if ('src' in webviewEl) {
+          webviewEl.src = FF5CH_TOP_URL;
+        }
         return true;
       }
       return false;
@@ -368,11 +375,29 @@ export function SearchPanel(): React.JSX.Element {
 
         {/* Remote results (webview) */}
         {remoteUrl !== null && mode === 'remote' && (
-          <webview
-            ref={webviewRef as React.Ref<HTMLElement>}
-            src={remoteUrl}
-            className="h-full w-full"
-          />
+          <div className="flex h-full flex-col">
+            <div className="flex items-center border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-2 py-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const wv = webviewRef.current as unknown as { src: string } | null;
+                  if (wv !== null && 'src' in wv) {
+                    wv.src = FF5CH_TOP_URL;
+                  }
+                }}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                title="検索トップページに戻る"
+              >
+                <MdiIcon path={mdiHome} size={12} />
+                検索トップ
+              </button>
+            </div>
+            <webview
+              ref={webviewRef as React.Ref<HTMLElement>}
+              src={remoteUrl}
+              className="flex-1"
+            />
+          </div>
         )}
 
         {!searching && localResults.length === 0 && remoteUrl === null && (
