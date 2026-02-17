@@ -4,6 +4,7 @@
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage } from '@mdi/js';
 import type { Res } from '@shared/domain';
@@ -552,8 +553,8 @@ function ResItem({
         </div>
       )}
 
-      {/* Context menu */}
-      {contextMenu !== null && (
+      {/* Context menu — rendered via portal to escape transform containing block */}
+      {contextMenu !== null && createPortal(
         <div
           className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -608,27 +609,30 @@ function ResItem({
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {/* F29: ワッチョイ popup */}
-      {watchoiPopup !== null && (
+      {/* F29: ワッチョイ popup — rendered via portal to escape transform containing block */}
+      {watchoiPopup !== null && createPortal(
         <WatchoiPopup
           info={watchoiPopup.info}
           x={watchoiPopup.x}
           y={watchoiPopup.y}
           onClose={() => { setWatchoiPopup(null); }}
-        />
+        />,
+        document.body,
       )}
 
-      {/* F28: IP info popup */}
-      {ipPopup !== null && (
+      {/* F28: IP info popup — rendered via portal to escape transform containing block */}
+      {ipPopup !== null && createPortal(
         <IpPopup
           ip={ipPopup.ip}
           x={ipPopup.x}
           y={ipPopup.y}
           onClose={() => { setIpPopup(null); }}
-        />
+        />,
+        document.body,
       )}
     </div>
   );
