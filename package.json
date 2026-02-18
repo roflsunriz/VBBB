@@ -1,6 +1,6 @@
 {
   "name": "vbbb",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "VBBB - 汎用掲示板ブラウザ",
   "private": true,
   "main": "./out/main/index.js",
@@ -18,6 +18,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "build:dist": "electron-vite build && electron-builder --config electron-builder.yml",
+    "build:win": "electron-vite build && electron-builder --config electron-builder.yml --win",
+    "build:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux",
+    "build:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac",
     "rebuild": "electron-builder install-app-deps"
   },
   "engines": {

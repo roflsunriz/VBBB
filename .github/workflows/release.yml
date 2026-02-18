@@ -9,7 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  release-windows:
+    name: Build & Release (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +35,9 @@ jobs:
       - name: Unit tests
         run: bun run test
 
-      - name: Build application
-        run: bun run build
-
       - name: Build Windows installer
-        run: bun run build:dist
+        # build:win = electron-vite build + electron-builder --win
+        run: bun run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,7 +46,8 @@ jobs:
         with:
           files: |
             release/*.exe
-            release/*.yml
+            release/*.blockmap
+            release/latest.yml
           draft: true
           generate_release_notes: true
         env:

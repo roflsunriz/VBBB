@@ -6,6 +6,10 @@ directories:
 files:
   - out/**/*
   - "!out/**/*.map"
+
+# ────────────────────────────────────────────────
+# Windows (Windows 10/11 x64) — 動作確認済み
+# ────────────────────────────────────────────────
 win:
   icon: resources/icon.png
   target:
@@ -16,3 +20,26 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
+
+# ────────────────────────────────────────────────
+# Linux — 自己責任ビルド（動作未確認）
+# ────────────────────────────────────────────────
+linux:
+  icon: resources/icon.png
+  category: Network
+  target:
+    - target: AppImage
+      arch:
+        - x64
+
+# ────────────────────────────────────────────────
+# macOS — 自己責任ビルド（動作未確認）
+# ────────────────────────────────────────────────
+mac:
+  icon: resources/icon.png
+  category: public.app-category.utilities
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
