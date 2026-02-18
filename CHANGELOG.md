@@ -26,4 +26,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
-[1.0.0]: https://github.com/yourname/VBBB/releases/tag/v1.0.0
+[1.0.0]: https://github.com/roflsunriz/VBBB/releases/tag/v1.0.0
