@@ -1,0 +1,12 @@
+- まず全ての変更がコミットプッシュ済みであることを確認します。
+- package.jsonのバージョンを上げます。目安はv1.2.3の場合、1（メジャー）は破壊的変更や大幅な機能強化、2（マイナー）は小さな機能追加やバグ修正、3（パッチ）はバグ修正です。
+- src/types/file-format.tsのDEFAULT_USER_AGENTのバージョン番号を更新します。
+- .env.exampleのユーザーエージェントのバージョン番号を更新します。
+- CHANGELOG.mdに変更点を記載し、必要であればREADME.mdも更新します。
+- ここまでの変更をリモートリポジトリにコミットプッシュします。
+- git tag <タグ名>でタグを作成し、git push origin <タグ名>でタグをプッシュします。
+- GitHub ActionsのReleaseワークフローが実行され、ビルドが始まります。
+- リリースのドラフトが自動作成されます。
+- リリース本文にはFull Changelogのリンクしかないので、変更点を記載しエンリッチメントします。
+- github cli　`gh` でリリースを作成します。`gh release create <タグ名> --generate-notes`
+- リリースが作成されたら、GitHub Releasesからダウンロードできるようになります。
