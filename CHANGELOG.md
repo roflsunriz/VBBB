@@ -5,6 +5,13 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-18
+
+### Added
+
+- 検索入力欄に検索履歴機能を追加（SearchInputWithHistory コンポーネント）。板ツリー・お気に入り・履歴・検索・スレッド一覧の各検索欄で履歴を localStorage に永続化し、過去の検索キーワードを候補表示から選択可能
+- タブ切り替え時に直前のアクティブタブのスクロール位置を保存し、再訪時に復元する機能を追加
+
 ## [1.0.3] - 2026-02-18
 
 ### Added
@@ -52,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.1.0]: https://github.com/roflsunriz/VBBB/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/roflsunriz/VBBB/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/roflsunriz/VBBB/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/roflsunriz/VBBB/compare/v1.0.0...v1.0.1
