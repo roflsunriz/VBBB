@@ -13,6 +13,7 @@ import {
   mdiMagnify,
   mdiClose,
 } from '@mdi/js';
+import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { Board, Category } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
@@ -338,12 +339,12 @@ export function BoardTree(): React.JSX.Element {
       {menu !== null && (
         <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
           <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
-          <input
-            type="text"
+          <SearchInputWithHistory
             value={searchFilter}
-            onChange={(e) => { setSearchFilter(e.target.value); }}
+            onChange={setSearchFilter}
+            storageKey="vbbb-search-history-board-tree"
             placeholder="カテゴリ・板を検索..."
-            className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+            inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
           {searchFilter.length > 0 && (
             <>

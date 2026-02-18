@@ -5,6 +5,7 @@
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { mdiMagnify, mdiClose, mdiShieldCheck, mdiHome } from '@mdi/js';
+import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { LocalSearchAllResult, SearchTarget } from '@shared/search';
 import { LocalSearchScope } from '@shared/search';
 import { parseAnyThreadUrl } from '@shared/url-parser';
@@ -185,14 +186,14 @@ export function SearchPanel(): React.JSX.Element {
     };
   }, [remoteUrl, openThread, selectBoard]);
 
-  const handleSearch = useCallback(async () => {
-    if (pattern.trim().length === 0) return;
+  const runSearch = useCallback(async (query: string) => {
+    if (query.trim().length === 0) return;
     setSearching(true);
     setError(null);
     try {
       if (mode === 'local') {
         const results = await window.electronApi.invoke('search:local-all', {
-          pattern: pattern.trim(),
+          pattern: query.trim(),
           scope,
           target,
           caseSensitive,
@@ -200,7 +201,7 @@ export function SearchPanel(): React.JSX.Element {
         setLocalResults(results);
         setRemoteUrl(null);
       } else {
-        const url = await window.electronApi.invoke('search:remote-url', pattern.trim());
+        const url = await window.electronApi.invoke('search:remote-url', query.trim());
         setRemoteUrl(url);
         setLocalResults([]);
       }
@@ -209,13 +210,16 @@ export function SearchPanel(): React.JSX.Element {
     } finally {
       setSearching(false);
     }
-  }, [pattern, mode, scope, target, caseSensitive]);
+  }, [mode, scope, target, caseSensitive]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      void handleSearch();
-    }
-  }, [handleSearch]);
+  const handleSearch = useCallback(() => {
+    void runSearch(pattern);
+  }, [runSearch, pattern]);
+
+  const handleSearchFromInput = useCallback((query: string) => {
+    setPattern(query);
+    void runSearch(query);
+  }, [runSearch]);
 
   const handleResultClick = useCallback((result: LocalSearchAllResult) => {
     switch (result.kind) {
@@ -319,13 +323,14 @@ export function SearchPanel(): React.JSX.Element {
       {/* Search input */}
       <div className="border-b border-[var(--color-border-secondary)] p-2">
         <div className="flex items-center gap-1">
-          <input
-            type="text"
+          <SearchInputWithHistory
             value={pattern}
-            onChange={(e) => { setPattern(e.target.value); }}
-            onKeyDown={handleKeyDown}
+            onChange={setPattern}
+            onSearch={handleSearchFromInput}
+            storageKey="vbbb-search-history-search-panel"
             placeholder={mode === 'local' ? '検索パターン (正規表現)' : 'キーワード (ff5ch.syoboi.jp)'}
-            className="flex-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+            inputClassName="flex-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
+            disabled={searching}
           />
           {pattern.length > 0 && (
             <button
@@ -339,7 +344,7 @@ export function SearchPanel(): React.JSX.Element {
           )}
           <button
             type="button"
-            onClick={() => { void handleSearch(); }}
+            onClick={handleSearch}
             disabled={searching}
             className="rounded bg-[var(--color-accent)] p-1 text-white hover:opacity-80 disabled:opacity-50"
             aria-label="検索"

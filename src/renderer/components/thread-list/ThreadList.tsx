@@ -6,6 +6,7 @@
  */
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel } from '@mdi/js';
+import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
@@ -600,12 +601,12 @@ export function ThreadList(): React.JSX.Element {
       {subjects.length > 0 && (
         <div className="flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-3 py-1">
           <MdiIcon path={mdiMagnify} size={12} className="shrink-0 text-[var(--color-text-muted)]" />
-          <input
-            type="text"
+          <SearchInputWithHistory
             value={filter}
-            onChange={(e) => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, e.target.value); }}
+            onChange={(v) => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, v); }}
+            storageKey="vbbb-search-history-thread-list"
             placeholder="スレッドを検索..."
-            className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+            inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
           {filter.length > 0 && (
             <>

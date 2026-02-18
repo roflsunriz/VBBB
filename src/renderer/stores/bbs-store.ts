@@ -159,6 +159,35 @@ interface BBSState {
 }
 
 const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
+const BOARD_SORT_SETTINGS_KEY = 'vbbb-board-sort-settings';
+
+const VALID_SORT_KEYS: ReadonlySet<string> = new Set([
+  'index', 'title', 'count', 'ikioi', 'completionRate', 'firstPostDate',
+]);
+const VALID_SORT_DIRS: ReadonlySet<string> = new Set(['asc', 'desc']);
+
+type BoardSortRecord = Record<string, { readonly sortKey: BoardSortKey; readonly sortDir: BoardSortDir }>;
+
+function loadBoardSortSettings(): BoardSortRecord {
+  try {
+    const raw = localStorage.getItem(BOARD_SORT_SETTINGS_KEY);
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return parsed as BoardSortRecord;
+      }
+    }
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveBoardSortSetting(boardUrl: string, sortKey: BoardSortKey, sortDir: BoardSortDir): void {
+  try {
+    const all = loadBoardSortSettings();
+    const next: BoardSortRecord = { ...all, [boardUrl]: { sortKey, sortDir } };
+    localStorage.setItem(BOARD_SORT_SETTINGS_KEY, JSON.stringify(next));
+  } catch { /* ignore */ }
+}
 
 function loadHighlightSettings(): HighlightSettings {
   try {
@@ -362,6 +391,18 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       return;
     }
 
+    // Load persisted sort settings for this board
+    const savedSortAll = loadBoardSortSettings();
+    const savedSort = savedSortAll[boardTabId];
+    const persistedSortKey: BoardSortKey =
+      savedSort !== undefined && VALID_SORT_KEYS.has(savedSort.sortKey)
+        ? savedSort.sortKey
+        : 'index';
+    const persistedSortDir: BoardSortDir =
+      savedSort !== undefined && VALID_SORT_DIRS.has(savedSort.sortDir)
+        ? savedSort.sortDir
+        : 'asc';
+
     // Create new board tab
     const newTab: BoardTab = {
       id: boardTabId,
@@ -371,8 +412,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       subjectLoading: true,
       subjectError: null,
       filter: '',
-      sortKey: 'index',
-      sortDir: 'asc',
+      sortKey: persistedSortKey,
+      sortDir: persistedSortDir,
     };
     set((state) => ({
       boardTabs: [...state.boardTabs, newTab],
@@ -1186,6 +1227,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set((state) => ({
       boardTabs: state.boardTabs.map((t) => t.id === tabId ? { ...t, sortKey, sortDir } : t),
     }));
+    // Persist sort settings keyed by boardUrl (tabId === boardUrl for board tabs)
+    saveBoardSortSetting(tabId, sortKey, sortDir);
   },
 
   reorderBoardTabs: (fromIndex: number, toIndex: number) => {

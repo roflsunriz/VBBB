@@ -6,6 +6,7 @@
  */
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { mdiMagnify, mdiClose, mdiDelete, mdiRefresh } from '@mdi/js';
+import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
@@ -98,12 +99,12 @@ export function HistoryPanel(): React.JSX.Element {
       {/* Search */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
         <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
-        <input
-          type="text"
+        <SearchInputWithHistory
           value={filter}
-          onChange={(e) => { setFilter(e.target.value); }}
+          onChange={setFilter}
+          storageKey="vbbb-search-history-history-panel"
           placeholder="履歴を検索..."
-          className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+          inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         />
         {filter.length > 0 && (
           <button

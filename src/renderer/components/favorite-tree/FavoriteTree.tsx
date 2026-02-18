@@ -5,6 +5,7 @@
  */
 import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete, mdiMagnify, mdiClose } from '@mdi/js';
+import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
 import { parseAnyThreadUrl, parseExternalBoardUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
@@ -282,12 +283,12 @@ export function FavoriteTree(): React.JSX.Element {
       {/* Search */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
         <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
-        <input
-          type="text"
+        <SearchInputWithHistory
           value={searchFilter}
-          onChange={(e) => { setSearchFilter(e.target.value); }}
+          onChange={setSearchFilter}
+          storageKey="vbbb-search-history-favorite-tree"
           placeholder="お気に入りを検索..."
-          className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+          inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         />
         {searchFilter.length > 0 && (
           <button
