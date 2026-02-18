@@ -2,6 +2,23 @@
   "name": "vbbb",
   "version": "1.0.0",
   "description": "VBBB - 汎用掲示板ブラウザ",
+  "author": "roflsunriz",
+  "license": "MIT",
+  "homepage": "https://github.com/roflsunriz/VBBB",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/roflsunriz/VBBB.git"
+  },
+  "bugs": {
+    "url": "https://github.com/roflsunriz/VBBB/issues"
+  },
+  "keywords": [
+    "2ch",
+    "5ch",
+    "bbs",
+    "browser",
+    "desktop"
+  ],
   "private": true,
   "main": "./out/main/index.js",
   "type": "module",
