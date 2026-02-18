@@ -5,6 +5,17 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-02-19
+
+### Added
+
+- スレッド表示のスクロール復元に新規レスポンス追跡を追加し、正確な位置復元を強化
+- dateTime フィールドへの IP ベース識別子抽出に対応
+
+### Changed
+
+- 投稿時の文字エンコード処理を強化（マルチバイト文字の互換性向上）
+
 ## [1.1.1] - 2026-02-18
 
 ### Fixed
@@ -65,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.1.2]: https://github.com/roflsunriz/VBBB/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/roflsunriz/VBBB/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/roflsunriz/VBBB/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/roflsunriz/VBBB/compare/v1.0.2...v1.0.3
