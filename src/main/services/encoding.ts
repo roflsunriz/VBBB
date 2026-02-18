@@ -48,7 +48,7 @@ export function httpEncode(text: string, encoding: EncodingType): string {
 }
 
 /**
- * Replace characters that cannot be represented in CP932 (Windows-31J)
+ * Replace characters that cannot be represented in the given encoding
  * with Numeric Character References (NCR: `&#codepoint;`).
  *
  * Processing is done per Unicode grapheme cluster (via Intl.Segmenter) so
@@ -56,14 +56,18 @@ export function httpEncode(text: string, encoding: EncodingType): string {
  * are correctly split into per-codepoint NCRs rather than being broken at
  * surrogate pair boundaries.
  *
- * This must be applied to all form field values BEFORE Shift_JIS encoding.
+ * This must be applied to all form field values BEFORE encoding to
+ * Shift_JIS / EUC-JP.
+ *
+ * @param input    - The input string.
+ * @param encoding - Target encoding to check against (default: 'Shift_JIS').
  */
-export function replaceWithNCR(input: string): string {
+export function replaceWithNCR(input: string, encoding: EncodingType = 'Shift_JIS'): string {
   const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' });
   const parts: string[] = [];
 
   for (const { segment } of segmenter.segment(input)) {
-    if (canEncodeCP932(segment)) {
+    if (canEncodeInEncoding(segment, encoding)) {
       parts.push(segment);
     } else {
       // Convert each codepoint in the grapheme cluster to NCR
@@ -80,13 +84,13 @@ export function replaceWithNCR(input: string): string {
 }
 
 /**
- * Check whether a string segment can be fully encoded in CP932.
+ * Check whether a string segment can be fully encoded in the given encoding.
  * iconv-lite replaces unencodable characters with '?' (0x3F), so we
  * encode then decode and verify round-trip fidelity.
  */
-function canEncodeCP932(segment: string): boolean {
-  const encoded = iconv.encode(segment, 'Shift_JIS');
-  const decoded = iconv.decode(encoded, 'Shift_JIS');
+function canEncodeInEncoding(segment: string, encoding: EncodingType): boolean {
+  const encoded = iconv.encode(segment, encoding);
+  const decoded = iconv.decode(encoded, encoding);
   return decoded === segment;
 }
 

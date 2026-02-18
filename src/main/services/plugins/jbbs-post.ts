@@ -6,7 +6,7 @@ import type { Board, PostParams, PostResult } from '@shared/domain';
 import { PostResultType } from '@shared/domain';
 import { createLogger } from '../../logger';
 import { buildCookieHeader, parseSetCookieHeaders } from '../cookie-store';
-import { decodeBuffer, httpEncode } from '../encoding';
+import { decodeBuffer, httpEncode, replaceWithNCR } from '../encoding';
 import { httpFetch } from '../http-client';
 
 const logger = createLogger('jbbs-post');
@@ -33,9 +33,9 @@ function buildJBBSPostBody(params: PostParams, board: Board): string {
   const encoding = 'EUC-JP' as const;
 
   const fields: Array<[string, string]> = [
-    ['NAME', params.name],
-    ['MAIL', params.mail],
-    ['MESSAGE', params.message],
+    ['NAME', replaceWithNCR(params.name, encoding)],
+    ['MAIL', replaceWithNCR(params.mail, encoding)],
+    ['MESSAGE', replaceWithNCR(params.message, encoding)],
     ['BBS', board.bbsId],
     ['KEY', params.threadId],
     ['DIR', dir],
