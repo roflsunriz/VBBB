@@ -922,15 +922,45 @@ export function ThreadView(): React.JSX.Element {
   // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
   const [filterKey, setFilterKey] = useState<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
 
+  // Preserve scroll position across filter apply/clear cycles.
+  // Saved when transitioning from no-filter → filter; restored when transitioning back to no-filter.
+  const preFilterScrollTopRef = useRef<number>(0);
+  const prevFilterKeyRef = useRef<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
+
+  // Restore scroll when filter is cleared (non-null → null transition)
+  useEffect(() => {
+    const prevFilter = prevFilterKeyRef.current;
+    prevFilterKeyRef.current = filterKey;
+    if (prevFilter !== null && filterKey === null) {
+      const savedScrollTop = preFilterScrollTopRef.current;
+      if (savedScrollTop > 0) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollRef.current?.scrollTo(0, savedScrollTop);
+          });
+        });
+      }
+    }
+  }, [filterKey]);
+
   const handleFilterById = useCallback((id: string) => {
+    if (filterKey === null) {
+      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+    }
     setFilterKey((prev) => (prev?.type === 'id' && prev.value === id) ? null : { type: 'id', value: id });
-  }, []);
+  }, [filterKey]);
   const handleFilterByWatchoi = useCallback((label: string) => {
+    if (filterKey === null) {
+      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+    }
     setFilterKey((prev) => (prev?.type === 'watchoi' && prev.value === label) ? null : { type: 'watchoi', value: label });
-  }, []);
+  }, [filterKey]);
   const handleFilterByKotehan = useCallback((name: string) => {
+    if (filterKey === null) {
+      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+    }
     setFilterKey((prev) => (prev?.type === 'kotehan' && prev.value === name) ? null : { type: 'kotehan', value: name });
-  }, []);
+  }, [filterKey]);
   const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
 
   // AA font override state: manual per-post toggle (true = force AA, false = force normal)
@@ -1025,11 +1055,15 @@ export function ThreadView(): React.JSX.Element {
   }, [displayResponses]);
 
   // Virtual scrolling for the response list
+  // getItemKey ensures size cache is keyed by res number, not by index.
+  // Without this, applying a filter changes which item occupies each index,
+  // causing the virtualizer to reuse wrong cached heights → overlapping text / huge gaps.
   const virtualizer = useVirtualizer({
     count: displayResponses.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 80,
     overscan: 5,
+    getItemKey: (index) => displayResponses[index]?.number ?? index,
   });
 
   // Stable refs for use in callbacks without deps churn
@@ -1171,6 +1205,8 @@ export function ThreadView(): React.JSX.Element {
   useEffect(() => {
     setPopup(null);
     setAaOverrides((prev) => prev.size > 0 ? new Map<number, boolean>() : prev);
+    preFilterScrollTopRef.current = 0;
+    prevFilterKeyRef.current = null;
   }, [activeTabId]);
 
   // Seed lastVisibleResRef after layout settles on tab open/switch.
