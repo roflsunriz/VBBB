@@ -1396,8 +1396,20 @@ export function ThreadView(): React.JSX.Element {
       role="tab"
       tabIndex={0}
       {...getThreadTabDragProps(i)}
-      onClick={() => { setActiveTab(tab.id); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab(tab.id); }}
+      onClick={() => {
+        if (activeTabId !== null && activeTabId !== tab.id && scrollRef.current !== null) {
+          updateTabScroll(activeTabId, scrollRef.current.scrollTop);
+        }
+        setActiveTab(tab.id);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          if (activeTabId !== null && activeTabId !== tab.id && scrollRef.current !== null) {
+            updateTabScroll(activeTabId, scrollRef.current.scrollTop);
+          }
+          setActiveTab(tab.id);
+        }
+      }}
       onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
       className={`group flex cursor-pointer items-center gap-1 text-xs transition-opacity ${
         isVerticalThreadTabs ? 'rounded px-2 py-1' : 'max-w-48 shrink-0 rounded-t px-2 py-1'
