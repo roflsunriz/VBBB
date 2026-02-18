@@ -982,9 +982,10 @@ export function ThreadView(): React.JSX.Element {
     const seen = new Set<string>();
     for (const r of activeTab.responses) {
       for (const img of detectImageUrls(r.body)) {
-        if (!seen.has(img.url)) {
-          seen.add(img.url);
-          urls.push(img.url);
+        // displayUrl is always the actual image URL (thumbnail for rich media, normalized for direct images)
+        if (!seen.has(img.displayUrl)) {
+          seen.add(img.displayUrl);
+          urls.push(img.displayUrl);
         }
       }
     }

@@ -17,6 +17,8 @@ import { MdiIcon } from '../common/MdiIcon';
 
 interface ImageModalProps {
   readonly url: string;
+  /** Original page URL (e.g. YouTube/imgur page). Used for "Open in browser". Falls back to url if omitted. */
+  readonly pageUrl?: string | undefined;
   /** All image URLs in the context for left/right keyboard navigation */
   readonly allImageUrls?: readonly string[] | undefined;
   readonly onClose: () => void;
@@ -26,7 +28,7 @@ const ZOOM_STEP = 0.25;
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
 
-export function ImageModal({ url, allImageUrls, onClose }: ImageModalProps): React.JSX.Element {
+export function ImageModal({ url, pageUrl, allImageUrls, onClose }: ImageModalProps): React.JSX.Element {
   const [currentUrl, setCurrentUrl] = useState(url);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -142,8 +144,8 @@ export function ImageModal({ url, allImageUrls, onClose }: ImageModalProps): Rea
   }, [currentUrl, fileName]);
 
   const handleOpenExternal = useCallback(() => {
-    void window.electronApi.invoke('shell:open-external', currentUrl);
-  }, [currentUrl]);
+    void window.electronApi.invoke('shell:open-external', pageUrl ?? currentUrl);
+  }, [pageUrl, currentUrl]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();

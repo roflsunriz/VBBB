@@ -8,7 +8,6 @@ const IMAGE_QUERY_FORMAT = /[?&]format=(jpe?g|gif|png|webp)(?:&|$)/i;
 const URL_PATTERN = /https?:\/\/[^\s"'<>\]]+/gi;
 
 /** Patterns for rich media sites (F9/F10) */
-const IMGUR_ALBUM_PATTERN = /^https?:\/\/(?:i\.)?imgur\.com\/a\/([A-Za-z0-9]+)/;
 const IMGUR_SINGLE_PATTERN = /^https?:\/\/imgur\.com\/([A-Za-z0-9]+)$/;
 const GYAZO_PATTERN = /^https?:\/\/gyazo\.com\/([A-Fa-f0-9]+)$/;
 const YOUTUBE_PATTERN = /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/;
@@ -56,11 +55,6 @@ function resolveRichMediaThumbnail(url: string): string | null {
   const imgurSingle = IMGUR_SINGLE_PATTERN.exec(url);
   if (imgurSingle?.[1] !== undefined) {
     return `https://i.imgur.com/${imgurSingle[1]}t.jpg`;
-  }
-  // Imgur album — use cover thumbnail
-  const imgurAlbum = IMGUR_ALBUM_PATTERN.exec(url);
-  if (imgurAlbum?.[1] !== undefined) {
-    return `https://i.imgur.com/${imgurAlbum[1]}t.jpg`;
   }
   // Gyazo screenshot
   const gyazo = GYAZO_PATTERN.exec(url);
@@ -122,7 +116,9 @@ export function detectImageUrls(bodyHtml: string): DetectedImage[] {
     const thumb = resolveRichMediaThumbnail(cleaned);
     if (thumb !== null) {
       seen.add(cleaned);
-      results.push({ url: thumb, displayUrl: cleaned });
+      // url = original page URL ("Original URL as found in the text")
+      // displayUrl = thumbnail image URL ("Display-ready URL" for <img src>)
+      results.push({ url: cleaned, displayUrl: thumb });
     }
   }
   return results;

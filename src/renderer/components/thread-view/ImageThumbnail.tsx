@@ -82,7 +82,7 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
         )}
       </span>
 
-      {modalOpen && <ImageModal url={url} allImageUrls={allImageUrls} onClose={handleCloseModal} />}
+      {modalOpen && <ImageModal url={displayUrl} pageUrl={url} allImageUrls={allImageUrls} onClose={handleCloseModal} />}
     </>
   );
 }
