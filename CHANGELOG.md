@@ -5,6 +5,14 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-02-18
+
+### Added
+
+- スレッド一覧の検索キーワード・並び替えを板タブごとに独立化（タブを切り替えても検索/ソート状態を保持）
+- 書き込み欄・分析欄・プログラマティック書き込み欄をスレッドタブごとに独立化（NG欄は共通のまま維持）
+- 返信を受けたレスのレス番前に `+N` バッジを表示し、マウスホバーで返信内容をポップアップ表示
+
 ## [1.0.2] - 2026-02-18
 
 ### Added
@@ -44,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.0.3]: https://github.com/roflsunriz/VBBB/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/roflsunriz/VBBB/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/roflsunriz/VBBB/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/roflsunriz/VBBB/releases/tag/v1.0.0

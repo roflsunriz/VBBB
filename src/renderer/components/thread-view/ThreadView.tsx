@@ -16,7 +16,7 @@ import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
-import { convertAnchorsToLinks } from '../../utils/anchor-parser';
+import { convertAnchorsToLinks, parseAnchors } from '../../utils/anchor-parser';
 import { detectImageUrls, detectVideoUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
 import { RefreshOverlay } from '../common/RefreshOverlay';
@@ -325,6 +325,7 @@ function ResItem({
   idCount,
   watchoiCount,
   kotehanCount,
+  replyNumbers,
   onAnchorHover,
   onAnchorLeave,
   onResNumberClick,
@@ -348,6 +349,8 @@ function ResItem({
   readonly idCount: number;
   readonly watchoiCount: number;
   readonly kotehanCount: number;
+  /** Response numbers that reference (reply to) this response */
+  readonly replyNumbers: readonly number[];
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onAnchorLeave: () => void;
   readonly onResNumberClick: (resNumber: number) => void;
@@ -494,9 +497,23 @@ function ResItem({
         ? 'border-l-2 border-l-[var(--color-highlight-reply-border)] bg-[var(--color-highlight-reply)]'
         : '';
 
+  const replyCount = replyNumbers.length;
+
   return (
     <div className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${highlightClass}`} id={`res-${String(res.number)}`} onContextMenu={handleContextMenu}>
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
+        {replyCount > 0 && (
+          <button
+            type="button"
+            className="cursor-pointer rounded border-none bg-transparent p-0 text-[10px] font-semibold text-[var(--color-link)] hover:underline"
+            onMouseEnter={(e) => { onAnchorHover(replyNumbers, e.clientX, e.clientY); }}
+            onMouseLeave={onAnchorLeave}
+            onClick={(e) => { e.stopPropagation(); onAnchorHover(replyNumbers, e.clientX, e.clientY); }}
+            title={`${String(replyCount)}件の返信`}
+          >
+            +{replyCount}
+          </button>
+        )}
         <button
           type="button"
           className="cursor-pointer border-none bg-transparent p-0 font-bold text-[var(--color-res-number)] hover:underline"
@@ -757,25 +774,24 @@ export function ThreadView(): React.JSX.Element {
   const reorderThreadTabs = useBBSStore((s) => s.reorderThreadTabs);
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
-  const postEditorOpen = useBBSStore((s) => s.postEditorOpen);
-  const togglePostEditor = useBBSStore((s) => s.togglePostEditor);
-  const closePostEditor = useBBSStore((s) => s.closePostEditor);
-  const [progPostOpen, setProgPostOpen] = useState(false);
+  const toggleTabPostEditor = useBBSStore((s) => s.toggleTabPostEditor);
+  const closeTabPostEditor = useBBSStore((s) => s.closeTabPostEditor);
+  const openTabPostEditorWithQuote = useBBSStore((s) => s.openTabPostEditorWithQuote);
+  const toggleTabAnalysis = useBBSStore((s) => s.toggleTabAnalysis);
+  const toggleTabProgPost = useBBSStore((s) => s.toggleTabProgPost);
+  const closeTabProgPost = useBBSStore((s) => s.closeTabProgPost);
 
   const handleTogglePostEditor = useCallback(() => {
-    togglePostEditor();
-    setProgPostOpen(false);
-  }, [togglePostEditor]);
+    if (activeTabId !== null) toggleTabPostEditor(activeTabId);
+  }, [activeTabId, toggleTabPostEditor]);
 
   const handleToggleProgPost = useCallback(() => {
-    setProgPostOpen((p) => {
-      if (!p) { closePostEditor(); }
-      return !p;
-    });
-  }, [closePostEditor]);
+    if (activeTabId !== null) toggleTabProgPost(activeTabId);
+  }, [activeTabId, toggleTabProgPost]);
 
-  const handleCloseProgPost = useCallback(() => { setProgPostOpen(false); }, []);
-  const openPostEditorWithQuote = useBBSStore((s) => s.openPostEditorWithQuote);
+  const handleCloseProgPost = useCallback(() => {
+    if (activeTabId !== null) closeTabProgPost(activeTabId);
+  }, [activeTabId, closeTabProgPost]);
   const ngRules = useBBSStore((s) => s.ngRules);
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
@@ -903,9 +919,10 @@ export function ThreadView(): React.JSX.Element {
     });
   }, []);
 
-  // F16: Analysis panel toggle
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const handleToggleAnalysis = useCallback(() => { setAnalysisOpen((p) => !p); }, []);
+  // F16: Analysis panel toggle (per tab)
+  const handleToggleAnalysis = useCallback(() => {
+    if (activeTabId !== null) toggleTabAnalysis(activeTabId);
+  }, [activeTabId, toggleTabAnalysis]);
 
   // Inline media (image/video) toggle — persisted in localStorage
   const [inlineMediaEnabled, setInlineMediaEnabled] = useState(() => {
@@ -974,6 +991,36 @@ export function ThreadView(): React.JSX.Element {
   }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // Per-tab panel states derived from the active tab
+  const postEditorOpen = activeTab?.postEditorOpen ?? false;
+  const analysisOpen = activeTab?.analysisOpen ?? false;
+  const progPostOpen = activeTab?.progPostOpen ?? false;
+  const postEditorInitialMessage = activeTab?.postEditorInitialMessage ?? '';
+
+  // Build reply map: maps each resNumber → list of resNumbers that reference it (>>N)
+  const replyMap = useMemo<ReadonlyMap<number, readonly number[]>>(() => {
+    if (activeTab === undefined) return new Map<number, readonly number[]>();
+    const map = new Map<number, number[]>();
+    for (const res of activeTab.responses) {
+      const anchors = parseAnchors(res.body);
+      const referenced = new Set<number>();
+      for (const anchor of anchors) {
+        for (const num of anchor.numbers) {
+          referenced.add(num);
+        }
+      }
+      for (const num of referenced) {
+        const existing = map.get(num);
+        if (existing !== undefined) {
+          existing.push(res.number);
+        } else {
+          map.set(num, [res.number]);
+        }
+      }
+    }
+    return map;
+  }, [activeTab]);
 
   // Collect all image URLs across the entire thread for modal keyboard navigation
   const allThreadImageUrls = useMemo<readonly string[]>(() => {
@@ -1275,8 +1322,8 @@ export function ThreadView(): React.JSX.Element {
   }, []);
 
   const handleResNumberClick = useCallback((resNumber: number) => {
-    openPostEditorWithQuote(resNumber);
-  }, [openPostEditorWithQuote]);
+    if (activeTabId !== null) openTabPostEditorWithQuote(activeTabId, resNumber);
+  }, [activeTabId, openTabPostEditorWithQuote]);
 
   const handleSetKokomade = useCallback((resNumber: number) => {
     if (activeTabId !== null) {
@@ -1431,7 +1478,7 @@ export function ThreadView(): React.JSX.Element {
         className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
           ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
         }`}
-        title="NG管理"
+        title="NG管理（共通）"
       >
         <MdiIcon path={mdiShieldOff} size={14} />
       </button>
@@ -1580,6 +1627,7 @@ export function ThreadView(): React.JSX.Element {
                         idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
                         watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
                         kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
+                        replyNumbers={replyMap.get(res.number) ?? []}
                         onAnchorHover={handleAnchorHover}
                         onAnchorLeave={handleAnchorLeave}
                         onResNumberClick={handleResNumberClick}
@@ -1607,15 +1655,21 @@ export function ThreadView(): React.JSX.Element {
               />
             )}
 
-            {/* NG Editor */}
+            {/* NG Editor (shared across all tabs) */}
             {ngEditorOpen && <NgEditor />}
 
-            {/* Post editor */}
+            {/* Post editor (per tab) */}
             {postEditorOpen && (
-              <PostEditor boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} hasExposedIps={hasExposedIps} />
+              <PostEditor
+                boardUrl={activeTab.boardUrl}
+                threadId={activeTab.threadId}
+                hasExposedIps={hasExposedIps}
+                onClose={() => { closeTabPostEditor(activeTab.id); }}
+                initialMessage={postEditorInitialMessage}
+              />
             )}
 
-            {/* F26: Programmatic post editor */}
+            {/* F26: Programmatic post editor (per tab) */}
             {progPostOpen && (
               <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} onClose={handleCloseProgPost} />
             )}

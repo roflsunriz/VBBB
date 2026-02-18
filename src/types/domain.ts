@@ -43,6 +43,12 @@ export const PostResultType = {
 } as const;
 export type PostResultType = (typeof PostResultType)[keyof typeof PostResultType];
 
+/** Sort key for the thread list in a board tab */
+export type BoardSortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate';
+
+/** Sort direction for the thread list in a board tab */
+export type BoardSortDir = 'asc' | 'desc';
+
 // ---------------------------------------------------------------------------
 // Records
 // ---------------------------------------------------------------------------

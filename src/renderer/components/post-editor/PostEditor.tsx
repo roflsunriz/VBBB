@@ -16,6 +16,8 @@ interface PostEditorProps {
   readonly boardUrl: string;
   readonly threadId: string;
   readonly hasExposedIps?: boolean | undefined;
+  readonly onClose: () => void;
+  readonly initialMessage: string;
 }
 
 const AUTO_CLOSE_KEY = 'vbbb-post-auto-close';
@@ -39,16 +41,13 @@ function calcSambaRemaining(interval: number, lastPostTime: string | null): numb
   return remaining > 0 ? Math.ceil(remaining) : 0;
 }
 
-export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProps): React.JSX.Element {
+export function PostEditor({ boardUrl, threadId, hasExposedIps, onClose, initialMessage }: PostEditorProps): React.JSX.Element {
   const kotehan = useBBSStore((s) => s.kotehan);
   const sambaInfo = useBBSStore((s) => s.sambaInfo);
   const saveKotehan = useBBSStore((s) => s.saveKotehan);
   const recordSambaTime = useBBSStore((s) => s.recordSambaTime);
   const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
-  const closePostEditor = useBBSStore((s) => s.closePostEditor);
   const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
-
-  const postEditorInitialMessage = useBBSStore((s) => s.postEditorInitialMessage);
 
   const [name, setName] = useState(kotehan.name);
   const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
@@ -58,9 +57,9 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
 
   // Apply initial message (e.g. >>N from res number click)
   useEffect(() => {
-    if (postEditorInitialMessage.length > 0 && postEditorInitialMessage !== consumedQuoteRef.current) {
-      consumedQuoteRef.current = postEditorInitialMessage;
-      setMessage((prev) => prev + postEditorInitialMessage);
+    if (initialMessage.length > 0 && initialMessage !== consumedQuoteRef.current) {
+      consumedQuoteRef.current = initialMessage;
+      setMessage((prev) => prev + initialMessage);
       // Focus textarea after inserting quote
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -70,7 +69,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         }
       });
     }
-  }, [postEditorInitialMessage]);
+  }, [initialMessage]);
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [sambaRemaining, setSambaRemaining] = useState(0);
@@ -236,7 +235,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         void refreshActiveThread();
         if (autoClose) {
           setTimeout(() => {
-            closePostEditor();
+            onClose();
           }, 800);
         }
       } else {
@@ -255,7 +254,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, closePostEditor, refreshDonguriDetails]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, onClose, refreshDonguriDetails]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -276,7 +275,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps }: PostEditorProp
         <span className="text-xs font-semibold text-[var(--color-text-secondary)]">書き込み</span>
         <button
           type="button"
-          onClick={() => { closePostEditor(); }}
+          onClick={() => { onClose(); }}
           className="rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           aria-label="閉じる"
         >

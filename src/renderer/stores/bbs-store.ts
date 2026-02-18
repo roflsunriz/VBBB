@@ -2,7 +2,7 @@
  * Zustand store for BBS browser state.
  */
 import { create } from 'zustand';
-import type { BBSMenu, Board, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
+import type { BBSMenu, Board, BoardSortDir, BoardSortKey, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
 import type { BrowsingHistoryEntry, DisplayRange, SavedTab, SessionState } from '@shared/history';
 import type { NgRule } from '@shared/ng';
@@ -23,6 +23,14 @@ interface ThreadTab {
   readonly scrollTop: number;
   readonly kokomade: number;
   readonly displayRange: DisplayRange;
+  /** Whether the post editor panel is open for this tab */
+  readonly postEditorOpen: boolean;
+  /** Initial message (e.g. quoted >>N) for the post editor */
+  readonly postEditorInitialMessage: string;
+  /** Whether the analysis panel is open for this tab */
+  readonly analysisOpen: boolean;
+  /** Whether the programmatic post panel is open for this tab */
+  readonly progPostOpen: boolean;
 }
 
 /** Tab state for board (category) tabs */
@@ -33,6 +41,12 @@ interface BoardTab {
   readonly threadIndices: readonly ThreadIndex[];
   readonly subjectLoading: boolean;
   readonly subjectError: string | null;
+  /** Thread list filter keyword for this board tab */
+  readonly filter: string;
+  /** Thread list sort key for this board tab */
+  readonly sortKey: BoardSortKey;
+  /** Thread list sort direction for this board tab */
+  readonly sortDir: BoardSortDir;
 }
 
 interface BBSState {
@@ -56,9 +70,7 @@ interface BBSState {
   tabs: readonly ThreadTab[];
   activeTabId: string | null;
 
-  // Post editor
-  postEditorOpen: boolean;
-  postEditorInitialMessage: string;
+  // (Post editor state is stored per thread tab)
 
   // Kotehan (per-board default name/mail)
   kotehan: KotehanConfig;
@@ -117,6 +129,18 @@ interface BBSState {
   updateTabScroll: (tabId: string, scrollTop: number) => void;
   updateTabKokomade: (tabId: string, kokomade: number) => void;
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
+  /** Per-tab post editor */
+  toggleTabPostEditor: (tabId: string) => void;
+  closeTabPostEditor: (tabId: string) => void;
+  openTabPostEditorWithQuote: (tabId: string, resNumber: number) => void;
+  /** Per-tab analysis panel */
+  toggleTabAnalysis: (tabId: string) => void;
+  /** Per-tab programmatic post panel */
+  toggleTabProgPost: (tabId: string) => void;
+  closeTabProgPost: (tabId: string) => void;
+  /** Per-tab board filter / sort */
+  updateBoardTabFilter: (tabId: string, filter: string) => void;
+  updateBoardTabSort: (tabId: string, sortKey: BoardSortKey, sortDir: BoardSortDir) => void;
   saveTabs: () => Promise<void>;
   restoreTabs: (prefetchedTabs?: readonly SavedTab[], activeThreadTabId?: string) => Promise<void>;
   restoreSession: (prefetchedSession?: SessionState) => Promise<void>;
@@ -129,9 +153,6 @@ interface BBSState {
   refreshActiveThread: () => Promise<void>;
   loadPostHistory: () => Promise<void>;
   setHighlightSettings: (settings: HighlightSettings) => void;
-  togglePostEditor: () => void;
-  closePostEditor: () => void;
-  openPostEditorWithQuote: (resNumber: number) => void;
   reorderBoardTabs: (fromIndex: number, toIndex: number) => void;
   reorderThreadTabs: (fromIndex: number, toIndex: number) => void;
   setStatusMessage: (message: string) => void;
@@ -223,9 +244,6 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   tabs: [],
   activeTabId: null,
-
-  postEditorOpen: false,
-  postEditorInitialMessage: '',
 
   kotehan: { name: '', mail: '' },
 
@@ -352,6 +370,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       threadIndices: [],
       subjectLoading: true,
       subjectError: null,
+      filter: '',
+      sortKey: 'index',
+      sortDir: 'asc',
     };
     set((state) => ({
       boardTabs: [...state.boardTabs, newTab],
@@ -646,6 +667,10 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         scrollTop,
         kokomade,
         displayRange: 'all',
+        postEditorOpen: false,
+        postEditorInitialMessage: '',
+        analysisOpen: false,
+        progPostOpen: false,
       };
       set((state) => ({
         tabs: [...state.tabs, newTab],
@@ -1097,16 +1122,70 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     await get().refreshThreadTab(activeTabId);
   },
 
-  togglePostEditor: () => {
-    set((state) => ({ postEditorOpen: !state.postEditorOpen, postEditorInitialMessage: '' }));
+  toggleTabPostEditor: (tabId: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? { ...t, postEditorOpen: !t.postEditorOpen, postEditorInitialMessage: '', progPostOpen: false }
+          : t,
+      ),
+    }));
   },
 
-  closePostEditor: () => {
-    set({ postEditorOpen: false, postEditorInitialMessage: '' });
+  closeTabPostEditor: (tabId: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId ? { ...t, postEditorOpen: false, postEditorInitialMessage: '' } : t,
+      ),
+    }));
   },
 
-  openPostEditorWithQuote: (resNumber: number) => {
-    set({ postEditorOpen: true, postEditorInitialMessage: `>>${String(resNumber)}\n` });
+  openTabPostEditorWithQuote: (tabId: string, resNumber: number) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? { ...t, postEditorOpen: true, postEditorInitialMessage: `>>${String(resNumber)}\n`, progPostOpen: false }
+          : t,
+      ),
+    }));
+  },
+
+  toggleTabAnalysis: (tabId: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId ? { ...t, analysisOpen: !t.analysisOpen } : t,
+      ),
+    }));
+  },
+
+  toggleTabProgPost: (tabId: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? { ...t, progPostOpen: !t.progPostOpen, postEditorOpen: false, postEditorInitialMessage: '' }
+          : t,
+      ),
+    }));
+  },
+
+  closeTabProgPost: (tabId: string) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId ? { ...t, progPostOpen: false } : t,
+      ),
+    }));
+  },
+
+  updateBoardTabFilter: (tabId: string, filter: string) => {
+    set((state) => ({
+      boardTabs: state.boardTabs.map((t) => t.id === tabId ? { ...t, filter } : t),
+    }));
+  },
+
+  updateBoardTabSort: (tabId: string, sortKey: BoardSortKey, sortDir: BoardSortDir) => {
+    set((state) => ({
+      boardTabs: state.boardTabs.map((t) => t.id === tabId ? { ...t, sortKey, sortDir } : t),
+    }));
   },
 
   reorderBoardTabs: (fromIndex: number, toIndex: number) => {

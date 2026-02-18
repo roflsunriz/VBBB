@@ -6,7 +6,7 @@
  */
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel } from '@mdi/js';
-import { AgeSage, type SubjectRecord } from '@shared/domain';
+import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
 import { AbonType, NgTarget } from '@shared/ng';
@@ -17,9 +17,6 @@ import { RefreshOverlay } from '../common/RefreshOverlay';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
 import { useTabOrientation } from '../../hooks/use-tab-orientation';
-
-type SortKey = 'index' | 'title' | 'count' | 'ikioi' | 'completionRate' | 'firstPostDate';
-type SortDir = 'asc' | 'desc';
 
 /** Compute thread momentum (勢い): posts per day */
 function computeIkioi(fileName: string, count: number): number {
@@ -96,10 +93,14 @@ export function ThreadList(): React.JSX.Element {
   const closeBoardTab = useBBSStore((s) => s.closeBoardTab);
   const refreshSelectedBoard = useBBSStore((s) => s.refreshSelectedBoard);
   const reorderBoardTabs = useBBSStore((s) => s.reorderBoardTabs);
+  const updateBoardTabFilter = useBBSStore((s) => s.updateBoardTabFilter);
+  const updateBoardTabSort = useBBSStore((s) => s.updateBoardTabSort);
 
-  const [sortKey, setSortKey] = useState<SortKey>('index');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [filter, setFilter] = useState('');
+  // Per-tab filter/sort: read from active board tab
+  const activeBoardTab = useBBSStore((s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId));
+  const filter = activeBoardTab?.filter ?? '';
+  const sortKey: BoardSortKey = activeBoardTab?.sortKey ?? 'index';
+  const sortDir: BoardSortDir = activeBoardTab?.sortDir ?? 'asc';
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
@@ -254,15 +255,15 @@ export function ThreadList(): React.JSX.Element {
   }, [filteredSubjects, sortKey, sortDir]);
 
   const handleSort = useCallback(
-    (key: SortKey) => {
+    (key: BoardSortKey) => {
+      if (activeBoardTabId === null) return;
       if (sortKey === key) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        updateBoardTabSort(activeBoardTabId, key, sortDir === 'asc' ? 'desc' : 'asc');
       } else {
-        setSortKey(key);
-        setSortDir('asc');
+        updateBoardTabSort(activeBoardTabId, key, 'asc');
       }
     },
-    [sortKey],
+    [activeBoardTabId, sortKey, sortDir, updateBoardTabSort],
   );
 
   const handleOpenThread = useCallback(
@@ -410,7 +411,7 @@ export function ThreadList(): React.JSX.Element {
   }, [ctxMenu, selectedBoard, currentBoardId, addNgRule]);
 
   const SortHeader = useCallback(
-    ({ label, field }: { readonly label: string; readonly field: SortKey }) => (
+    ({ label, field }: { readonly label: string; readonly field: BoardSortKey }) => (
       <button
         type="button"
         onClick={() => { handleSort(field); }}
@@ -602,7 +603,7 @@ export function ThreadList(): React.JSX.Element {
           <input
             type="text"
             value={filter}
-            onChange={(e) => { setFilter(e.target.value); }}
+            onChange={(e) => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, e.target.value); }}
             placeholder="スレッドを検索..."
             className="min-w-0 flex-1 bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           />
@@ -611,7 +612,7 @@ export function ThreadList(): React.JSX.Element {
               <span className="text-xs text-[var(--color-text-muted)]">{filteredSubjects.length} 件</span>
               <button
                 type="button"
-                onClick={() => { setFilter(''); }}
+                onClick={() => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, ''); }}
                 className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
                 aria-label="検索をクリア"
               >
