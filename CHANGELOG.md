@@ -5,6 +5,18 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-02-18
+
+### Added
+
+- 画像プレビューモーダル（ImageModal）にページ URL を外部ブラウザで開くリンクを追加（`pageUrl` prop 経由）
+- ImageThumbnail から元 URL を ImageModal へ渡すよう対応し、ユーザーナビゲーションを改善
+
+### Fixed
+
+- フィルター適用・解除時にスクロール位置を保持するよう改善（ThreadView）
+- フィルター適用中の仮想スクロール描画の安定性向上（アイテムキーのユニーク化）
+
 ## [1.0.1] - 2026-02-18
 
 ### Fixed
@@ -32,5 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.0.2]: https://github.com/roflsunriz/VBBB/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/roflsunriz/VBBB/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/roflsunriz/VBBB/releases/tag/v1.0.0
