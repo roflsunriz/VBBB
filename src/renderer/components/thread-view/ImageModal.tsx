@@ -3,6 +3,7 @@
  * Supports: drag to move, zoom in/out, fit to view, original size, save, open in external browser.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   mdiClose,
   mdiMagnifyPlusOutline,
@@ -150,7 +151,7 @@ export function ImageModal({ url, allImageUrls, onClose }: ImageModalProps): Rea
 
   const zoomPercent = Math.round(scale * 100);
 
-  return (
+  return createPortal(
     <div
       ref={containerRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
@@ -219,6 +220,7 @@ export function ImageModal({ url, allImageUrls, onClose }: ImageModalProps): Rea
         draggable={false}
         referrerPolicy="no-referrer"
       />
-    </div>
+    </div>,
+    document.body,
   );
 }
