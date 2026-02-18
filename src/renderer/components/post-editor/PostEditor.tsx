@@ -48,6 +48,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps, onClose, initial
   const recordSambaTime = useBBSStore((s) => s.recordSambaTime);
   const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
   const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
+  const loadPostHistory = useBBSStore((s) => s.loadPostHistory);
 
   const [name, setName] = useState(kotehan.name);
   const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : 'sage');
@@ -221,8 +222,8 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps, onClose, initial
         void saveKotehan(boardUrl, { name, mail });
         void recordSambaTime(boardUrl);
 
-        // Save post history
-        void window.electronApi.invoke('post:save-history', {
+        // Save post history and reload store so highlight is applied immediately
+        await window.electronApi.invoke('post:save-history', {
           timestamp: new Date().toISOString(),
           boardUrl,
           threadId,
@@ -230,6 +231,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps, onClose, initial
           mail,
           message,
         });
+        await loadPostHistory();
 
         // Auto-refresh thread and conditionally close editor
         void refreshActiveThread();
@@ -254,7 +256,7 @@ export function PostEditor({ boardUrl, threadId, hasExposedIps, onClose, initial
     } finally {
       setPosting(false);
     }
-  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, onClose, refreshDonguriDetails]);
+  }, [boardUrl, threadId, name, mail, message, sambaRemaining, autoClose, setStatusMessage, saveKotehan, recordSambaTime, refreshActiveThread, loadPostHistory, onClose, refreshDonguriDetails]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
