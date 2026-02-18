@@ -12,6 +12,15 @@ import type { Res } from '@shared/domain';
 const ID_PATTERN = /ID:([^\s]+)/;
 
 /**
+ * Extract IP-based identifier from dateTime field.
+ * Some boards (e.g. 5ch boards with SLIP enabled) expose the poster's
+ * (masked) IP instead of a hashed ID, formatted as:
+ *   発信元:240a:61:326c:1539:*
+ * This pattern captures the value after "発信元:" up to the next whitespace.
+ */
+const SHINMOTSU_PATTERN = /発信元:([^\s]+)/;
+
+/**
  * Extract ワッチョイ-family from name field.
  * Hash parts are alphanumeric (not limited to hex).
  * Optional trailing content like [IP] is allowed before closing paren.
@@ -48,7 +57,9 @@ const DEFAULT_NAMES = new Set([
 export function extractId(res: Res): string | null {
   if (res.id !== undefined && res.id.length > 0) return res.id;
   const m = ID_PATTERN.exec(res.dateTime);
-  return m?.[1] ?? null;
+  if (m?.[1] !== undefined) return m[1];
+  const ms = SHINMOTSU_PATTERN.exec(res.dateTime);
+  return ms?.[1] ?? null;
 }
 
 export interface WatchoiInfo {
