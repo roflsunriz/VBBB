@@ -9,6 +9,8 @@ export interface SavedTab {
   readonly title: string;
   /** Scroll position (pixels from top). Absent in legacy tab.sav files. */
   readonly scrollTop?: number | undefined;
+  /** First visible response number at the top of the viewport (0 or absent = unset). Preferred over scrollTop for restoration. */
+  readonly scrollResNumber?: number | undefined;
 }
 
 /** A browsing history entry */

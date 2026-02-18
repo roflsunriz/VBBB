@@ -16,8 +16,8 @@ const SESSION_FILE = 'session.json';
 
 /**
  * Parse tab.sav content into SavedTab array.
- * Format: boardUrl \t threadId \t title [\t scrollTop]
- * The 4th field (scrollTop) is optional for backward compatibility.
+ * Format: boardUrl \t threadId \t title [\t scrollTop [\t scrollResNumber]]
+ * Fields 4 and 5 are optional for backward compatibility.
  */
 export function parseTabSav(content: string): SavedTab[] {
   const tabs: SavedTab[] = [];
@@ -29,16 +29,23 @@ export function parseTabSav(content: string): SavedTab[] {
     const threadId = fields[1] ?? '';
     const title = fields[2] ?? '';
     if (boardUrl.length === 0 || threadId.length === 0) continue;
+
     const rawScroll = fields[3];
     const scrollTop = rawScroll !== undefined && rawScroll.length > 0 ? Number(rawScroll) : undefined;
     // scrollTop 0 is semantically identical to "no saved position" (start from top),
     // so omit the property entirely to ensure proper round-tripping.
     const resolvedScroll = scrollTop !== undefined && Number.isFinite(scrollTop) && scrollTop > 0 ? scrollTop : undefined;
+
+    const rawResNum = fields[4];
+    const parsedResNum = rawResNum !== undefined && rawResNum.length > 0 ? Number(rawResNum) : undefined;
+    const resolvedResNum = parsedResNum !== undefined && Number.isFinite(parsedResNum) && parsedResNum > 0 ? parsedResNum : undefined;
+
     tabs.push({
       boardUrl,
       threadId,
       title,
       ...(resolvedScroll !== undefined ? { scrollTop: resolvedScroll } : {}),
+      ...(resolvedResNum !== undefined ? { scrollResNumber: resolvedResNum } : {}),
     });
   }
   return tabs;
@@ -46,11 +53,11 @@ export function parseTabSav(content: string): SavedTab[] {
 
 /**
  * Serialize SavedTab array to tab.sav format.
- * Format: boardUrl \t threadId \t title \t scrollTop
+ * Format: boardUrl \t threadId \t title \t scrollTop \t scrollResNumber
  */
 export function serializeTabSav(tabs: readonly SavedTab[]): string {
   return tabs
-    .map((t) => `${t.boardUrl}\t${t.threadId}\t${t.title}\t${String(t.scrollTop ?? 0)}`)
+    .map((t) => `${t.boardUrl}\t${t.threadId}\t${t.title}\t${String(t.scrollTop ?? 0)}\t${String(t.scrollResNumber ?? 0)}`)
     .join('\n');
 }
 

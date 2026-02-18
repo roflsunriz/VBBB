@@ -107,8 +107,12 @@ export interface ThreadIndex {
   readonly newReceive: number;
   /** Unread flag */
   readonly unRead: boolean;
-  /** Scroll position */
+  /** Scroll position (pixels from top, legacy) */
   readonly scrollTop: number;
+  /** First visible response number at the top of the viewport (0 = unset). Preferred over scrollTop for restoration. */
+  readonly scrollResNumber: number;
+  /** Pixel offset from the top of scrollResNumber's virtual item to the viewport top (0 = item is at top). */
+  readonly scrollResOffset: number;
   /** Total response count on server */
   readonly allResCount: number;
   /** New response count since last fetch */

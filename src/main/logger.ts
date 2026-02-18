@@ -39,7 +39,7 @@ function maskSensitive(message: string): string {
 const LOG_BUFFER_MAX = 1000;
 const logBuffer: DiagLogEntry[] = [];
 
-function pushEntry(level: DiagLogLevel, tag: string, message: string): void {
+export function pushEntry(level: DiagLogLevel, tag: string, message: string): void {
   const entry: DiagLogEntry = {
     timestamp: new Date().toISOString(),
     level,

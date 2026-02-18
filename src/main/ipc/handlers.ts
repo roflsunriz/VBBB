@@ -9,7 +9,7 @@ import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '
 import type { IpcChannelMap, IpLookupResult } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
-import { clearLogBuffer, createLogger, getLogBuffer } from '../logger';
+import { clearLogBuffer, createLogger, getLogBuffer, pushEntry } from '../logger';
 import { menuEmitter } from '../menu';
 import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
@@ -252,6 +252,8 @@ export async function registerIpcHandlers(): Promise<void> {
           ...idx,
           ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
           ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
+          ...(updates.scrollResNumber !== undefined ? { scrollResNumber: updates.scrollResNumber } : {}),
+          ...(updates.scrollResOffset !== undefined ? { scrollResOffset: updates.scrollResOffset } : {}),
           ...(updates.lastModified !== undefined ? { lastModified: updates.lastModified } : {}),
         };
       });
@@ -270,6 +272,8 @@ export async function registerIpcHandlers(): Promise<void> {
         newReceive: 0,
         unRead: false,
         scrollTop: updates.scrollTop ?? 0,
+        scrollResNumber: updates.scrollResNumber ?? 0,
+        scrollResOffset: updates.scrollResOffset ?? 0,
         allResCount: 0,
         newResCount: 0,
         ageSage: AgeSage.None,
@@ -613,6 +617,11 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   // Diagnostic log handlers
+  handle('diag:add-log', (level, tag, message) => {
+    pushEntry(level, tag, message);
+    return Promise.resolve();
+  });
+
   handle('diag:get-logs', () => {
     return Promise.resolve(getLogBuffer());
   });

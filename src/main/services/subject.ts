@@ -250,6 +250,10 @@ export function parseFolderIdx(content: string): ThreadIndex[] {
       allResCount: hexToInt(fields[12] ?? '0'),
       newResCount: hexToInt(fields[13] ?? '0'),
       ageSage: hexToInt(fields[14] ?? '0') as AgeSage,
+      // Field 15: scrollResNumber (optional; 0 if absent for backward compat)
+      scrollResNumber: fields.length > 15 ? hexToInt(fields[15] ?? '0') : 0,
+      // Field 16: scrollResOffset (optional; 0 if absent for backward compat)
+      scrollResOffset: fields.length > 16 ? hexToInt(fields[16] ?? '0') : 0,
     });
   }
 
@@ -279,6 +283,8 @@ export function serializeFolderIdx(indices: readonly ThreadIndex[]): string {
       intToHex(idx.allResCount),
       intToHex(idx.newResCount),
       intToHex(idx.ageSage),
+      intToHex(idx.scrollResNumber),
+      intToHex(idx.scrollResOffset),
     ];
     lines.push(fields.join(SOH));
   }
@@ -347,6 +353,8 @@ export function buildUpdatedIndex(
         newReceive: 0,
         unRead: true,
         scrollTop: 0,
+        scrollResNumber: 0,
+        scrollResOffset: 0,
         allResCount: subject.count,
         newResCount: subject.count,
         ageSage,

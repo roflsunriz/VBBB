@@ -1119,6 +1119,8 @@ export function ThreadView(): React.JSX.Element {
   virtualizerRef.current = virtualizer;
   const displayResponsesRef = useRef(displayResponses);
   displayResponsesRef.current = displayResponses;
+  const resNumberToIndexRef = useRef(resNumberToIndex);
+  resNumberToIndexRef.current = resNumberToIndex;
 
   // Scroll to a specific res number using the virtualizer
   const scrollToResNumber = useCallback((resNumber: number) => {
@@ -1172,19 +1174,141 @@ export function ThreadView(): React.JSX.Element {
     }
   }, [highlightSettings, setHighlightSettings]);
 
-  // Restore scroll position when tab changes.
-  // Uses retry logic because layout may not be complete after the first rAF,
-  // especially for threads with many responses.
+  // Restore scroll position when the active tab changes (tab open / tab switch).
+  //
+  // This effect fires ONLY when activeTabId changes — intentionally NOT when
+  // scrollTop / scrollResNumber change during normal scrolling. Adding those
+  // values to the dependency array would re-trigger the restoration on every
+  // debounced scroll event, calling scrollToIndex with stale estimated offsets
+  // and causing the viewport to jump upward (the "下端を維持できない" bug).
+  //
+  // The values of activeTabScrollTop / activeTabScrollResNumber are read from
+  // the store at the time the effect runs. Because restoreTabs calls
+  // updateTabScroll (which sets scrollResNumber from tab.sav) *before* setting
+  // activeTabId, the effect always sees the final, correct values.
+  //
+  // Primary path (scrollResNumber > 0): use virtualizer.scrollToIndex so that
+  // the restoration is index-based rather than pixel-based. Pixel offsets drift
+  // when TanStack Virtual re-measures items with sizes differing from the 80px
+  // estimate, causing the viewport to land above the intended position.
+  // Retries by checking visibility after each retryDelay (not synchronously,
+  // because the DOM scroll is asynchronous relative to scrollToIndex).
+  //
+  // Fallback (scrollResNumber === 0, scrollTop > 0): legacy pixel-based scroll
+  // for tabs restored from old tab.sav / Folder.idx without scrollResNumber.
   const activeTabScrollTop = activeTab?.scrollTop ?? 0;
+  const activeTabScrollResNumber = activeTab?.scrollResNumber ?? 0;
+  const activeTabScrollResOffset = activeTab?.scrollResOffset ?? 0;
   useEffect(() => {
     const container = scrollRef.current;
-    if (container === null) return;
+    const diagLog = (level: 'info' | 'warn' | 'error' | 'success', message: string): void => {
+      const diagLevel = level === 'success' ? 'info' : level;
+      void window.electronApi.invoke('diag:add-log', diagLevel, 'scroll', message);
+    };
+
+    if (container === null) {
+      diagLog('warn', `[scroll-restore] tabId=${activeTabId ?? 'null'} container=null — skip`);
+      return;
+    }
+
+    const resCount = displayResponsesRef.current.length;
+    const initScrollTop = container.scrollTop;
+    const initScrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+
+    diagLog('info',
+      `[scroll-restore] START tabId=${activeTabId ?? 'null'} ` +
+      `resNum=${String(activeTabScrollResNumber)} scrollTop=${String(activeTabScrollTop)} ` +
+      `responses=${String(resCount)} container.scrollTop=${String(initScrollTop)} ` +
+      `scrollHeight=${String(initScrollHeight)} clientHeight=${String(clientHeight)}`
+    );
+
+    if (activeTabScrollResNumber > 0) {
+      // Index-based restoration — snapshot the target res number at effect time
+      const targetResNumber = activeTabScrollResNumber;
+      let cancelled = false;
+      let retries = 0;
+      const maxRetries = 20;
+      const retryDelay = 50;
+
+      const tryScrollToIndex = (): void => {
+        if (cancelled) return;
+        const targetIndex = resNumberToIndexRef.current.get(targetResNumber);
+        if (targetIndex === undefined) {
+          diagLog('warn',
+            `[scroll-restore] resNum=${String(targetResNumber)} not in displayResponses — abort`
+          );
+          return;
+        }
+        const totalSize = virtualizerRef.current.getTotalSize();
+        diagLog('info',
+          `[scroll-restore] scrollToIndex retry=${String(retries)} ` +
+          `targetResNum=${String(targetResNumber)} targetIndex=${String(targetIndex)} ` +
+          `estimatedTotalSize=${String(totalSize)} ` +
+          `container.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+        );
+        virtualizerRef.current.scrollToIndex(targetIndex, { align: 'start' });
+        // Check visibility after retryDelay (DOM scroll is async, so the virtual
+        // items list reflects the new position only after the browser has scrolled)
+        setTimeout(() => {
+          if (cancelled) return;
+          const items = virtualizerRef.current.getVirtualItems();
+          const isVisible = items.some((item) => item.index === targetIndex);
+          const firstItem = items[0];
+          const lastItem = items[items.length - 1];
+          diagLog(isVisible ? 'success' : 'warn',
+            `[scroll-restore] check retry=${String(retries)} ` +
+            `visible=${String(isVisible)} container.scrollTop=${String(container.scrollTop)} ` +
+            `scrollHeight=${String(container.scrollHeight)} ` +
+            `virtualItems=${String(items.length)} ` +
+            `range=[${String(firstItem?.index ?? -1)}..${String(lastItem?.index ?? -1)}]`
+          );
+          if (!isVisible && retries < maxRetries) {
+            retries += 1;
+            tryScrollToIndex();
+          } else if (isVisible) {
+            // Apply intra-item offset to restore the exact sub-item scroll position.
+            // scrollResOffset = pixels from the top of the target virtual item to the viewport top.
+            const savedOffset = activeTabScrollResOffset;
+            if (savedOffset > 0) {
+              const maxScroll = container.scrollHeight - container.clientHeight;
+              container.scrollTop = Math.min(container.scrollTop + savedOffset, maxScroll);
+            }
+            diagLog('success',
+              `[scroll-restore] DONE (index) retries=${String(retries)} ` +
+              `offset=${String(savedOffset)} final.scrollTop=${String(container.scrollTop)}`
+            );
+          } else {
+            diagLog('error',
+              `[scroll-restore] GAVE UP after ${String(retries)} retries ` +
+              `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+            );
+          }
+        }, retryDelay);
+      };
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(tryScrollToIndex);
+      });
+      return () => { cancelled = true; };
+    }
 
     if (activeTabScrollTop <= 0) {
+      diagLog('info', `[scroll-restore] scrollTop=0 — scroll to top`);
       container.scrollTo(0, 0);
       return;
     }
 
+    // Legacy pixel-based fallback.
+    // Clamp target to the maximum reachable scroll position to avoid infinite
+    // retries when the saved offset exceeds the current scrollHeight.
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const clampedScrollTop = Math.min(activeTabScrollTop, maxScrollTop);
+    diagLog('info',
+      `[scroll-restore] LEGACY path scrollTop=${String(activeTabScrollTop)} ` +
+      `clamped=${String(clampedScrollTop)} maxScrollTop=${String(maxScrollTop)} ` +
+      `scrollHeight=${String(container.scrollHeight)}`
+    );
     let cancelled = false;
     let retries = 0;
     const maxRetries = 10;
@@ -1192,21 +1316,34 @@ export function ThreadView(): React.JSX.Element {
 
     const tryScroll = (): void => {
       if (cancelled) return;
-      container.scrollTo(0, activeTabScrollTop);
-      // Verify scroll actually reached the target (layout may not be ready)
-      if (Math.abs(container.scrollTop - activeTabScrollTop) > 2 && retries < maxRetries) {
+      container.scrollTo(0, clampedScrollTop);
+      const diff = Math.abs(container.scrollTop - clampedScrollTop);
+      diagLog(diff <= 2 ? 'success' : 'warn',
+        `[scroll-restore] legacy retry=${String(retries)} ` +
+        `target=${String(clampedScrollTop)} actual=${String(container.scrollTop)} diff=${String(diff)} ` +
+        `scrollHeight=${String(container.scrollHeight)}`
+      );
+      if (diff > 2 && retries < maxRetries) {
         retries += 1;
         setTimeout(tryScroll, retryDelay);
+      } else if (diff <= 2) {
+        diagLog('success',
+          `[scroll-restore] DONE (legacy) retries=${String(retries)} final.scrollTop=${String(container.scrollTop)}`
+        );
+      } else {
+        diagLog('error',
+          `[scroll-restore] GAVE UP (legacy) after ${String(retries)} retries ` +
+          `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+        );
       }
     };
 
-    // Double rAF ensures at least one full paint cycle before scrolling
     requestAnimationFrame(() => {
       requestAnimationFrame(tryScroll);
     });
 
     return () => { cancelled = true; };
-  }, [activeTabId, activeTabScrollTop]);
+  }, [activeTabId]);
 
   // Track the last visible response number at the viewport bottom.
   // Updated cheaply on scroll (ref only, no state update / IPC).
@@ -1223,23 +1360,51 @@ export function ThreadView(): React.JSX.Element {
       if (timeout !== null) clearTimeout(timeout);
       timeout = setTimeout(() => {
         if (activeTabId !== null) {
-          updateTabScroll(activeTabId, container.scrollTop);
-        }
+          const scrollTopVal = container.scrollTop;
+          const items = virtualizerRef.current.getVirtualItems();
+          const responses = displayResponsesRef.current;
 
-        // Lightweight: just update the ref, no state change
-        const viewportBottom = container.scrollTop + container.clientHeight;
-        const items = virtualizerRef.current.getVirtualItems();
-        const responses = displayResponsesRef.current;
-        let lastVisible = -1;
-        for (const item of items) {
-          if (item.start < viewportBottom) {
-            const res = responses[item.index];
-            if (res !== undefined) {
-              lastVisible = res.number;
+          // Find first visible response number and its intra-item offset
+          let firstVisible = 0;
+          let firstVisibleOffset = 0;
+          for (const item of items) {
+            if (item.end > scrollTopVal) {
+              const res = responses[item.index];
+              if (res !== undefined) {
+                firstVisible = res.number;
+                // How many pixels from the item's estimated top to the viewport top
+                firstVisibleOffset = Math.max(0, Math.round(scrollTopVal - item.start));
+                break;
+              }
             }
           }
+
+          void window.electronApi.invoke('diag:add-log', 'info', 'scroll',
+            `[scroll-save] tabId=${activeTabId} scrollTop=${String(scrollTopVal)} ` +
+            `firstResNum=${String(firstVisible)} offset=${String(firstVisibleOffset)} ` +
+            `totalSize=${String(virtualizerRef.current.getTotalSize())} ` +
+            `scrollHeight=${String(container.scrollHeight)}`
+          );
+          updateTabScroll(
+            activeTabId,
+            scrollTopVal,
+            firstVisible > 0 ? firstVisible : undefined,
+            firstVisible > 0 ? firstVisibleOffset : undefined,
+          );
+
+          // Lightweight: just update the ref, no state change
+          const viewportBottom = scrollTopVal + container.clientHeight;
+          let lastVisible = -1;
+          for (const item of items) {
+            if (item.start < viewportBottom) {
+              const res = responses[item.index];
+              if (res !== undefined) {
+                lastVisible = res.number;
+              }
+            }
+          }
+          lastVisibleResRef.current = lastVisible;
         }
-        lastVisibleResRef.current = lastVisible;
       }, 300);
     };
     container.addEventListener('scroll', handleScroll, { passive: true });

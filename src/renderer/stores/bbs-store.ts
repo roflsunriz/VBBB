@@ -21,6 +21,10 @@ interface ThreadTab {
   readonly title: string;
   readonly responses: readonly Res[];
   readonly scrollTop: number;
+  /** First visible response number at top of viewport (0 = unset). Used for accurate scroll restoration. */
+  readonly scrollResNumber: number;
+  /** Pixel offset from the top of scrollResNumber's virtual item to the viewport top (0 = item is at top). */
+  readonly scrollResOffset: number;
   readonly kokomade: number;
   readonly displayRange: DisplayRange;
   /** Whether the post editor panel is open for this tab */
@@ -126,7 +130,7 @@ interface BBSState {
   openThread: (boardUrl: string, threadId: string, title: string) => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
-  updateTabScroll: (tabId: string, scrollTop: number) => void;
+  updateTabScroll: (tabId: string, scrollTop: number, scrollResNumber?: number, scrollResOffset?: number) => void;
   updateTabKokomade: (tabId: string, kokomade: number) => void;
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
   /** Per-tab post editor */
@@ -684,6 +688,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
       const kokomade = idx?.kokomade ?? -1;
       const scrollTop = idx?.scrollTop ?? 0;
+      const scrollResNumber = idx?.scrollResNumber ?? 0;
+      const scrollResOffset = idx?.scrollResOffset ?? 0;
 
       pushStatus('thread', 'info', `[kokomade] openThread: threadId=${threadId}, source=${idxSource}, kokomade=${String(kokomade)}, resCount=${String(result.responses.length)}`);
 
@@ -706,6 +712,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         title: resolvedTitle,
         responses: result.responses,
         scrollTop,
+        scrollResNumber,
+        scrollResOffset,
         kokomade,
         displayRange: 'all',
         postEditorOpen: false,
@@ -749,10 +757,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     const { tabs } = get();
     const closingTab = tabs.find((t) => t.id === tabId);
 
-    // Persist scrollTop and kokomade before closing
+    // Persist scrollTop, scrollResNumber and kokomade before closing
     if (closingTab !== undefined) {
       void getApi().invoke('bbs:update-thread-index', closingTab.boardUrl, closingTab.threadId, {
         scrollTop: closingTab.scrollTop,
+        scrollResNumber: closingTab.scrollResNumber,
+        scrollResOffset: closingTab.scrollResOffset,
         kokomade: closingTab.kokomade,
       });
     }
@@ -771,9 +781,18 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set({ activeTabId: tabId });
   },
 
-  updateTabScroll: (tabId: string, scrollTop: number) => {
+  updateTabScroll: (tabId: string, scrollTop: number, scrollResNumber?: number, scrollResOffset?: number) => {
     set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, scrollTop } : t)),
+      tabs: state.tabs.map((t) =>
+        t.id === tabId
+          ? {
+              ...t,
+              scrollTop,
+              ...(scrollResNumber !== undefined ? { scrollResNumber } : {}),
+              ...(scrollResOffset !== undefined ? { scrollResOffset } : {}),
+            }
+          : t,
+      ),
     }));
   },
 
@@ -826,14 +845,17 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       threadId: t.threadId,
       title: t.title,
       scrollTop: t.scrollTop,
+      scrollResNumber: t.scrollResNumber,
     }));
     await getApi().invoke('tab:save', savedTabs);
 
-    // Also persist scrollTop to Folder.idx for each open tab
+    // Also persist scrollTop, scrollResNumber and scrollResOffset to Folder.idx for each open tab
     for (const t of tabs) {
-      if (t.scrollTop > 0) {
+      if (t.scrollTop > 0 || t.scrollResNumber > 0) {
         void getApi().invoke('bbs:update-thread-index', t.boardUrl, t.threadId, {
           scrollTop: t.scrollTop,
+          scrollResNumber: t.scrollResNumber,
+          scrollResOffset: t.scrollResOffset,
         });
       }
     }
@@ -864,15 +886,20 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           pushStatus('thread', 'error', `[restoreTabs] 復元例外: ${saved.title}: ${err instanceof Error ? err.message : String(err)}`);
         }
 
-        // Apply scrollTop from tab.sav (takes priority over Folder.idx
+        // Apply scrollTop/scrollResNumber from tab.sav (takes priority over Folder.idx
         // which may be stale if the tab was never explicitly closed).
-        if (saved.scrollTop !== undefined && saved.scrollTop > 0) {
+        if ((saved.scrollTop !== undefined && saved.scrollTop > 0) ||
+            (saved.scrollResNumber !== undefined && saved.scrollResNumber > 0)) {
           const { tabs } = get();
           const opened = tabs.find(
             (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
           );
           if (opened !== undefined) {
-            get().updateTabScroll(opened.id, saved.scrollTop);
+            get().updateTabScroll(
+              opened.id,
+              saved.scrollTop ?? 0,
+              saved.scrollResNumber,
+            );
           }
         }
       }));
@@ -1269,7 +1296,9 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let prevTabIdSnapshot = '';
 
 useBBSStore.subscribe((state) => {
-  const snapshot = state.tabs.map((t) => t.id).join('\t');
+  // Include scrollResNumber so that scroll position updates are also persisted,
+  // not only tab open/close events.
+  const snapshot = state.tabs.map((t) => `${t.id}|${String(t.scrollResNumber)}`).join('\t');
   if (snapshot === prevTabIdSnapshot) return;
   prevTabIdSnapshot = snapshot;
 

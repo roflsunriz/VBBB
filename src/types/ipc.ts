@@ -5,7 +5,7 @@
  */
 import type { AuthState } from './auth';
 import type { StoredCookie } from './cookie';
-import type { DiagLogEntry } from './diagnostic';
+import type { DiagLogEntry, DiagLogLevel } from './diagnostic';
 import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
 import type { FavNode, FavTree } from './favorite';
 import type { BrowsingHistoryEntry, SavedTab, SessionState } from './history';
@@ -179,7 +179,7 @@ export interface IpcChannelMap {
   };
   /** Update a single thread's index entry (kokomade, scrollTop, lastModified, etc.) */
   'bbs:update-thread-index': {
-    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number; lastModified?: string | null }];
+    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number; scrollResNumber?: number; scrollResOffset?: number; lastModified?: string | null }];
     result: void;
   };
   /** Load saved tabs */
@@ -315,6 +315,11 @@ export interface IpcChannelMap {
   /** Set custom user agent */
   'config:set-user-agent': {
     args: [userAgent: string];
+    result: void;
+  };
+  /** Add a single entry to the diagnostic log buffer (from renderer) */
+  'diag:add-log': {
+    args: [level: DiagLogLevel, tag: string, message: string];
     result: void;
   };
   /** Get diagnostic log buffer */

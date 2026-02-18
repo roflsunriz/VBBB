@@ -78,6 +78,8 @@ export const FolderIdxLineSchema = z.object({
   newReceive: z.number().int().nonnegative(),
   unRead: z.boolean(),
   scrollTop: z.number().int().nonnegative(),
+  scrollResNumber: z.number().int().nonnegative(),
+  scrollResOffset: z.number().int().nonnegative(),
   allResCount: z.number().int().nonnegative(),
   newResCount: z.number().int().nonnegative(),
   ageSage: z.number().int().min(0).max(4),
