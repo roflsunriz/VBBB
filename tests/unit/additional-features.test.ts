@@ -67,14 +67,17 @@ describe('feature 2: app-icon', () => {
 // Feature 3: 投稿成功後に書き込み欄を自動で閉じる
 // ---------------------------------------------------------------------------
 describe('feature 3: post-editor-close', () => {
-  it('PostEditor calls closePostEditor on success', () => {
+  it('PostEditor accepts onClose prop and calls it on success', () => {
     const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/post-editor/PostEditor.tsx'), 'utf-8');
-    expect(src).toContain('closePostEditor');
+    // PostEditor now receives onClose as a prop (per-tab close handler)
+    expect(src).toContain('onClose');
+    expect(src).toContain('onClose()');
   });
 
-  it('store defines closePostEditor action', () => {
+  it('store defines closeTabPostEditor action', () => {
     const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/stores/bbs-store.ts'), 'utf-8');
-    expect(src).toContain('closePostEditor');
+    // Per-tab post editor close replaces the global closePostEditor
+    expect(src).toContain('closeTabPostEditor');
   });
 });
 
