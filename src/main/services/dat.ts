@@ -262,8 +262,8 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
       return fetchDatFull(board, threadId, dataDir);
     }
 
-    if (response.status === 302) {
-      // DAT fallen — try kako
+    if (response.status === 302 || response.status === 404) {
+      // DAT fallen — try kako (5ch returns 302 or 404 for fallen threads)
       return fetchDatKako(board, threadId, dataDir, encoding);
     }
 
@@ -298,7 +298,8 @@ async function fetchDatFull(board: Board, threadId: string, dataDir: string): Pr
     method: 'GET',
   });
 
-  if (response.status === 302) {
+  if (response.status === 302 || response.status === 404) {
+    // DAT fallen — try kako (5ch returns 302 or 404 for fallen threads)
     return fetchDatKako(board, threadId, dataDir, encoding);
   }
 

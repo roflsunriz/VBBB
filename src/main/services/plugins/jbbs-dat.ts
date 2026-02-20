@@ -175,6 +175,16 @@ export async function fetchJBBSDat(
   return fetchJBBSDatFull(board, threadId, dataDir);
 }
 
+/**
+ * Check if a JBBS/Shitaraba response indicates the thread is in storage (DAT落ち).
+ * Shitaraba returns HTTP 200 with "ERROR: STORAGE IN" in response header values
+ * when the thread has been moved to storage (archive).
+ * Reference: gikoNaviG2 ShitarabaJBBSPlugIn.dpr
+ */
+function isShitarabaStorageResponse(headers: Readonly<Record<string, string>>): boolean {
+  return Object.values(headers).some((v) => v.includes('STORAGE IN'));
+}
+
 async function fetchJBBSDatFull(
   board: Board,
   threadId: string,
@@ -190,8 +200,17 @@ async function fetchJBBSDatFull(
   try {
     const response = await httpFetch({ url, method: 'GET' });
 
-    if (response.status !== 200) {
-      // Try archive for JBBS
+    // Detect DAT落ち: non-200 response, OR Shitaraba "ERROR: STORAGE IN" header on 200
+    const isDatFallen = response.status !== 200 ||
+      isShitarabaStorageResponse(response.headers);
+
+    if (isDatFallen) {
+      const reason = response.status !== 200
+        ? `HTTP ${String(response.status)}`
+        : 'STORAGE IN header';
+      logger.info(`JBBS DAT fallen (${reason}): ${url}`);
+
+      // Try read_archive.cgi
       const archiveUrl = `${board.serverUrl}bbs/read_archive.cgi/${board.jbbsDir ?? ''}/${board.bbsId}/${threadId}/`;
       logger.info(`JBBS trying archive: ${archiveUrl}`);
       try {
@@ -207,15 +226,28 @@ async function fetchJBBSDatFull(
           };
         }
       } catch {
-        // Archive also failed
+        // Archive also failed — fall through to local cache
+      }
+
+      // Archive not found — try local cache (responses up to before DAT落ち)
+      const localContent = readFileSafe(localPath);
+      if (localContent !== null) {
+        logger.info(`JBBS DAT fallen, serving from local cache: ${localPath}`);
+        const text = decodeBuffer(localContent, encoding);
+        return {
+          status: DatFetchStatus.DatFallen,
+          responses: parseJBBSDat(text),
+          lastModified: null,
+          size: localContent.length,
+        };
       }
 
       return {
-        status: DatFetchStatus.Error,
+        status: DatFetchStatus.DatFallen,
         responses: [],
         lastModified: null,
         size: 0,
-        errorMessage: `JBBS HTTP ${String(response.status)}`,
+        errorMessage: `JBBS DAT fallen (${reason}, no archive or local cache)`,
       };
     }
 
