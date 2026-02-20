@@ -546,6 +546,9 @@ function ResItem({
         )}
         <span className="inline-flex items-baseline gap-0.5 text-[var(--color-res-datetime)]">
           {renderDateTimeWithBe(res.dateTime, res.number, showRelativeTime)}
+          {resId !== null && res.id !== undefined && (
+            <span>ID:{resId}</span>
+          )}
           {resId !== null && (
             <CountBadge count={idCount} onClick={() => { onFilterById(resId); }} />
           )}
