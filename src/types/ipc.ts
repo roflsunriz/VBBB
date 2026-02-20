@@ -15,6 +15,7 @@ import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
 import type { MenuAction } from './menu';
 import type { LocalSearchAllQuery, LocalSearchAllResult, LocalSearchQuery, SearchResult } from './search';
+import type { UpdateCheckResult } from './update';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -341,6 +342,16 @@ export interface IpcChannelMap {
   'ip:lookup': {
     args: [ip: string];
     result: IpLookupResult;
+  };
+  /** Check for a new version via GitHub Releases API */
+  'update:check': {
+    args: [];
+    result: UpdateCheckResult;
+  };
+  /** Download the latest installer and launch it (progress via update:progress push event) */
+  'update:download-and-install': {
+    args: [];
+    result: void;
   };
 }
 

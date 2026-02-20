@@ -41,6 +41,7 @@ import type { SavedTab, SessionState } from '@shared/history';
 import { loadSavedTabs, loadSessionState, saveSessionState, saveSessionStateSync, saveTabs, saveTabsSync } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
+import { checkForUpdate, downloadAndInstall } from '../services/updater';
 
 const logger = createLogger('ipc');
 
@@ -677,6 +678,19 @@ export async function registerIpcHandlers(): Promise<void> {
       org: typeof d['org'] === 'string' ? d['org'] : '',
       as: typeof d['as'] === 'string' ? d['as'] : '',
     };
+  });
+
+  handle('update:check', async () => {
+    return checkForUpdate(app.getVersion());
+  });
+
+  handle('update:download-and-install', async () => {
+    const windows = BrowserWindow.getAllWindows();
+    await downloadAndInstall((progress) => {
+      for (const win of windows) {
+        win.webContents.send('update:progress', progress);
+      }
+    });
   });
 
   logger.info('IPC handlers registered');

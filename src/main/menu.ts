@@ -124,6 +124,13 @@ export function buildAppMenu(): void {
       label: 'ヘルプ',
       submenu: [
         {
+          label: 'アップデート',
+          click: () => {
+            dispatchAction({ type: 'open-modal', modal: 'update' });
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'VBBB について',
           click: () => {
             dispatchAction({ type: 'open-modal', modal: 'about' });

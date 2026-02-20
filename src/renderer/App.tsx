@@ -31,13 +31,14 @@ import { CookieManager } from './components/settings/CookieManager';
 import { ConsoleModal } from './components/console/ConsoleModal';
 import { StatusConsole } from './components/status-console/StatusConsole';
 import { AddBoardDialog } from './components/board-tree/AddBoardDialog';
+import { UpdateDialog } from './components/update/UpdateDialog';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
-type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | null;
+type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | 'update' | null;
 
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
@@ -175,7 +176,7 @@ export function App(): React.JSX.Element {
               }
               break;
             case 'open-modal':
-              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager' || action.modal === 'console') {
+              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager' || action.modal === 'console' || action.modal === 'update') {
                 setActiveModalRef.current(action.modal);
               }
               break;
@@ -459,6 +460,11 @@ export function App(): React.JSX.Element {
       {/* Modal: Add Board */}
       <Modal open={activeModal === 'add-board'} onClose={closeModal} width="max-w-lg">
         <AddBoardDialog onClose={closeModal} />
+      </Modal>
+
+      {/* Modal: Update */}
+      <Modal open={activeModal === 'update'} onClose={closeModal} width="max-w-sm">
+        <UpdateDialog onClose={closeModal} />
       </Modal>
 
       {/* Modal: About */}
