@@ -1,5 +1,6 @@
 export * from './domain';
 export * from './api';
+export * from './dsl';
 export * from './file-format';
 export * from './html-entities';
 export * from './ipc';
