@@ -944,43 +944,71 @@ export function ThreadView(): React.JSX.Element {
 
   // Preserve scroll position across filter apply/clear cycles.
   // Saved when transitioning from no-filter → filter; restored when transitioning back to no-filter.
+  // preFilterResNumberRef stores the first visible res number for index-based restoration
+  // (more reliable than pixel-based with TanStack Virtual's estimated sizes).
+  // preFilterScrollTopRef is kept as pixel-based fallback.
   const preFilterScrollTopRef = useRef<number>(0);
+  const preFilterResNumberRef = useRef<number>(0);
   const prevFilterKeyRef = useRef<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
 
-  // Restore scroll when filter is cleared (non-null → null transition)
+  // Restore scroll when filter is cleared (non-null → null transition).
+  // Uses index-based scrollToIndex when available (same approach as tab restoration),
+  // falls back to pixel-based scrollTo.
   useEffect(() => {
     const prevFilter = prevFilterKeyRef.current;
     prevFilterKeyRef.current = filterKey;
     if (prevFilter !== null && filterKey === null) {
+      const savedResNumber = preFilterResNumberRef.current;
       const savedScrollTop = preFilterScrollTopRef.current;
-      if (savedScrollTop > 0) {
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
+          if (savedResNumber > 0) {
+            const index = resNumberToIndexRef.current.get(savedResNumber);
+            if (index !== undefined) {
+              virtualizerRef.current.scrollToIndex(index, { align: 'start' });
+              return;
+            }
+          }
+          if (savedScrollTop > 0) {
             scrollRef.current?.scrollTo(0, savedScrollTop);
-          });
+          }
         });
-      }
+      });
     }
   }, [filterKey]);
 
+  // Save pre-filter scroll position (both res number and pixel offset).
+  // virtualizerRef / displayResponsesRef are declared after these callbacks but are
+  // accessible at call-time since all hooks initialise before any user event fires.
+  const savePreFilterScroll = useCallback((): void => {
+    preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+    const firstItem = virtualizerRef.current.getVirtualItems()[0];
+    if (firstItem !== undefined) {
+      const res = displayResponsesRef.current[firstItem.index];
+      preFilterResNumberRef.current = res?.number ?? 0;
+    } else {
+      preFilterResNumberRef.current = 0;
+    }
+  }, []);
+
   const handleFilterById = useCallback((id: string) => {
     if (filterKey === null) {
-      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+      savePreFilterScroll();
     }
     setFilterKey((prev) => (prev?.type === 'id' && prev.value === id) ? null : { type: 'id', value: id });
-  }, [filterKey]);
+  }, [filterKey, savePreFilterScroll]);
   const handleFilterByWatchoi = useCallback((label: string) => {
     if (filterKey === null) {
-      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+      savePreFilterScroll();
     }
     setFilterKey((prev) => (prev?.type === 'watchoi' && prev.value === label) ? null : { type: 'watchoi', value: label });
-  }, [filterKey]);
+  }, [filterKey, savePreFilterScroll]);
   const handleFilterByKotehan = useCallback((name: string) => {
     if (filterKey === null) {
-      preFilterScrollTopRef.current = scrollRef.current?.scrollTop ?? 0;
+      savePreFilterScroll();
     }
     setFilterKey((prev) => (prev?.type === 'kotehan' && prev.value === name) ? null : { type: 'kotehan', value: name });
-  }, [filterKey]);
+  }, [filterKey, savePreFilterScroll]);
   const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
 
   // AA font override state: manual per-post toggle (true = force AA, false = force normal)
@@ -1422,6 +1450,7 @@ export function ThreadView(): React.JSX.Element {
     setPopup(null);
     setAaOverrides((prev) => prev.size > 0 ? new Map<number, boolean>() : prev);
     preFilterScrollTopRef.current = 0;
+    preFilterResNumberRef.current = 0;
     prevFilterKeyRef.current = null;
   }, [activeTabId]);
 
