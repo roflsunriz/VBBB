@@ -5,6 +5,14 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-20
+
+### Added
+
+- プログラマティック書き込み欄に DSL（ドメイン固有言語）サポートを導入し、構造化された書き込み指示の記述が可能に
+- ThreadView にレスポンス ID の表示を追加
+- DAT 落ちスレッドのハンドリング機能を実装（dat サービス・JBBS サービス・UI）
+
 ## [1.1.2] - 2026-02-19
 
 ### Added
@@ -76,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.2.0]: https://github.com/roflsunriz/VBBB/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/roflsunriz/VBBB/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/roflsunriz/VBBB/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/roflsunriz/VBBB/compare/v1.0.3...v1.1.0
