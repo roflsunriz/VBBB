@@ -188,9 +188,11 @@ export const DatFetchStatus = {
   Partial: 'partial',
   /** Not modified (HTTP 304) */
   NotModified: 'not_modified',
-  /** DAT fallen / archived (HTTP 302) */
+  /** DAT fallen and retrieved from kako archive (HTTP 302 → kako 200) */
   Archived: 'archived',
-  /** Error */
+  /** DAT fallen but kako archive not found — responses are from local cache or empty */
+  DatFallen: 'dat_fallen',
+  /** Error (non-DAT-fallen: HTTP 4xx/5xx, network failure, etc.) */
   Error: 'error',
 } as const;
 export type DatFetchStatus = (typeof DatFetchStatus)[keyof typeof DatFetchStatus];

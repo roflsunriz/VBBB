@@ -1588,7 +1588,12 @@ export function ThreadView(): React.JSX.Element {
       }${threadTabDragSourceIndex === i ? ' opacity-50' : ''}${threadTabDragIndicator(i)}`}
       aria-selected={tab.id === activeTabId}
     >
-      <span className="truncate">{tab.title}</span>
+      <span className="truncate">
+        {tab.isDatFallen && (
+          <span className="mr-0.5 font-bold text-[var(--color-error)]">【DAT落ち】</span>
+        )}
+        {tab.title}
+      </span>
       <button
         type="button"
         onClick={(e) => { handleCloseTab(e, tab.id); }}
@@ -1740,7 +1745,12 @@ export function ThreadView(): React.JSX.Element {
           <>
             {/* Thread title */}
             <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-4 py-1.5">
-              <h2 className="text-sm font-medium text-[var(--color-text-primary)]">{activeTab.title}</h2>
+              <h2 className="text-sm font-medium text-[var(--color-text-primary)]">
+                {activeTab.isDatFallen && (
+                  <span className="mr-1 font-bold text-[var(--color-error)]">【DAT落ち】</span>
+                )}
+                {activeTab.title}
+              </h2>
               <p className="text-xs text-[var(--color-text-muted)]">{activeTab.responses.length} レス</p>
             </div>
 

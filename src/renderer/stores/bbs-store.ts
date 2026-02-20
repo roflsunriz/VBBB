@@ -3,6 +3,7 @@
  */
 import { create } from 'zustand';
 import type { BBSMenu, Board, BoardSortDir, BoardSortKey, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
+import { DatFetchStatus } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
 import type { BrowsingHistoryEntry, DisplayRange, SavedTab, SessionState } from '@shared/history';
 import type { NgRule } from '@shared/ng';
@@ -35,6 +36,8 @@ interface ThreadTab {
   readonly analysisOpen: boolean;
   /** Whether the programmatic post panel is open for this tab */
   readonly progPostOpen: boolean;
+  /** Whether the thread has DAT fallen (サーバーが HTTP 302 を返した) */
+  readonly isDatFallen: boolean;
 }
 
 /** Tab state for board (category) tabs */
@@ -705,6 +708,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         resolvedTitle = threadId;
       }
 
+      const isDatFallen = result.status === DatFetchStatus.Archived || result.status === DatFetchStatus.DatFallen;
+
       const newTab: ThreadTab = {
         id: tabId,
         boardUrl,
@@ -720,6 +725,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         postEditorInitialMessage: '',
         analysisOpen: false,
         progPostOpen: false,
+        isDatFallen,
       };
       set((state) => ({
         tabs: [...state.tabs, newTab],
@@ -1136,6 +1142,40 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     pushStatus('thread', 'info', `${targetTab.title} を更新中...`);
     try {
       const result = await getApi().invoke('bbs:fetch-dat', targetTab.boardUrl, targetTab.threadId);
+
+      // ネットワークエラーや HTTP 4xx/5xx — 既存レスを保持してエラー表示
+      if (result.status === DatFetchStatus.Error) {
+        const errorMsg = result.errorMessage ?? 'Unknown error';
+        set({ statusMessage: `スレ更新失敗: ${errorMsg}` });
+        pushStatus('thread', 'error', `スレ更新失敗 (既存レス保持): ${errorMsg}`);
+        return;
+      }
+
+      // DAT落ち (kako から取得成功)
+      if (result.status === DatFetchStatus.Archived) {
+        set((state) => ({
+          tabs: state.tabs.map((t) =>
+            t.id === tabId ? { ...t, responses: result.responses, isDatFallen: true } : t,
+          ),
+          statusMessage: `${targetTab.title}: DAT落ち / 過去ログ取得 (${String(result.responses.length)} レス)`,
+        }));
+        pushStatus('thread', 'warn', `${targetTab.title}: DAT落ちを確認 (過去ログから ${String(result.responses.length)} レス取得)`);
+        return;
+      }
+
+      // DAT落ち (kako も見つからず — ローカルキャッシュまたは既存レスを保持)
+      if (result.status === DatFetchStatus.DatFallen) {
+        const preserved = result.responses.length > 0 ? result.responses : targetTab.responses;
+        set((state) => ({
+          tabs: state.tabs.map((t) =>
+            t.id === tabId ? { ...t, responses: preserved, isDatFallen: true } : t,
+          ),
+          statusMessage: `${targetTab.title}: DAT落ち (${String(preserved.length)} レス)`,
+        }));
+        pushStatus('thread', 'warn', `${targetTab.title}: DAT落ちを確認 (過去ログなし・${String(preserved.length)} レス保持)`);
+        return;
+      }
+
       set((state) => ({
         tabs: state.tabs.map((t) =>
           t.id === tabId ? { ...t, responses: result.responses } : t,

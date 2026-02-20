@@ -351,11 +351,24 @@ async function fetchDatKako(
     }
   }
 
+  // DAT落ち確定・過去ログなし — ローカルキャッシュから読み込みを試みる
+  const localContent = readFileSafe(localPath);
+  if (localContent !== null) {
+    logger.info(`DAT fallen, serving from local cache: ${localPath}`);
+    const text = decodeBuffer(localContent, encoding);
+    return {
+      status: DatFetchStatus.DatFallen,
+      responses: parseDat(text),
+      lastModified: null,
+      size: localContent.length,
+    };
+  }
+
   return {
-    status: DatFetchStatus.Error,
+    status: DatFetchStatus.DatFallen,
     responses: [],
     lastModified: null,
     size: 0,
-    errorMessage: 'DAT not found (kako fallback failed)',
+    errorMessage: 'DAT fallen (kako fallback failed, no local cache)',
   };
 }
