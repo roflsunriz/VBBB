@@ -14,6 +14,7 @@ import {
   mdiConsoleLine,
   mdiLinkPlus,
   mdiHistory,
+  mdiGithub,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
@@ -477,6 +478,14 @@ export function App(): React.JSX.Element {
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             Electron + React + TypeScript
           </p>
+          <button
+            type="button"
+            onClick={() => { void window.electronApi.invoke('shell:open-external', 'https://github.com/roflsunriz/VBBB'); }}
+            className="flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            <MdiIcon path={mdiGithub} size={14} />
+            https://github.com/roflsunriz/VBBB
+          </button>
           <button
             type="button"
             onClick={closeModal}
