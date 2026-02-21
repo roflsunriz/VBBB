@@ -111,11 +111,16 @@ void app.whenReady().then(async () => {
     },
   );
 
-  // Await IPC handler registration (including board plugin initialisation)
-  // so that JBBS/Machi plugins are available before the renderer sends requests.
-  await registerIpcHandlers();
+  // Start IPC handler registration — all handle() calls execute synchronously
+  // before the first internal await, so every Phase-1 channel used by the
+  // renderer (bbs:fetch-menu, fav:load, …) is available immediately.
+  // createWindow() is called in parallel so the renderer begins loading while
+  // the async parts of handler registration (plugin dynamic-imports) run.
+  const ipcReady = registerIpcHandlers();
   createWindow();
   buildAppMenu();
+  // Await completion so any unhandled rejection surfaces here.
+  await ipcReady;
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -492,10 +492,8 @@ export async function registerIpcHandlers(): Promise<void> {
     });
   });
 
-  // Initialize board plugins (must complete before the renderer window is created)
-  await initializeBoardPlugins();
-
-  // Initialize cookie store on startup
+  // Load cookie store and proxy config before the plugin dynamic-import so
+  // all cookie/proxy/auth handlers are available as early as possible.
   loadCookies(dataDir);
 
   handle('cookie:get-for-url', (url: string) => {
@@ -516,7 +514,10 @@ export async function registerIpcHandlers(): Promise<void> {
     await saveCookies(dataDir);
   });
 
-  // Initialize proxy config on startup
+  handle('cookie:get-all', () => {
+    return Promise.resolve(getAllCookies());
+  });
+
   loadProxyConfig(dataDir);
 
   handle('proxy:get-config', () => {
@@ -598,11 +599,6 @@ export async function registerIpcHandlers(): Promise<void> {
   // Open URL in external browser
   handle('shell:open-external', async (url: string) => {
     await shell.openExternal(url);
-  });
-
-  // Get all cookies
-  handle('cookie:get-all', () => {
-    return Promise.resolve(getAllCookies());
   });
 
   // User-Agent management
@@ -692,6 +688,10 @@ export async function registerIpcHandlers(): Promise<void> {
       }
     });
   });
+
+  // Ensure board plugins are ready before any JBBS/Machi IPC can be handled.
+  // All handle() registrations above are synchronous and already active.
+  await initializeBoardPlugins();
 
   logger.info('IPC handlers registered');
 }

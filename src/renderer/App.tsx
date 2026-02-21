@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import {
   mdiBulletinBoard,
   mdiStar,
@@ -18,24 +18,48 @@ import {
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
-import { FavoriteTree } from './components/favorite-tree/FavoriteTree';
-import { SearchPanel } from './components/search/SearchPanel';
-import { HistoryPanel } from './components/history/HistoryPanel';
+import { NgEditor } from './components/ng-editor/NgEditor';
 import { ThreadList } from './components/thread-list/ThreadList';
 import { ThreadView } from './components/thread-view/ThreadView';
-import { AuthPanel } from './components/auth/AuthPanel';
-import { ProxySettings } from './components/settings/ProxySettings';
-import { RoundPanel } from './components/round/RoundPanel';
-import { NgEditor } from './components/ng-editor/NgEditor';
-import { CookieManager } from './components/settings/CookieManager';
-import { ConsoleModal } from './components/console/ConsoleModal';
 import { StatusConsole } from './components/status-console/StatusConsole';
-import { AddBoardDialog } from './components/board-tree/AddBoardDialog';
-import { UpdateDialog } from './components/update/UpdateDialog';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
 import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
+
+// Left-pane tabs: loaded on first activation (not needed on startup)
+const FavoriteTree = lazy(() =>
+  import('./components/favorite-tree/FavoriteTree').then((m) => ({ default: m.FavoriteTree })),
+);
+const SearchPanel = lazy(() =>
+  import('./components/search/SearchPanel').then((m) => ({ default: m.SearchPanel })),
+);
+const HistoryPanel = lazy(() =>
+  import('./components/history/HistoryPanel').then((m) => ({ default: m.HistoryPanel })),
+);
+
+// Modals: loaded on first open (never shown on startup)
+const AuthPanel = lazy(() =>
+  import('./components/auth/AuthPanel').then((m) => ({ default: m.AuthPanel })),
+);
+const ProxySettings = lazy(() =>
+  import('./components/settings/ProxySettings').then((m) => ({ default: m.ProxySettings })),
+);
+const RoundPanel = lazy(() =>
+  import('./components/round/RoundPanel').then((m) => ({ default: m.RoundPanel })),
+);
+const CookieManager = lazy(() =>
+  import('./components/settings/CookieManager').then((m) => ({ default: m.CookieManager })),
+);
+const ConsoleModal = lazy(() =>
+  import('./components/console/ConsoleModal').then((m) => ({ default: m.ConsoleModal })),
+);
+const AddBoardDialog = lazy(() =>
+  import('./components/board-tree/AddBoardDialog').then((m) => ({ default: m.AddBoardDialog })),
+);
+const UpdateDialog = lazy(() =>
+  import('./components/update/UpdateDialog').then((m) => ({ default: m.UpdateDialog })),
+);
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
 type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | 'update' | null;
@@ -396,9 +420,21 @@ export function App(): React.JSX.Element {
           {/* Tab content */}
           <div className="min-h-0 flex-1 overflow-hidden">
             {leftTab === 'boards' && <BoardTree />}
-            {leftTab === 'favorites' && <FavoriteTree />}
-            {leftTab === 'search' && <SearchPanel />}
-            {leftTab === 'history' && <HistoryPanel />}
+            {leftTab === 'favorites' && (
+              <Suspense fallback={null}>
+                <FavoriteTree />
+              </Suspense>
+            )}
+            {leftTab === 'search' && (
+              <Suspense fallback={null}>
+                <SearchPanel />
+              </Suspense>
+            )}
+            {leftTab === 'history' && (
+              <Suspense fallback={null}>
+                <HistoryPanel />
+              </Suspense>
+            )}
           </div>
           {/* Status console */}
           <StatusConsole />
@@ -425,12 +461,16 @@ export function App(): React.JSX.Element {
 
       {/* Modal: Auth (resizable) */}
       <Modal open={activeModal === 'auth'} onClose={closeModal} resizable initialWidth={500} initialHeight={400}>
-        <AuthPanel onClose={closeModal} />
+        <Suspense fallback={null}>
+          <AuthPanel onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: Proxy (resizable) */}
       <Modal open={activeModal === 'proxy'} onClose={closeModal} resizable initialWidth={520} initialHeight={480}>
-        <ProxySettings onClose={closeModal} />
+        <Suspense fallback={null}>
+          <ProxySettings onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: NG Editor */}
@@ -443,28 +483,38 @@ export function App(): React.JSX.Element {
       {/* Modal: Round (resizable) */}
       <Modal open={activeModal === 'round'} onClose={closeModal} resizable initialWidth={480} initialHeight={500}>
         <div className="h-full overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-          <RoundPanel onClose={closeModal} />
+          <Suspense fallback={null}>
+            <RoundPanel onClose={closeModal} />
+          </Suspense>
         </div>
       </Modal>
 
       {/* Modal: Cookie/UA Manager (resizable) */}
       <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} resizable initialWidth={600} initialHeight={500}>
-        <CookieManager onClose={closeModal} />
+        <Suspense fallback={null}>
+          <CookieManager onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: Console (resizable) */}
       <Modal open={activeModal === 'console'} onClose={closeModal} resizable initialWidth={900} initialHeight={600}>
-        <ConsoleModal onClose={closeModal} />
+        <Suspense fallback={null}>
+          <ConsoleModal onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: Add Board */}
       <Modal open={activeModal === 'add-board'} onClose={closeModal} width="max-w-lg">
-        <AddBoardDialog onClose={closeModal} />
+        <Suspense fallback={null}>
+          <AddBoardDialog onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: Update */}
       <Modal open={activeModal === 'update'} onClose={closeModal} width="max-w-sm">
-        <UpdateDialog onClose={closeModal} />
+        <Suspense fallback={null}>
+          <UpdateDialog onClose={closeModal} />
+        </Suspense>
       </Modal>
 
       {/* Modal: About */}
