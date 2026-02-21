@@ -596,6 +596,53 @@ export async function registerIpcHandlers(): Promise<void> {
     return { saved: true, path: result.filePath };
   });
 
+  // Bulk image save — select folder, then download all URLs
+  handle('image:save-bulk', async (urls: readonly string[]) => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win === null) return { saved: 0, folder: '' };
+
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+      title: '画像の保存先フォルダを選択',
+    });
+
+    if (result.canceled || result.filePaths[0] === undefined) {
+      return { saved: 0, folder: '' };
+    }
+
+    const folder = result.filePaths[0];
+    let saved = 0;
+    const seen = new Set<string>();
+
+    for (const url of urls) {
+      try {
+        const urlObj = new URL(url);
+        const rawName = urlObj.pathname.split('/').pop() ?? '';
+        const baseName = rawName.length > 0 ? rawName : `image_${String(saved + 1)}.jpg`;
+        // Deduplicate filenames
+        let destName = baseName;
+        let counter = 1;
+        while (seen.has(destName)) {
+          const dot = baseName.lastIndexOf('.');
+          destName = dot !== -1
+            ? `${baseName.slice(0, dot)}_${String(counter)}${baseName.slice(dot)}`
+            : `${baseName}_${String(counter)}`;
+          counter++;
+        }
+        seen.add(destName);
+
+        const res = await fetch(url);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        await writeFile(join(folder, destName), buffer);
+        saved++;
+      } catch (err) {
+        logger.warn(`image:save-bulk 個別エラー url=${url} err=${String(err)}`);
+      }
+    }
+
+    return { saved, folder };
+  });
+
   // Open URL in external browser
   handle('shell:open-external', async (url: string) => {
     await shell.openExternal(url);

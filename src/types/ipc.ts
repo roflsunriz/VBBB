@@ -298,6 +298,11 @@ export interface IpcChannelMap {
     args: [imageUrl: string, suggestedName: string];
     result: { saved: boolean; path: string };
   };
+  /** Save multiple images to a user-selected folder */
+  'image:save-bulk': {
+    args: [urls: readonly string[]];
+    result: { saved: number; folder: string };
+  };
   /** Open URL in external browser */
   'shell:open-external': {
     args: [url: string];
