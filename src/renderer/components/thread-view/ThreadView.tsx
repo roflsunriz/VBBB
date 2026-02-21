@@ -35,6 +35,7 @@ import type { IpLookupResult } from '@shared/ipc';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
 import { useTabOrientation } from '../../hooks/use-tab-orientation';
+import { ContextMenuContainer } from '../common/ContextMenuContainer';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -591,9 +592,10 @@ function ResItem({
 
       {/* Context menu — rendered via portal to escape transform containing block */}
       {contextMenu !== null && createPortal(
-        <div
+        <ContextMenuContainer
+          x={contextMenu.x}
+          y={contextMenu.y}
           className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={handleCloseContextMenu}
           role="menu"
         >
@@ -660,7 +662,7 @@ function ResItem({
           >
             {isAaFinal ? '通常フォントに戻す' : 'AAフォントで表示'}
           </button>
-        </div>,
+        </ContextMenuContainer>,
         document.body,
       )}
 
@@ -1592,6 +1594,7 @@ export function ThreadView(): React.JSX.Element {
       key={tab.id}
       role="tab"
       tabIndex={0}
+      title={tab.title}
       {...getThreadTabDragProps(i)}
       onClick={() => {
         if (activeTabId !== null && activeTabId !== tab.id && scrollRef.current !== null) {
@@ -1901,9 +1904,10 @@ export function ThreadView(): React.JSX.Element {
 
       {/* Thread tab context menu (F12) */}
       {tabCtxMenu !== null && (
-        <div
+        <ContextMenuContainer
+          x={tabCtxMenu.x}
+          y={tabCtxMenu.y}
           className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          style={{ left: tabCtxMenu.x, top: tabCtxMenu.y }}
           role="menu"
         >
           <button
@@ -1931,7 +1935,7 @@ export function ThreadView(): React.JSX.Element {
           >
             {tabCtxMenu.isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
           </button>
-        </div>
+        </ContextMenuContainer>
       )}
 
       {/* Anchor popup */}

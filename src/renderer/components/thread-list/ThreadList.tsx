@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel } from '@mdi/js';
 import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
+import { ContextMenuContainer } from '../common/ContextMenuContainer';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
@@ -511,6 +512,7 @@ export function ThreadList(): React.JSX.Element {
       key={bt.id}
       role="tab"
       tabIndex={0}
+      title={bt.board.title}
       {...getBoardTabDragProps(i)}
       onClick={() => { setActiveBoardTab(bt.id); }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
@@ -578,7 +580,7 @@ export function ThreadList(): React.JSX.Element {
 
       {/* Header with board title and refresh */}
       <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-secondary)]">
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-secondary)]" title={selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}>
           {selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}
         </span>
         {subjectLoading && <MdiIcon path={mdiLoading} size={12} className="animate-spin text-[var(--color-accent)]" />}
@@ -682,7 +684,7 @@ export function ThreadList(): React.JSX.Element {
             >
               <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
               <span className="w-5 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
-              <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]">{subject.title}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]" title={subject.title}>{subject.title}</span>
               <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
                 {subject.ikioi >= 1 ? String(Math.round(subject.ikioi)) : subject.ikioi.toFixed(1)}
               </span>
@@ -719,9 +721,10 @@ export function ThreadList(): React.JSX.Element {
 
       {/* Board tab context menu (F13 + F24) */}
       {boardTabCtxMenu !== null && (
-        <div
+        <ContextMenuContainer
+          x={boardTabCtxMenu.x}
+          y={boardTabCtxMenu.y}
           className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          style={{ left: boardTabCtxMenu.x, top: boardTabCtxMenu.y }}
           role="menu"
         >
           <button
@@ -748,14 +751,15 @@ export function ThreadList(): React.JSX.Element {
           >
             巡回に追加
           </button>
-        </div>
+        </ContextMenuContainer>
       )}
 
       {/* Context menu */}
       {ctxMenu !== null && (
-        <div
+        <ContextMenuContainer
+          x={ctxMenu.x}
+          y={ctxMenu.y}
           className="fixed z-50 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
           role="menu"
         >
           <button
@@ -803,7 +807,7 @@ export function ThreadList(): React.JSX.Element {
           >
             NGスレッド (透明あぼーん)
           </button>
-        </div>
+        </ContextMenuContainer>
       )}
     </section>
   );
