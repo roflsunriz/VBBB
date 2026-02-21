@@ -5,6 +5,17 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-22
+
+### Added
+
+- コンテキストメニューの表示位置を改善する ContextMenuContainer コンポーネントを追加
+- 画像の一括保存機能を追加（保存先フォルダをユーザーが選択可能）
+
+### Changed
+
+- IPC ハンドラー登録を最適化し、コンポーネントの遅延ロードを導入してパフォーマンスを向上
+
 ## [1.2.1] - 2026-02-21
 
 ### Added
@@ -95,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.3.0]: https://github.com/roflsunriz/VBBB/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/roflsunriz/VBBB/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/roflsunriz/VBBB/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/roflsunriz/VBBB/compare/v1.1.1...v1.1.2
