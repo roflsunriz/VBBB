@@ -724,7 +724,7 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('update:check', async () => {
-    return checkForUpdate(app.getVersion());
+    return checkForUpdate();
   });
 
   handle('update:download-and-install', async () => {

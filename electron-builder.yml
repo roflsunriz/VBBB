@@ -3,6 +3,10 @@ productName: VBBB
 directories:
   buildResources: resources
   output: release
+publish:
+  provider: github
+  owner: roflsunriz
+  repo: VBBB
 files:
   - out/**/*
   - "!out/**/*.map"
