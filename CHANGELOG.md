@@ -5,6 +5,21 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-22
+
+### Added
+
+- electron-updater を統合し、GitHub Releases を使った自動アップデート機能を実装（終了時にサイレントインストール対応）
+- バンドル分析・可視化ツールを追加（rollup-plugin-visualizer による stats.html 生成）
+- 複数コンポーネントのレイジーローディングを実装し、初回読み込みパフォーマンスを向上
+
+### Changed
+
+- electron-builder の設定を強化（最大圧縮・不要な WebGPU DLL の削除によるアプリサイズ削減）
+- GitHub Actions のリリースワークフローを改善（CHANGELOG.md からリリースノートを自動抽出・ドラフトなし自動リリース）
+- IPC ハンドラーのアップデート確認プロセスを簡略化
+- package.json の依存関係を整理（@mdi/js、@tanstack/react-virtual、dompurify を追加）
+
 ## [1.3.0] - 2026-02-22
 
 ### Added
@@ -106,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.3.1]: https://github.com/roflsunriz/VBBB/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/roflsunriz/VBBB/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/roflsunriz/VBBB/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/roflsunriz/VBBB/compare/v1.1.2...v1.2.0
