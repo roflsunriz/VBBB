@@ -18,7 +18,6 @@ import {
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
-import { NgEditor } from './components/ng-editor/NgEditor';
 import { ThreadList } from './components/thread-list/ThreadList';
 import { ThreadView } from './components/thread-view/ThreadView';
 import { StatusConsole } from './components/status-console/StatusConsole';
@@ -39,6 +38,9 @@ const HistoryPanel = lazy(() =>
 );
 
 // Modals: loaded on first open (never shown on startup)
+const NgEditor = lazy(() =>
+  import('./components/ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
+);
 const AuthPanel = lazy(() =>
   import('./components/auth/AuthPanel').then((m) => ({ default: m.AuthPanel })),
 );
@@ -476,7 +478,9 @@ export function App(): React.JSX.Element {
       {/* Modal: NG Editor */}
       <Modal open={activeModal === 'ng'} onClose={closeModal} width="max-w-2xl">
         <div className="max-h-[70vh] overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-          <NgEditor onClose={closeModal} />
+          <Suspense fallback={null}>
+            <NgEditor onClose={closeModal} />
+          </Suspense>
         </div>
       </Modal>
 

@@ -3,7 +3,7 @@
  * Displays thread responses with tabs for multiple threads.
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
-import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage, mdiViewSequential, mdiViewParallel } from '@mdi/js';
@@ -20,13 +20,23 @@ import { convertAnchorsToLinks, parseAnchors } from '../../utils/anchor-parser';
 import { detectImageUrls, detectVideoUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
 import { RefreshOverlay } from '../common/RefreshOverlay';
-import { PostEditor } from '../post-editor/PostEditor';
-import { ProgrammaticPost } from '../post-editor/ProgrammaticPost';
 import { ResPopup } from './ResPopup';
 import { ImageThumbnail } from './ImageThumbnail';
 import { InlineVideo } from './InlineVideo';
-import { ThreadAnalysis } from './ThreadAnalysis';
-import { NgEditor } from '../ng-editor/NgEditor';
+
+// Heavy panels: loaded on first open (never shown on startup)
+const PostEditor = lazy(() =>
+  import('../post-editor/PostEditor').then((m) => ({ default: m.PostEditor })),
+);
+const ProgrammaticPost = lazy(() =>
+  import('../post-editor/ProgrammaticPost').then((m) => ({ default: m.ProgrammaticPost })),
+);
+const ThreadAnalysis = lazy(() =>
+  import('./ThreadAnalysis').then((m) => ({ default: m.ThreadAnalysis })),
+);
+const NgEditor = lazy(() =>
+  import('../ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
+);
 import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
 import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
@@ -1870,30 +1880,40 @@ export function ThreadView(): React.JSX.Element {
 
             {/* F16: Thread Analysis Panel */}
             {analysisOpen && (
-              <ThreadAnalysis
-                responses={activeTab.responses}
-                onClose={handleToggleAnalysis}
-                onScrollToRes={handleScrollToRes}
-              />
+              <Suspense fallback={null}>
+                <ThreadAnalysis
+                  responses={activeTab.responses}
+                  onClose={handleToggleAnalysis}
+                  onScrollToRes={handleScrollToRes}
+                />
+              </Suspense>
             )}
 
             {/* NG Editor (shared across all tabs) */}
-            {ngEditorOpen && <NgEditor />}
+            {ngEditorOpen && (
+              <Suspense fallback={null}>
+                <NgEditor />
+              </Suspense>
+            )}
 
             {/* Post editor (per tab) */}
             {postEditorOpen && (
-              <PostEditor
-                boardUrl={activeTab.boardUrl}
-                threadId={activeTab.threadId}
-                hasExposedIps={hasExposedIps}
-                onClose={() => { closeTabPostEditor(activeTab.id); }}
-                initialMessage={postEditorInitialMessage}
-              />
+              <Suspense fallback={null}>
+                <PostEditor
+                  boardUrl={activeTab.boardUrl}
+                  threadId={activeTab.threadId}
+                  hasExposedIps={hasExposedIps}
+                  onClose={() => { closeTabPostEditor(activeTab.id); }}
+                  initialMessage={postEditorInitialMessage}
+                />
+              </Suspense>
             )}
 
             {/* F26: Programmatic post editor (per tab) */}
             {progPostOpen && (
-              <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} onClose={handleCloseProgPost} />
+              <Suspense fallback={null}>
+                <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} onClose={handleCloseProgPost} />
+              </Suspense>
             )}
           </>
         )}

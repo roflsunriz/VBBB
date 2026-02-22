@@ -8,6 +8,9 @@ dist/
 # Vite
 *.local
 
+# Bundle analysis
+stats.html
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
