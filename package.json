@@ -44,8 +44,10 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@mdi/js": "^7.4.47",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-virtual": "^3.13.18",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/dompurify": "^3.2.0",
@@ -54,6 +56,7 @@
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "dompurify": "^3.3.1",
     "electron": "^40.4.1",
     "electron-builder": "^26.7.0",
     "electron-vite": "^5.0.0",
@@ -64,24 +67,21 @@
     "happy-dom": "^20.6.1",
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "rollup-plugin-visualizer": "^7.0.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "zustand": "^5.0.11"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@mdi/js": "^7.4.47",
-    "@tanstack/react-virtual": "^3.13.18",
     "@xmldom/xmldom": "^0.8.11",
-    "dompurify": "^3.3.1",
     "electron-updater": "^6.8.3",
     "https-proxy-agent": "^7.0.6",
     "iconv-lite": "^0.7.2",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "zod": "^4.3.6",
-    "zustand": "^5.0.11"
+    "zod": "^4.3.6"
   }
 }

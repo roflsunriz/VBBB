@@ -4,8 +4,10 @@
  * with progress reporting, and silently installs on quit.
  */
 import { app } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import electronUpdater from 'electron-updater';
 import type { UpdateInfo, ProgressInfo, UpdateDownloadedEvent } from 'electron-updater';
+
+const { autoUpdater } = electronUpdater;
 import type { UpdateCheckResult, UpdateProgress } from '@shared/update';
 import { createLogger } from '../logger';
 

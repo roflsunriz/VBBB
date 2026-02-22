@@ -1,5 +1,7 @@
 appId: com.vbbb.app
 productName: VBBB
+compression: maximum
+afterPack: scripts/after-pack.mjs
 directories:
   buildResources: resources
   output: release
@@ -10,6 +12,7 @@ publish:
 files:
   - out/**/*
   - "!out/**/*.map"
+  - "!out/tsconfig.node.tsbuildinfo"
 
 # ────────────────────────────────────────────────
 # Windows (Windows 10/11 x64) — 動作確認済み
