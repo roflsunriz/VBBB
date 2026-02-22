@@ -2,3 +2,4 @@
 - パッケージマネージャはbunを使用しています。npmではありません。
 - bun lint, bun type-check, bun test, bun format, bun run build を実行してください。
 - コミットメッセージは日本語で作成し、コンベンショナルコミッツの規約に従ってください。
+- 単に「アップデート」や"/update"と指示されたときは"how-to-update.md"の指示に従いアップデート作業を行います。
