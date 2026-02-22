@@ -6,7 +6,4 @@
 - ここまでの変更をリモートリポジトリにコミットプッシュします。
 - git tag <タグ名>でタグを作成し、git push origin <タグ名>でタグをプッシュします。
 - GitHub ActionsのReleaseワークフローが実行され、ビルドが始まります。
-- リリースのドラフトが自動作成されます。
-- リリース本文にはFull Changelogのリンクしかないので、変更点を記載しエンリッチメントします。
-- github cli　`gh` でリリースを作成します。`gh release create <タグ名> --generate-notes`
-- リリースが作成されたら、GitHub Releasesからダウンロードできるようになります。
+- リリースが自動作成されます。
