@@ -5,6 +5,25 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-02-23
+
+### Added
+
+- フォーム形式の DSL エディタモーダルを新設（ツールメニュー「DSLエディタ」/ Ctrl+Shift+D）
+  - グローバル設定（SCHEDULE / COUNTDOWN）とPOSTブロックをフォームで入力し、.vbbs ソースをリアルタイム生成
+  - 既存 .vbbs ファイルの読み込み・編集、名前を付けて保存、クリップボードコピーに対応
+  - 投稿ブロックの動的追加・削除・折りたたみ
+- DSL ソース生成ユーティリティ `generateDslSource` を追加（`parseDslScript` の逆操作）
+- DSL ファイル保存用 IPC チャンネル `dsl:save-file` を追加
+- ツールバーに DSL エディタボタンを追加
+- `bun test` 向けに `bunfig.toml` と happy-dom グローバル登録を導入し、Bun 内蔵テストランナーでも全テスト合格するよう整備
+
+### Changed
+
+- プログラマティック書き込み欄の DSL タブからテキストエリアを廃止し、ファイル読み込み＋実行のみに簡素化
+- ルート `tsconfig.json` に `@shared` / `@renderer` パスエイリアスを追加（bun test でのモジュール解決対応）
+- `browsing-history` テストから `vi.setSystemTime` 依存を除去し、bun test 互換に改善
+
 ## [1.4.0] - 2026-02-23
 
 ### Added
@@ -144,6 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.5.0]: https://github.com/roflsunriz/VBBB/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/roflsunriz/VBBB/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/roflsunriz/VBBB/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/roflsunriz/VBBB/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/roflsunriz/VBBB/compare/v1.2.0...v1.2.1
