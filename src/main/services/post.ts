@@ -231,6 +231,10 @@ function resolveRetryUrl(formAction: string | undefined, originalUrl: string): s
 
 /**
  * Build POST body for the initial attempt.
+ *
+ * Supports two modes (matching Slevo's ThreadCreateRemoteDataSourceImpl):
+ * - Reply (threadId non-empty): bbs, key, time, FROM, mail, MESSAGE, submit="書き込む"
+ * - New thread (threadId empty): bbs, time, subject, FROM, mail, MESSAGE, submit="新規スレッド作成"
  */
 function buildPostBody(
   params: PostParams,
@@ -238,6 +242,7 @@ function buildPostBody(
 ): string {
   const encoding = getPostEncoding(board.boardType);
   const fields: Array<[string, string]> = [];
+  const isNewThread = params.threadId.length === 0;
 
   // Add UPLIFT sid if available
   const sid = getUpliftSid();
@@ -245,17 +250,23 @@ function buildPostBody(
     fields.push(['sid', sid]);
   }
 
-  // Parameter order matches Slevo's PostRemoteDataSourceImpl exactly:
-  // bbs, key, time, FROM, mail, MESSAGE, submit
+  // Parameter order follows Slevo's reference implementation:
+  // Reply:      bbs, key, time, FROM, mail, MESSAGE, submit
+  // New thread: bbs, time, subject, FROM, mail, MESSAGE, submit
   // NCR conversion is applied to all user-supplied fields so that characters
   // outside CP932 (e.g. emoji) are safely transmitted as &#codepoint;
   fields.push(['bbs', replaceWithNCR(board.bbsId)]);
-  fields.push(['key', replaceWithNCR(params.threadId)]);
+  if (!isNewThread) {
+    fields.push(['key', replaceWithNCR(params.threadId)]);
+  }
   fields.push(['time', replaceWithNCR(String(Math.floor(Date.now() / 1000)))]);
+  if (isNewThread && params.subject !== undefined) {
+    fields.push(['subject', replaceWithNCR(params.subject)]);
+  }
   fields.push(['FROM', replaceWithNCR(params.name)]);
   fields.push(['mail', replaceWithNCR(params.mail)]);
   fields.push(['MESSAGE', replaceWithNCR(params.message)]);
-  fields.push(['submit', '\u66F8\u304D\u8FBC\u3080']); // 書き込む
+  fields.push(['submit', isNewThread ? '\u65B0\u898F\u30B9\u30EC\u30C3\u30C9\u4F5C\u6210' : '\u66F8\u304D\u8FBC\u3080']); // 新規スレッド作成 / 書き込む
 
   return fields
     .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)

@@ -6,8 +6,8 @@
 import { useCallback, useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage, mdiViewSequential, mdiViewParallel } from '@mdi/js';
-import type { Res } from '@shared/domain';
+import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage, mdiViewSequential, mdiViewParallel, mdiChevronLeft, mdiChevronRight, mdiArrowRightBold } from '@mdi/js';
+import type { Res, SubjectRecord } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
@@ -38,6 +38,7 @@ const NgEditor = lazy(() =>
   import('../ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
 );
 import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
+import { findNextThread, NEXT_THREAD_RESPONSE_THRESHOLD, NEXT_THREAD_BUTTON_THRESHOLD } from '../../utils/next-thread-detect';
 import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
@@ -787,6 +788,9 @@ export function ThreadView(): React.JSX.Element {
   const refreshActiveThread = useBBSStore((s) => s.refreshActiveThread);
   const refreshThreadTab = useBBSStore((s) => s.refreshThreadTab);
   const reorderThreadTabs = useBBSStore((s) => s.reorderThreadTabs);
+  const switchToAdjacentTab = useBBSStore((s) => s.switchToAdjacentTab);
+  const boardTabs = useBBSStore((s) => s.boardTabs);
+  const openThread = useBBSStore((s) => s.openThread);
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const toggleTabPostEditor = useBBSStore((s) => s.toggleTabPostEditor);
@@ -858,6 +862,22 @@ export function ThreadView(): React.JSX.Element {
     const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
     setTabCtxMenu({ x: e.clientX, y: e.clientY, tabId, isFavorite: favoriteUrlToId.has(threadUrl) });
   }, [tabs, favoriteUrlToId]);
+
+  // Alt+[ / Alt+] keyboard shortcut for prev/next thread tab navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (!e.altKey) return;
+      if (e.key === '[') {
+        e.preventDefault();
+        switchToAdjacentTab('prev');
+      } else if (e.key === ']') {
+        e.preventDefault();
+        switchToAdjacentTab('next');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => { document.removeEventListener('keydown', handler); };
+  }, [switchToAdjacentTab]);
 
   const handleTabCtxToggleFavorite = useCallback(() => {
     if (tabCtxMenu === null) return;
@@ -1034,6 +1054,56 @@ export function ThreadView(): React.JSX.Element {
   }, []);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // ---------------------------------------------------------------------------
+  // 次スレ自動移動 (Next-thread detection)
+  // ---------------------------------------------------------------------------
+  // undefined = not yet detected, null = detected but not found, SubjectRecord = found
+  const [nextThreadCandidate, setNextThreadCandidate] = useState<SubjectRecord | null | undefined>(undefined);
+
+  // Reset detection state when the active tab changes
+  useEffect(() => {
+    setNextThreadCandidate(undefined);
+  }, [activeTabId]);
+
+  // Auto-detect when the thread reaches the threshold response count
+  const activeTabResponseCount = activeTab?.responses.length ?? 0;
+  useEffect(() => {
+    if (activeTab === undefined || activeTabResponseCount < NEXT_THREAD_RESPONSE_THRESHOLD) {
+      return;
+    }
+    const boardTab = boardTabs.find((bt) => bt.board.url === activeTab.boardUrl);
+    if (boardTab === undefined || boardTab.subjects.length === 0) return;
+
+    const found = findNextThread(
+      activeTab.title,
+      `${activeTab.threadId}.dat`,
+      boardTab.subjects,
+    );
+    setNextThreadCandidate(found ?? null);
+  }, [activeTabId, activeTabResponseCount, boardTabs]);
+
+  const handleOpenNextThread = useCallback(() => {
+    if (nextThreadCandidate === undefined || nextThreadCandidate === null) return;
+    if (activeTab === undefined) return;
+    const threadId = nextThreadCandidate.fileName.replace('.dat', '');
+    void openThread(activeTab.boardUrl, threadId, nextThreadCandidate.title);
+  }, [nextThreadCandidate, activeTab, openThread]);
+
+  const handleSearchNextThread = useCallback(() => {
+    if (activeTab === undefined) return;
+    const boardTab = boardTabs.find((bt) => bt.board.url === activeTab.boardUrl);
+    if (boardTab === undefined || boardTab.subjects.length === 0) {
+      setNextThreadCandidate(null);
+      return;
+    }
+    const found = findNextThread(
+      activeTab.title,
+      `${activeTab.threadId}.dat`,
+      boardTab.subjects,
+    );
+    setNextThreadCandidate(found ?? null);
+  }, [activeTab, boardTabs]);
 
   // Per-tab panel states derived from the active tab
   const postEditorOpen = activeTab?.postEditorOpen ?? false;
@@ -1647,8 +1717,29 @@ export function ThreadView(): React.JSX.Element {
     </div>
   );
 
+  const activeTabIndex = activeTabId !== null ? tabs.findIndex((t) => t.id === activeTabId) : -1;
+
   const actionButtons = activeTab !== undefined ? (
     <div className={`flex items-center gap-1 ${isVerticalThreadTabs ? 'px-2' : 'mr-2'}`}>
+      {/* 次スレッドに自動移動: prev/next tab navigation (Slevo: SwitchToPreviousTab / SwitchToNextTab) */}
+      <button
+        type="button"
+        onClick={() => { switchToAdjacentTab('prev'); }}
+        disabled={activeTabIndex <= 0}
+        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
+        title="前のスレッドへ (Alt+[)"
+      >
+        <MdiIcon path={mdiChevronLeft} size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => { switchToAdjacentTab('next'); }}
+        disabled={activeTabIndex < 0 || activeTabIndex >= tabs.length - 1}
+        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
+        title="次のスレッドへ (Alt+])"
+      >
+        <MdiIcon path={mdiChevronRight} size={14} />
+      </button>
       <button
         type="button"
         onClick={() => { void handleRefreshCurrentThread(); }}
@@ -1659,6 +1750,24 @@ export function ThreadView(): React.JSX.Element {
       >
         <MdiIcon path={refreshing ? mdiLoading : mdiRefresh} size={14} className={refreshing ? 'animate-spin' : ''} />
       </button>
+      {/* 次スレ検索ボタン: レス数が NEXT_THREAD_BUTTON_THRESHOLD 以上で表示 */}
+      {activeTabResponseCount >= NEXT_THREAD_BUTTON_THRESHOLD && (
+        <button
+          type="button"
+          onClick={handleSearchNextThread}
+          className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            nextThreadCandidate !== undefined && nextThreadCandidate !== null
+              ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+              : nextThreadCandidate === null
+                ? 'text-[var(--color-text-muted)]'
+                : 'text-[var(--color-warning)]'
+          }`}
+          title="次スレを検索"
+        >
+          <MdiIcon path={mdiArrowRightBold} size={12} />
+          次スレ
+        </button>
+      )}
       <button
         type="button"
         onClick={handleToggleInlineMedia}
@@ -1809,6 +1918,44 @@ export function ThreadView(): React.JSX.Element {
                 >
                   解除
                 </button>
+              </div>
+            )}
+
+            {/* 次スレバナー: スレッドが1000レス超えかつ次スレ検索済みの場合に表示 */}
+            {activeTabResponseCount >= NEXT_THREAD_RESPONSE_THRESHOLD && nextThreadCandidate !== undefined && (
+              <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs ${
+                nextThreadCandidate !== null
+                  ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
+                  : 'border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/60'
+              }`}>
+                <span className="shrink-0 font-semibold text-[var(--color-text-muted)]">
+                  このスレッドは1000を超えました。
+                </span>
+                {nextThreadCandidate !== null ? (
+                  <>
+                    <span className="min-w-0 flex-1 truncate text-[var(--color-success)]" title={nextThreadCandidate.title}>
+                      次スレ: {nextThreadCandidate.title}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenNextThread}
+                      className="shrink-0 rounded bg-[var(--color-success)] px-2 py-0.5 text-white hover:opacity-90"
+                    >
+                      開く
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 text-[var(--color-text-muted)]">次スレは見つかりませんでした</span>
+                    <button
+                      type="button"
+                      onClick={handleSearchNextThread}
+                      className="shrink-0 rounded border border-[var(--color-border-primary)] px-2 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                    >
+                      再検索
+                    </button>
+                  </>
+                )}
               </div>
             )}
 

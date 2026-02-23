@@ -163,6 +163,12 @@ interface BBSState {
   reorderBoardTabs: (fromIndex: number, toIndex: number) => void;
   reorderThreadTabs: (fromIndex: number, toIndex: number) => void;
   setStatusMessage: (message: string) => void;
+  /** Whether the new thread creation editor is open (board-level, in ThreadList) */
+  newThreadEditorOpen: boolean;
+  openNewThreadEditor: () => void;
+  closeNewThreadEditor: () => void;
+  /** Navigate to the previous or next open thread tab (Slevo: SwitchToPreviousTab / SwitchToNextTab) */
+  switchToAdjacentTab: (direction: 'prev' | 'next') => void;
 }
 
 const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
@@ -312,6 +318,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   highlightSettings: loadHighlightSettings(),
 
   statusMessage: 'Ready',
+
+  newThreadEditorOpen: false,
 
   fetchMenu: async () => {
     set({ menuLoading: true, menuError: null, statusMessage: '板一覧を取得中...' });
@@ -1322,6 +1330,30 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   setStatusMessage: (message: string) => {
     set({ statusMessage: message });
+  },
+
+  openNewThreadEditor: () => {
+    set({ newThreadEditorOpen: true });
+  },
+
+  closeNewThreadEditor: () => {
+    set({ newThreadEditorOpen: false });
+  },
+
+  switchToAdjacentTab: (direction: 'prev' | 'next') => {
+    const { tabs, activeTabId } = get();
+    if (tabs.length === 0) return;
+    const currentIndex = activeTabId !== null
+      ? tabs.findIndex((t) => t.id === activeTabId)
+      : -1;
+    if (currentIndex < 0) return;
+    const offset = direction === 'next' ? 1 : -1;
+    const targetIndex = currentIndex + offset;
+    if (targetIndex < 0 || targetIndex >= tabs.length) return;
+    const target = tabs[targetIndex];
+    if (target !== undefined) {
+      set({ activeTabId: target.id });
+    }
   },
 }));
 

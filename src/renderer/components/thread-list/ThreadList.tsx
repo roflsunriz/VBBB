@@ -4,8 +4,8 @@
  * Shows age/sage badges per thread.
  * Supports right-click context menu for favorites and NG.
  */
-import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel } from '@mdi/js';
+import { useCallback, useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel, mdiPencilPlus } from '@mdi/js';
 import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import { ContextMenuContainer } from '../common/ContextMenuContainer';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
@@ -15,6 +15,10 @@ import { AbonType, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
+
+const NewThreadEditor = lazy(() =>
+  import('../post-editor/NewThreadEditor').then((m) => ({ default: m.NewThreadEditor })),
+);
 import { RefreshOverlay } from '../common/RefreshOverlay';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
@@ -97,6 +101,9 @@ export function ThreadList(): React.JSX.Element {
   const reorderBoardTabs = useBBSStore((s) => s.reorderBoardTabs);
   const updateBoardTabFilter = useBBSStore((s) => s.updateBoardTabFilter);
   const updateBoardTabSort = useBBSStore((s) => s.updateBoardTabSort);
+  const newThreadEditorOpen = useBBSStore((s) => s.newThreadEditorOpen);
+  const openNewThreadEditor = useBBSStore((s) => s.openNewThreadEditor);
+  const closeNewThreadEditor = useBBSStore((s) => s.closeNewThreadEditor);
 
   // Per-tab filter/sort: read from active board tab
   const activeBoardTab = useBBSStore((s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId));
@@ -588,14 +595,28 @@ export function ThreadList(): React.JSX.Element {
           <span className="shrink-0 text-xs text-[var(--color-text-muted)]">{subjects.length} スレッド</span>
         )}
         {selectedBoard !== null && (
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-            title="スレッド一覧を再取得"
-          >
-            <MdiIcon path={subjectLoading ? mdiLoading : mdiRefresh} size={12} className={subjectLoading ? 'animate-spin' : ''} />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => { openNewThreadEditor(); }}
+              className={`shrink-0 rounded p-0.5 hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                newThreadEditorOpen
+                  ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                  : 'text-[var(--color-text-muted)]'
+              }`}
+              title="スレッドを新規作成"
+            >
+              <MdiIcon path={mdiPencilPlus} size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              title="スレッド一覧を再取得"
+            >
+              <MdiIcon path={subjectLoading ? mdiLoading : mdiRefresh} size={12} className={subjectLoading ? 'animate-spin' : ''} />
+            </button>
+          </>
         )}
       </div>
 
@@ -716,6 +737,16 @@ export function ThreadList(): React.JSX.Element {
       </div>
 
       {edgeRefreshing && <RefreshOverlay />}
+
+      {/* New thread creation editor panel */}
+      {newThreadEditorOpen && selectedBoard !== null && (
+        <Suspense fallback={null}>
+          <NewThreadEditor
+            boardUrl={selectedBoard.url}
+            onClose={closeNewThreadEditor}
+          />
+        </Suspense>
+      )}
 
       </div>{/* end content area */}
 

@@ -156,10 +156,20 @@ export interface SambaInfo {
 /** Parameters for posting a response */
 export interface PostParams {
   readonly boardUrl: string;
+  /**
+   * Thread ID (numeric string).
+   * Pass an empty string when creating a new thread — `subject` must be provided in that case.
+   */
   readonly threadId: string;
   readonly name: string;
   readonly mail: string;
   readonly message: string;
+  /**
+   * Thread subject/title.
+   * Required when `threadId` is empty (new thread creation).
+   * Ignored for replies.
+   */
+  readonly subject?: string | undefined;
 }
 
 /** Result of a post attempt */
