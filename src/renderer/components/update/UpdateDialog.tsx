@@ -178,7 +178,9 @@ export function UpdateDialog({ onClose }: Props): React.JSX.Element {
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => { void handleCheck(); }}
+          onClick={() => {
+            void handleCheck();
+          }}
           disabled={!canCheck}
           className="flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -189,7 +191,9 @@ export function UpdateDialog({ onClose }: Props): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { void handleDownload(); }}
+          onClick={() => {
+            void handleDownload();
+          }}
           disabled={!canDownload}
           className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >

@@ -6,7 +6,12 @@ import type { Board } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
 import { createLogger } from '../logger';
 import { loadFavorites, saveFavorites } from './favorite';
-import { replaceRoundBoardUrls, replaceRoundItemUrls, saveRoundBoard, saveRoundItem } from './round-list';
+import {
+  replaceRoundBoardUrls,
+  replaceRoundItemUrls,
+  saveRoundBoard,
+  saveRoundItem,
+} from './round-list';
 import { loadSavedTabs, replaceTabUrls, saveTabs } from './tab-persistence';
 
 const logger = createLogger('board-transfer');

@@ -10,7 +10,13 @@ import { DonguriStatus } from '@shared/auth';
 import { PostResultType } from '@shared/domain';
 import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
-import { buildCookieHeader, getCookie, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
+import {
+  buildCookieHeader,
+  getCookie,
+  parseSetCookieHeaders,
+  removeCookie,
+  setCookie,
+} from './cookie-store';
 import { decodeBuffer } from './encoding';
 import { httpFetch } from './http-client';
 
@@ -49,8 +55,14 @@ function parseDonguriHomeHtml(html: string): DonguriState {
   const userName = extractWithRegex(html, /<div class="stats header">([\s\S]*?)<\/div>/i);
   const level = extractWithRegex(html, /レベル[:：]\s*([^<\s]+)/);
   const acorn = extractWithRegex(html, /(?:どんぐり残高|種子残高)[:：]\s*([^<\n]+)/);
-  const cannonStats = extractWithRegex(html, /<label>\s*大砲の統計\s*<\/label>\s*<div>([\s\S]*?)<\/div>/i);
-  const fightStats = extractWithRegex(html, /<label>\s*大乱闘の統計\s*<\/label>\s*<div>([\s\S]*?)<\/div>/i);
+  const cannonStats = extractWithRegex(
+    html,
+    /<label>\s*大砲の統計\s*<\/label>\s*<div>([\s\S]*?)<\/div>/i,
+  );
+  const fightStats = extractWithRegex(
+    html,
+    /<label>\s*大乱闘の統計\s*<\/label>\s*<div>([\s\S]*?)<\/div>/i,
+  );
   const loggedIn = id !== undefined && id.length > 0;
   const hasAcornCookie = getCookie(ACORN_COOKIE, '5ch.net') !== undefined;
 
@@ -81,10 +93,7 @@ function applyDonguriStatHeader(
   };
 }
 
-function decodeDonguriHtml(
-  body: Buffer,
-  headers: Readonly<Record<string, string>>,
-): string {
+function decodeDonguriHtml(body: Buffer, headers: Readonly<Record<string, string>>): string {
   const contentType = headers['content-type'] ?? '';
   if (/charset\s*=\s*(?:shift[_-]?jis|sjis)/i.test(contentType)) {
     return decodeBuffer(body, 'Shift_JIS');

@@ -2,7 +2,14 @@
  * subject.txt fetch, parse, and Age/Sage/New/Archive determination.
  */
 import { join } from 'node:path';
-import { AgeSage, type Board, BoardType, type SubjectFetchResult, type SubjectRecord, type ThreadIndex } from '@shared/domain';
+import {
+  AgeSage,
+  type Board,
+  BoardType,
+  type SubjectFetchResult,
+  type SubjectRecord,
+  type ThreadIndex,
+} from '@shared/domain';
 import { KOKOMADE_UNSET, ZERO_DATE_HEX, FOLDER_IDX_VERSION, SOH } from '@shared/file-format';
 import { decodeHtmlEntities } from '@shared/html-entities';
 import { SubjectLineSchema } from '@shared/zod-schemas';
@@ -49,9 +56,9 @@ export function parseSubjectLine(line: string): SubjectRecord | null {
   let count = 0;
 
   const countPatterns = [
-    /\((\d+)\)\s*$/,     // (123)
+    /\((\d+)\)\s*$/, // (123)
     /\uff08(\d+)\uff09\s*$/, // (123)
-    /<(\d+)>\s*$/,       // <123>
+    /<(\d+)>\s*$/, // <123>
   ];
 
   for (const pattern of countPatterns) {
@@ -152,9 +159,10 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
     }
   }
 
-  const encoding = (board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS)
-    ? 'Shift_JIS'
-    : 'EUC-JP';
+  const encoding =
+    board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
+      ? 'Shift_JIS'
+      : 'EUC-JP';
 
   logger.info(`Fetching ${subjectUrl}`);
 
@@ -304,7 +312,10 @@ export function loadFolderIdx(boardDir: string): ThreadIndex[] {
 /**
  * Save Folder.idx to disk.
  */
-export async function saveFolderIdx(boardDir: string, indices: readonly ThreadIndex[]): Promise<void> {
+export async function saveFolderIdx(
+  boardDir: string,
+  indices: readonly ThreadIndex[],
+): Promise<void> {
   const content = serializeFolderIdx(indices);
   const encoded = encodeString(content, 'Shift_JIS');
   await atomicWriteFile(join(boardDir, 'Folder.idx'), encoded);

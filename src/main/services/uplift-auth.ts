@@ -27,7 +27,10 @@ let currentSession: UpliftSession = { loggedIn: false, sessionId: '' };
  * @param userId - UPLIFT user ID
  * @param password - UPLIFT password (NEVER persisted)
  */
-export async function upliftLogin(userId: string, password: string): Promise<{ success: boolean; message: string }> {
+export async function upliftLogin(
+  userId: string,
+  password: string,
+): Promise<{ success: boolean; message: string }> {
   logger.info('Attempting UPLIFT login (credentials masked)');
 
   const body = `usr=${encodeURIComponent(userId)}&pwd=${encodeURIComponent(password)}&log=`;
@@ -70,7 +73,11 @@ export async function upliftLogin(userId: string, password: string): Promise<{ s
 
     // Check response body for error messages
     const responseText = response.body.toString('utf-8');
-    if (responseText.includes('error') || responseText.includes('Error') || response.status !== 200) {
+    if (
+      responseText.includes('error') ||
+      responseText.includes('Error') ||
+      response.status !== 200
+    ) {
       logger.warn('UPLIFT login failed: no sid cookie in response');
       return { success: false, message: 'Login failed: invalid credentials or server error' };
     }

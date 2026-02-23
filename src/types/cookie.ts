@@ -33,6 +33,4 @@ export const WellKnownCookies = {
 } as const;
 
 /** Cookies that must NOT be persisted to disk (session-only) */
-export const SESSION_ONLY_COOKIES: readonly string[] = [
-  WellKnownCookies.Sid,
-] as const;
+export const SESSION_ONLY_COOKIES: readonly string[] = [WellKnownCookies.Sid] as const;

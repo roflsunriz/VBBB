@@ -53,19 +53,22 @@ export type BBSMenuEntry = z.infer<typeof BBSMenuSchema>;
 // Post params validation
 // ---------------------------------------------------------------------------
 
-export const PostParamsSchema = z.object({
-  boardUrl: z.string().url(),
-  /** Numeric thread ID, or empty string when creating a new thread. */
-  threadId: z.string().regex(/^\d*$/, 'Thread ID must be numeric (or empty for new thread)'),
-  name: z.string(),
-  mail: z.string(),
-  message: z.string().min(1, 'Message must not be empty'),
-  /** Required when threadId is empty (new thread creation). */
-  subject: z.string().optional(),
-}).refine(
-  (data) => data.threadId.length > 0 || (data.subject !== undefined && data.subject.trim().length > 0),
-  { message: 'Subject is required when creating a new thread (threadId must be empty)' },
-);
+export const PostParamsSchema = z
+  .object({
+    boardUrl: z.string().url(),
+    /** Numeric thread ID, or empty string when creating a new thread. */
+    threadId: z.string().regex(/^\d*$/, 'Thread ID must be numeric (or empty for new thread)'),
+    name: z.string(),
+    mail: z.string(),
+    message: z.string().min(1, 'Message must not be empty'),
+    /** Required when threadId is empty (new thread creation). */
+    subject: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.threadId.length > 0 || (data.subject !== undefined && data.subject.trim().length > 0),
+    { message: 'Subject is required when creating a new thread (threadId must be empty)' },
+  );
 export type PostParamsInput = z.infer<typeof PostParamsSchema>;
 
 // ---------------------------------------------------------------------------

@@ -30,6 +30,24 @@ console.log('\nBundle lines:', lines.length);
 // Check top-level function/variable names to estimate what's app code vs vendor
 // Look for common React hooks pattern
 const hookMatches = content.match(/use[A-Z][a-zA-Z]+/g) || [];
-const uniqueHooks = [...new Set(hookMatches)].filter(h => !['useState', 'useEffect', 'useCallback', 'useMemo', 'useRef', 'useContext', 'useReducer', 'useId', 'useLayoutEffect', 'useSyncExternalStore', 'useTransition', 'useDeferredValue', 'useInsertionEffect', 'useDebugValue'].includes(h));
+const uniqueHooks = [...new Set(hookMatches)].filter(
+  (h) =>
+    ![
+      'useState',
+      'useEffect',
+      'useCallback',
+      'useMemo',
+      'useRef',
+      'useContext',
+      'useReducer',
+      'useId',
+      'useLayoutEffect',
+      'useSyncExternalStore',
+      'useTransition',
+      'useDeferredValue',
+      'useInsertionEffect',
+      'useDebugValue',
+    ].includes(h),
+);
 console.log('\nCustom hooks found:', uniqueHooks.length);
-uniqueHooks.sort().forEach(h => console.log(' -', h));
+uniqueHooks.sort().forEach((h) => console.log(' -', h));

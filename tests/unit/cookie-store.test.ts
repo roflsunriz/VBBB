@@ -67,8 +67,22 @@ describe('setCookie / getCookie', () => {
   });
 
   it('overwrites cookie with same domain/path/name', () => {
-    setCookie({ name: 'test', value: 'old', domain: '5ch.net', path: '/', sessionOnly: false, secure: false });
-    setCookie({ name: 'test', value: 'new', domain: '5ch.net', path: '/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'test',
+      value: 'old',
+      domain: '5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
+    setCookie({
+      name: 'test',
+      value: 'new',
+      domain: '5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
     const result = getCookie('test', '5ch.net');
     expect(result?.value).toBe('new');
   });
@@ -76,8 +90,22 @@ describe('setCookie / getCookie', () => {
 
 describe('getCookiesForUrl', () => {
   it('returns matching cookies', () => {
-    setCookie({ name: 'a', value: '1', domain: '.5ch.net', path: '/', sessionOnly: false, secure: false });
-    setCookie({ name: 'b', value: '2', domain: 'other.com', path: '/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'a',
+      value: '1',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
+    setCookie({
+      name: 'b',
+      value: '2',
+      domain: 'other.com',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
 
     const result = getCookiesForUrl('https://agree.5ch.net/test');
     expect(result).toHaveLength(1);
@@ -100,8 +128,22 @@ describe('getCookiesForUrl', () => {
   });
 
   it('returns cookies with path matching', () => {
-    setCookie({ name: 'root', value: '1', domain: '5ch.net', path: '/', sessionOnly: false, secure: false });
-    setCookie({ name: 'sub', value: '2', domain: '5ch.net', path: '/test/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'root',
+      value: '1',
+      domain: '5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
+    setCookie({
+      name: 'sub',
+      value: '2',
+      domain: '5ch.net',
+      path: '/test/',
+      sessionOnly: false,
+      secure: false,
+    });
 
     const rootResult = getCookiesForUrl('https://5ch.net/');
     expect(rootResult).toHaveLength(1);
@@ -114,7 +156,14 @@ describe('getCookiesForUrl', () => {
 
 describe('removeCookie', () => {
   it('removes a cookie by name and domain', () => {
-    setCookie({ name: 'test', value: '123', domain: '5ch.net', path: '/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'test',
+      value: '123',
+      domain: '5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
     expect(getCookie('test', '5ch.net')).toBeDefined();
 
     removeCookie('test', '5ch.net');
@@ -124,8 +173,22 @@ describe('removeCookie', () => {
 
 describe('buildCookieHeader', () => {
   it('builds a proper Cookie header', () => {
-    setCookie({ name: 'a', value: '1', domain: '.5ch.net', path: '/', sessionOnly: false, secure: false });
-    setCookie({ name: 'b', value: '2', domain: '.5ch.net', path: '/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'a',
+      value: '1',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
+    setCookie({
+      name: 'b',
+      value: '2',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
 
     const header = buildCookieHeader('https://agree.5ch.net/test');
     expect(header).toContain('a=1');
@@ -199,7 +262,8 @@ describe('parseSetCookieHeaders', () => {
 
   it('parses newline-separated cookies with expires containing commas', () => {
     const headers: Record<string, string> = {
-      'set-cookie': 'SPID=abc; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net\nPON=xyz; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net',
+      'set-cookie':
+        'SPID=abc; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net\nPON=xyz; expires=Thu, 01 Jan 2099 00:00:00 GMT; path=/; domain=.5ch.net',
     };
     parseSetCookieHeaders(headers, 'https://eagle.5ch.net/test/bbs.cgi');
 
@@ -241,8 +305,22 @@ describe('parseSetCookieHeaders', () => {
 
 describe('serialize / deserialize', () => {
   it('round-trips persistent cookies', () => {
-    setCookie({ name: 'DMDM', value: 'val1', domain: '.5ch.net', path: '/', sessionOnly: false, secure: false });
-    setCookie({ name: 'MDMD', value: 'val2', domain: '.5ch.net', path: '/', sessionOnly: false, secure: true });
+    setCookie({
+      name: 'DMDM',
+      value: 'val1',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
+    setCookie({
+      name: 'MDMD',
+      value: 'val2',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: true,
+    });
 
     const serialized = serializeCookies();
     clearAllCookies();
@@ -260,8 +338,22 @@ describe('serialize / deserialize', () => {
   });
 
   it('excludes session-only cookies from serialization', () => {
-    setCookie({ name: 'sid', value: 'secret', domain: '.5ch.net', path: '/', sessionOnly: true, secure: false });
-    setCookie({ name: 'DMDM', value: 'keep', domain: '.5ch.net', path: '/', sessionOnly: false, secure: false });
+    setCookie({
+      name: 'sid',
+      value: 'secret',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: true,
+      secure: false,
+    });
+    setCookie({
+      name: 'DMDM',
+      value: 'keep',
+      domain: '.5ch.net',
+      path: '/',
+      sessionOnly: false,
+      secure: false,
+    });
 
     const serialized = serializeCookies();
     expect(serialized).not.toContain('sid');

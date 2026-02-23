@@ -6,7 +6,14 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { Res } from '@shared/domain';
-import { type NgRule, type NgFilterResult, AbonType, NgMatchMode, NgTarget, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
+import {
+  type NgRule,
+  type NgFilterResult,
+  AbonType,
+  NgMatchMode,
+  NgTarget,
+  NgFilterResult as NgFilterResultEnum,
+} from '@shared/ng';
 import { readFileSafe, atomicWriteFile, ensureDir } from './file-io';
 import { createLogger } from '../logger';
 
@@ -177,7 +184,12 @@ function matchTokensAgainstText(rule: NgRule, text: string): boolean {
  * Check if a response matches an NG rule.
  * Matching is against the full DAT line (name + mail + dateTime + body).
  */
-export function matchesNgRule(rule: NgRule, res: Res, currentBoardId: string, currentThreadId: string): boolean {
+export function matchesNgRule(
+  rule: NgRule,
+  res: Res,
+  currentBoardId: string,
+  currentThreadId: string,
+): boolean {
   // Only apply response-level rules (default target)
   if (rule.target !== undefined && rule.target !== NgTarget.Response) return false;
 
@@ -199,7 +211,12 @@ export function matchesNgRule(rule: NgRule, res: Res, currentBoardId: string, cu
 /**
  * Check if a thread title matches a thread-level NG rule.
  */
-export function matchesThreadNgRule(rule: NgRule, threadTitle: string, boardId: string, threadId: string): boolean {
+export function matchesThreadNgRule(
+  rule: NgRule,
+  threadTitle: string,
+  boardId: string,
+  threadId: string,
+): boolean {
   if (rule.target !== NgTarget.Thread) return false;
   // Board scope check
   if (rule.boardId !== undefined && rule.boardId !== boardId) return false;

@@ -134,9 +134,7 @@ export function Modal({
           style={{ width: modalW, height: modalH }}
           onMouseDown={stopMouseDown}
         >
-          <div className="flex h-full w-full flex-col overflow-hidden">
-            {children}
-          </div>
+          <div className="flex h-full w-full flex-col overflow-hidden">{children}</div>
           {/* Corner resize handle */}
           <div
             onMouseDown={handleResizeMouseDown}
@@ -144,13 +142,24 @@ export function Modal({
             aria-label="リサイズ"
             role="separator"
           >
-            <svg viewBox="0 0 16 16" className="h-full w-full text-[var(--color-text-muted)] opacity-60">
-              <path d="M14 14L14 8M14 14L8 14M10 14L14 10" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            <svg
+              viewBox="0 0 16 16"
+              className="h-full w-full text-[var(--color-text-muted)] opacity-60"
+            >
+              <path
+                d="M14 14L14 8M14 14L8 14M10 14L14 10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                fill="none"
+              />
             </svg>
           </div>
         </div>
       ) : (
-        <div className={`${width} mx-4 w-full animate-[fadeIn_0.15s_ease-out]`} onMouseDown={stopMouseDown}>
+        <div
+          className={`${width} mx-4 w-full animate-[fadeIn_0.15s_ease-out]`}
+          onMouseDown={stopMouseDown}
+        >
           {children}
         </div>
       )}

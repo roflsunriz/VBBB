@@ -5,7 +5,21 @@
  * Supports right-click context menu for favorites and NG.
  */
 import { useCallback, useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { mdiArrowUp, mdiArrowDown, mdiNewBox, mdiArchive, mdiLoading, mdiMagnify, mdiStar, mdiStarOutline, mdiClose, mdiRefresh, mdiViewSequential, mdiViewParallel, mdiPencilPlus } from '@mdi/js';
+import {
+  mdiArrowUp,
+  mdiArrowDown,
+  mdiNewBox,
+  mdiArchive,
+  mdiLoading,
+  mdiMagnify,
+  mdiStar,
+  mdiStarOutline,
+  mdiClose,
+  mdiRefresh,
+  mdiViewSequential,
+  mdiViewParallel,
+  mdiPencilPlus,
+} from '@mdi/js';
 import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import { ContextMenuContainer } from '../common/ContextMenuContainer';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
@@ -76,7 +90,11 @@ function matchesThreadNg(rule: NgRule, title: string, boardId: string, threadId:
   if (rule.matchMode === 'regexp') {
     const pattern = rule.tokens[0];
     if (pattern === undefined) return false;
-    try { return new RegExp(pattern, 'i').test(title); } catch { return false; }
+    try {
+      return new RegExp(pattern, 'i').test(title);
+    } catch {
+      return false;
+    }
   }
   return rule.tokens.every((t) => title.includes(t));
 }
@@ -111,7 +129,11 @@ export function ThreadList(): React.JSX.Element {
   const sortKey: BoardSortKey = activeBoardTab?.sortKey ?? 'index';
   const sortDir: BoardSortDir = activeBoardTab?.sortDir ?? 'asc';
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
-  const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{
+    x: number;
+    y: number;
+    tabId: string;
+  } | null>(null);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
   const handleScrollKeyboard = useScrollKeyboard(listScrollRef);
@@ -121,17 +143,25 @@ export function ThreadList(): React.JSX.Element {
   // Close board tab context menu on click
   useEffect(() => {
     if (boardTabCtxMenu === null) return;
-    const handler = (): void => { setBoardTabCtxMenu(null); };
+    const handler = (): void => {
+      setBoardTabCtxMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [boardTabCtxMenu]);
 
   // Close context menu on click
   useEffect(() => {
     if (ctxMenu === null) return;
-    const handler = (): void => { setCtxMenu(null); };
+    const handler = (): void => {
+      setCtxMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [ctxMenu]);
 
   // Build index maps for AgeSage and new count lookup
@@ -161,9 +191,10 @@ export function ThreadList(): React.JSX.Element {
   }, [favorites]);
 
   // Thread-level NG rules
-  const threadNgRules = useMemo(() =>
-    ngRules.filter((r) => r.target === NgTarget.Thread && r.enabled),
-  [ngRules]);
+  const threadNgRules = useMemo(
+    () => ngRules.filter((r) => r.target === NgTarget.Thread && r.enabled),
+    [ngRules],
+  );
 
   // Extract boardId for NG matching
   const currentBoardId = useMemo(() => {
@@ -219,7 +250,10 @@ export function ThreadList(): React.JSX.Element {
     for (const s of subjects) {
       const threadId = s.fileName.replace('.dat', '');
       for (const rule of threadNgRules) {
-        if (matchesThreadNg(rule, s.title, currentBoardId, threadId) && rule.abonType === AbonType.Normal) {
+        if (
+          matchesThreadNg(rule, s.title, currentBoardId, threadId) &&
+          rule.abonType === AbonType.Normal
+        ) {
           set.add(s.fileName);
           break;
         }
@@ -328,30 +362,35 @@ export function ThreadList(): React.JSX.Element {
     void refreshSelectedBoard();
   }, [selectedBoard, subjectLoading, refreshSelectedBoard]);
 
-  const handleListWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    const container = listScrollRef.current;
-    if (container === null) return;
-    if (edgeRefreshLockedRef.current || subjectLoading || selectedBoard === null) return;
+  const handleListWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      const container = listScrollRef.current;
+      if (container === null) return;
+      if (edgeRefreshLockedRef.current || subjectLoading || selectedBoard === null) return;
 
-    const atTop = container.scrollTop <= 0;
-    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
-    const scrollingUp = e.deltaY < 0;
-    const scrollingDown = e.deltaY > 0;
+      const atTop = container.scrollTop <= 0;
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
+      const scrollingUp = e.deltaY < 0;
+      const scrollingDown = e.deltaY > 0;
 
-    if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
-      edgeRefreshLockedRef.current = true;
-      setEdgeRefreshing(true);
-      void refreshSelectedBoard().finally(() => { setEdgeRefreshing(false); });
+      if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
+        edgeRefreshLockedRef.current = true;
+        setEdgeRefreshing(true);
+        void refreshSelectedBoard().finally(() => {
+          setEdgeRefreshing(false);
+        });
 
-      if (edgeRefreshUnlockTimerRef.current !== null) {
-        clearTimeout(edgeRefreshUnlockTimerRef.current);
+        if (edgeRefreshUnlockTimerRef.current !== null) {
+          clearTimeout(edgeRefreshUnlockTimerRef.current);
+        }
+        edgeRefreshUnlockTimerRef.current = setTimeout(() => {
+          edgeRefreshLockedRef.current = false;
+          edgeRefreshUnlockTimerRef.current = null;
+        }, 1200);
       }
-      edgeRefreshUnlockTimerRef.current = setTimeout(() => {
-        edgeRefreshLockedRef.current = false;
-        edgeRefreshUnlockTimerRef.current = null;
-      }, 1200);
-    }
-  }, [subjectLoading, selectedBoard, refreshSelectedBoard]);
+    },
+    [subjectLoading, selectedBoard, refreshSelectedBoard],
+  );
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, subject: SubjectRecord) => {
@@ -423,7 +462,9 @@ export function ThreadList(): React.JSX.Element {
     ({ label, field }: { readonly label: string; readonly field: BoardSortKey }) => (
       <button
         type="button"
-        onClick={() => { handleSort(field); }}
+        onClick={() => {
+          handleSort(field);
+        }}
         className="flex items-center gap-0.5 text-left text-xs font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
       >
         {label}
@@ -443,14 +484,11 @@ export function ThreadList(): React.JSX.Element {
     [closeBoardTab],
   );
 
-  const handleBoardTabContextMenu = useCallback(
-    (e: React.MouseEvent, tabId: string) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setBoardTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
-    },
-    [],
-  );
+  const handleBoardTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBoardTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
+  }, []);
 
   const handleAddBoardToRound = useCallback(() => {
     if (boardTabCtxMenu === null) return;
@@ -499,12 +537,18 @@ export function ThreadList(): React.JSX.Element {
     setBoardTabCtxMenu(null);
   }, [boardTabCtxMenu, boardTabs, addFavorite]);
 
-  const { getDragProps: getBoardTabDragProps, dragOverIndex: boardTabDragOverIndex, dragSourceIndex: boardTabDragSourceIndex } = useDragReorder({
+  const {
+    getDragProps: getBoardTabDragProps,
+    dragOverIndex: boardTabDragOverIndex,
+    dragSourceIndex: boardTabDragSourceIndex,
+  } = useDragReorder({
     itemCount: boardTabs.length,
     onReorder: reorderBoardTabs,
   });
 
-  const [boardTabOrientation, toggleBoardTabOrientation] = useTabOrientation('vbbb-board-tab-orientation');
+  const [boardTabOrientation, toggleBoardTabOrientation] = useTabOrientation(
+    'vbbb-board-tab-orientation',
+  );
   const isVerticalBoardTabs = boardTabOrientation === 'vertical';
 
   const boardTabDragIndicator = (i: number): string =>
@@ -514,16 +558,22 @@ export function ThreadList(): React.JSX.Element {
         : ' border-l-2 border-l-[var(--color-accent)]'
       : '';
 
-  const renderBoardTabItem = (bt: typeof boardTabs[number], i: number): React.ReactNode => (
+  const renderBoardTabItem = (bt: (typeof boardTabs)[number], i: number): React.ReactNode => (
     <div
       key={bt.id}
       role="tab"
       tabIndex={0}
       title={bt.board.title}
       {...getBoardTabDragProps(i)}
-      onClick={() => { setActiveBoardTab(bt.id); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id); }}
-      onContextMenu={(e) => { handleBoardTabContextMenu(e, bt.id); }}
+      onClick={() => {
+        setActiveBoardTab(bt.id);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') setActiveBoardTab(bt.id);
+      }}
+      onContextMenu={(e) => {
+        handleBoardTabContextMenu(e, bt.id);
+      }}
       className={`group flex cursor-pointer items-center gap-1 text-xs transition-opacity ${
         isVerticalBoardTabs ? 'rounded px-2 py-1' : 'max-w-36 shrink-0 rounded-t px-2 py-0.5'
       } ${
@@ -536,7 +586,9 @@ export function ThreadList(): React.JSX.Element {
       <span className="truncate">{bt.board.title}</span>
       <button
         type="button"
-        onClick={(e) => { handleCloseBoardTab(e, bt.id); }}
+        onClick={(e) => {
+          handleCloseBoardTab(e, bt.id);
+        }}
         className="ml-0.5 shrink-0 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
         aria-label="板タブを閉じる"
       >
@@ -546,10 +598,13 @@ export function ThreadList(): React.JSX.Element {
   );
 
   return (
-    <section className={`relative flex h-full min-w-0 flex-1 ${isVerticalBoardTabs ? 'flex-row' : 'flex-col'}`} onKeyDown={handleScrollKeyboard}>
+    <section
+      className={`relative flex h-full min-w-0 flex-1 ${isVerticalBoardTabs ? 'flex-row' : 'flex-col'}`}
+      onKeyDown={handleScrollKeyboard}
+    >
       {/* Board tabs */}
-      {boardTabs.length > 0 && (
-        isVerticalBoardTabs ? (
+      {boardTabs.length > 0 &&
+        (isVerticalBoardTabs ? (
           <div className="flex w-36 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
             <div className="flex items-center justify-end border-b border-[var(--color-border-secondary)] px-1 py-0.5">
               <button
@@ -579,176 +634,228 @@ export function ThreadList(): React.JSX.Element {
               <MdiIcon path={mdiViewSequential} size={12} />
             </button>
           </div>
-        )
-      )}
+        ))}
 
       {/* Content area */}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-
-      {/* Header with board title and refresh */}
-      <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-secondary)]" title={selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}>
-          {selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}
-        </span>
-        {subjectLoading && <MdiIcon path={mdiLoading} size={12} className="animate-spin text-[var(--color-accent)]" />}
-        {subjects.length > 0 && (
-          <span className="shrink-0 text-xs text-[var(--color-text-muted)]">{subjects.length} スレッド</span>
-        )}
-        {selectedBoard !== null && (
-          <>
-            <button
-              type="button"
-              onClick={() => { openNewThreadEditor(); }}
-              className={`shrink-0 rounded p-0.5 hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                newThreadEditorOpen
-                  ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
-                  : 'text-[var(--color-text-muted)]'
-              }`}
-              title="スレッドを新規作成"
-            >
-              <MdiIcon path={mdiPencilPlus} size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-              title="スレッド一覧を再取得"
-            >
-              <MdiIcon path={subjectLoading ? mdiLoading : mdiRefresh} size={12} className={subjectLoading ? 'animate-spin' : ''} />
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Filter input */}
-      {subjects.length > 0 && (
-        <div className="flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-3 py-1">
-          <MdiIcon path={mdiMagnify} size={12} className="shrink-0 text-[var(--color-text-muted)]" />
-          <SearchInputWithHistory
-            value={filter}
-            onChange={(v) => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, v); }}
-            storageKey="vbbb-search-history-thread-list"
-            placeholder="スレッドを検索..."
-            inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
-          />
-          {filter.length > 0 && (
+        {/* Header with board title and refresh */}
+        <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
+          <span
+            className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-text-secondary)]"
+            title={selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}
+          >
+            {selectedBoard !== null ? selectedBoard.title : 'スレッド一覧'}
+          </span>
+          {subjectLoading && (
+            <MdiIcon
+              path={mdiLoading}
+              size={12}
+              className="animate-spin text-[var(--color-accent)]"
+            />
+          )}
+          {subjects.length > 0 && (
+            <span className="shrink-0 text-xs text-[var(--color-text-muted)]">
+              {subjects.length} スレッド
+            </span>
+          )}
+          {selectedBoard !== null && (
             <>
-              <span className="text-xs text-[var(--color-text-muted)]">{filteredSubjects.length} 件</span>
               <button
                 type="button"
-                onClick={() => { if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, ''); }}
-                className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-                aria-label="検索をクリア"
+                onClick={() => {
+                  openNewThreadEditor();
+                }}
+                className={`shrink-0 rounded p-0.5 hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                  newThreadEditorOpen
+                    ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                    : 'text-[var(--color-text-muted)]'
+                }`}
+                title="スレッドを新規作成"
               >
-                <MdiIcon path={mdiClose} size={12} />
+                <MdiIcon path={mdiPencilPlus} size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                title="スレッド一覧を再取得"
+              >
+                <MdiIcon
+                  path={subjectLoading ? mdiLoading : mdiRefresh}
+                  size={12}
+                  className={subjectLoading ? 'animate-spin' : ''}
+                />
               </button>
             </>
           )}
         </div>
-      )}
 
-      {/* Table header */}
-      <div className="flex h-6 items-center gap-1 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-3">
-        <div className="w-8">
-          <SortHeader label="#" field="index" />
-        </div>
-        <div className="w-5" />
-        <div className="min-w-0 flex-1">
-          <SortHeader label="タイトル" field="title" />
-        </div>
-        <div className="w-12 text-right">
-          <SortHeader label="勢い" field="ikioi" />
-        </div>
-        <div className="w-10 text-right">
-          <SortHeader label="完走" field="completionRate" />
-        </div>
-        <div className="w-16 text-right">
-          <SortHeader label="作成日" field="firstPostDate" />
-        </div>
-        <div className="w-12 text-right">
-          <SortHeader label="レス" field="count" />
-        </div>
-        <div className="w-6" />
-      </div>
-
-      {/* Thread rows */}
-      <div ref={listScrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleListWheel}>
-        {selectedBoard === null && (
-          <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">板を選択してください</p>
+        {/* Filter input */}
+        {subjects.length > 0 && (
+          <div className="flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-3 py-1">
+            <MdiIcon
+              path={mdiMagnify}
+              size={12}
+              className="shrink-0 text-[var(--color-text-muted)]"
+            />
+            <SearchInputWithHistory
+              value={filter}
+              onChange={(v) => {
+                if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, v);
+              }}
+              storageKey="vbbb-search-history-thread-list"
+              placeholder="スレッドを検索..."
+              inputClassName="min-w-0 w-full bg-transparent text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+            />
+            {filter.length > 0 && (
+              <>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  {filteredSubjects.length} 件
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeBoardTabId !== null) updateBoardTabFilter(activeBoardTabId, '');
+                  }}
+                  className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                  aria-label="検索をクリア"
+                >
+                  <MdiIcon path={mdiClose} size={12} />
+                </button>
+              </>
+            )}
+          </div>
         )}
-        {sortedSubjects.map((subject, i) => {
-          const threadId = subject.fileName.replace('.dat', '');
-          const threadUrl = selectedBoard !== null ? `${selectedBoard.url}dat/${threadId}.dat` : '';
-          const isFavorite = favoriteUrlToId.has(threadUrl);
-          const isNormalAbon = normalAbonThreads.has(subject.fileName);
 
-          if (isNormalAbon) {
+        {/* Table header */}
+        <div className="flex h-6 items-center gap-1 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-3">
+          <div className="w-8">
+            <SortHeader label="#" field="index" />
+          </div>
+          <div className="w-5" />
+          <div className="min-w-0 flex-1">
+            <SortHeader label="タイトル" field="title" />
+          </div>
+          <div className="w-12 text-right">
+            <SortHeader label="勢い" field="ikioi" />
+          </div>
+          <div className="w-10 text-right">
+            <SortHeader label="完走" field="completionRate" />
+          </div>
+          <div className="w-16 text-right">
+            <SortHeader label="作成日" field="firstPostDate" />
+          </div>
+          <div className="w-12 text-right">
+            <SortHeader label="レス" field="count" />
+          </div>
+          <div className="w-6" />
+        </div>
+
+        {/* Thread rows */}
+        <div
+          ref={listScrollRef}
+          className="relative flex-1 overflow-y-auto"
+          onWheel={handleListWheel}
+        >
+          {selectedBoard === null && (
+            <p className="p-4 text-center text-xs text-[var(--color-text-muted)]">
+              板を選択してください
+            </p>
+          )}
+          {sortedSubjects.map((subject, i) => {
+            const threadId = subject.fileName.replace('.dat', '');
+            const threadUrl =
+              selectedBoard !== null ? `${selectedBoard.url}dat/${threadId}.dat` : '';
+            const isFavorite = favoriteUrlToId.has(threadUrl);
+            const isNormalAbon = normalAbonThreads.has(subject.fileName);
+
+            if (isNormalAbon) {
+              return (
+                <div
+                  key={subject.fileName}
+                  className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
+                  onContextMenu={(e) => {
+                    handleContextMenu(e, subject);
+                  }}
+                >
+                  <span className="w-8 shrink-0 text-[var(--color-text-muted)]">
+                    {String(i + 1)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[var(--color-res-abon)]">
+                    あぼーん
+                  </span>
+                </div>
+              );
+            }
+
             return (
-              <div
+              <button
                 key={subject.fileName}
-                className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
-                onContextMenu={(e) => { handleContextMenu(e, subject); }}
+                type="button"
+                onClick={() => {
+                  handleOpenThread(subject);
+                }}
+                onContextMenu={(e) => {
+                  handleContextMenu(e, subject);
+                }}
+                className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
               >
                 <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
-                <span className="min-w-0 flex-1 truncate text-[var(--color-res-abon)]">あぼーん</span>
-              </div>
+                <span className="w-5 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
+                <span
+                  className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]"
+                  title={subject.title}
+                >
+                  {subject.title}
+                </span>
+                <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {subject.ikioi >= 1
+                    ? String(Math.round(subject.ikioi))
+                    : subject.ikioi.toFixed(1)}
+                </span>
+                <span className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {subject.completionRate >= 100 ? '100%' : `${subject.completionRate.toFixed(0)}%`}
+                </span>
+                <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {formatTimestamp(subject.firstPostTs)}
+                </span>
+                <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {subject.count}
+                </span>
+                <span
+                  className="w-6 shrink-0 cursor-pointer text-center"
+                  onClick={(e) => {
+                    handleAddFavorite(e, subject);
+                  }}
+                  role="button"
+                  tabIndex={-1}
+                  title={isFavorite ? 'お気に入り済み' : 'お気に入りに追加'}
+                >
+                  <MdiIcon
+                    path={isFavorite ? mdiStar : mdiStarOutline}
+                    size={12}
+                    className={
+                      isFavorite
+                        ? 'text-[var(--color-warning)]'
+                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-warning)]'
+                    }
+                  />
+                </span>
+              </button>
             );
-          }
+          })}
+        </div>
 
-          return (
-            <button
-              key={subject.fileName}
-              type="button"
-              onClick={() => { handleOpenThread(subject); }}
-              onContextMenu={(e) => { handleContextMenu(e, subject); }}
-              className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
-            >
-              <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
-              <span className="w-5 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
-              <span className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]" title={subject.title}>{subject.title}</span>
-              <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
-                {subject.ikioi >= 1 ? String(Math.round(subject.ikioi)) : subject.ikioi.toFixed(1)}
-              </span>
-              <span className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
-                {subject.completionRate >= 100
-                  ? '100%'
-                  : `${subject.completionRate.toFixed(0)}%`}
-              </span>
-              <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
-                {formatTimestamp(subject.firstPostTs)}
-              </span>
-              <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">{subject.count}</span>
-              <span
-                className="w-6 shrink-0 cursor-pointer text-center"
-                onClick={(e) => { handleAddFavorite(e, subject); }}
-                role="button"
-                tabIndex={-1}
-                title={isFavorite ? 'お気に入り済み' : 'お気に入りに追加'}
-              >
-                <MdiIcon
-                  path={isFavorite ? mdiStar : mdiStarOutline}
-                  size={12}
-                  className={isFavorite ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-warning)]'}
-                />
-              </span>
-            </button>
-          );
-        })}
+        {edgeRefreshing && <RefreshOverlay />}
+
+        {/* New thread creation editor panel */}
+        {newThreadEditorOpen && selectedBoard !== null && (
+          <Suspense fallback={null}>
+            <NewThreadEditor boardUrl={selectedBoard.url} onClose={closeNewThreadEditor} />
+          </Suspense>
+        )}
       </div>
-
-      {edgeRefreshing && <RefreshOverlay />}
-
-      {/* New thread creation editor panel */}
-      {newThreadEditorOpen && selectedBoard !== null && (
-        <Suspense fallback={null}>
-          <NewThreadEditor
-            boardUrl={selectedBoard.url}
-            onClose={closeNewThreadEditor}
-          />
-        </Suspense>
-      )}
-
-      </div>{/* end content area */}
+      {/* end content area */}
 
       {/* Board tab context menu (F13 + F24) */}
       {boardTabCtxMenu !== null && (

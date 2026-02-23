@@ -96,7 +96,10 @@ describe('loadWindowState', () => {
 
   it('rejects negative width/height', () => {
     const dir = createTempDir();
-    writeFileSync(join(dir, 'window-state.json'), JSON.stringify({ x: 0, y: 0, width: -100, height: -50 }));
+    writeFileSync(
+      join(dir, 'window-state.json'),
+      JSON.stringify({ x: 0, y: 0, width: -100, height: -50 }),
+    );
 
     const state = loadWindowState(dir);
     expect(state.width).toBe(1280);
@@ -106,9 +109,16 @@ describe('loadWindowState', () => {
   it('resets position when window is outside all displays', () => {
     const dir = createTempDir();
     // Position completely outside the mocked 1920x1080 display
-    writeFileSync(join(dir, 'window-state.json'), JSON.stringify({
-      x: 5000, y: 5000, width: 800, height: 600, isMaximized: false,
-    }));
+    writeFileSync(
+      join(dir, 'window-state.json'),
+      JSON.stringify({
+        x: 5000,
+        y: 5000,
+        width: 800,
+        height: 600,
+        isMaximized: false,
+      }),
+    );
 
     const state = loadWindowState(dir);
     expect(state.x).toBe(-1);
@@ -120,9 +130,16 @@ describe('loadWindowState', () => {
   it('keeps position when window is partially visible', () => {
     const dir = createTempDir();
     // Partially visible (overlaps with 1920x1080 display)
-    writeFileSync(join(dir, 'window-state.json'), JSON.stringify({
-      x: 1800, y: 900, width: 800, height: 600, isMaximized: false,
-    }));
+    writeFileSync(
+      join(dir, 'window-state.json'),
+      JSON.stringify({
+        x: 1800,
+        y: 900,
+        width: 800,
+        height: 600,
+        isMaximized: false,
+      }),
+    );
 
     const state = loadWindowState(dir);
     expect(state.x).toBe(1800);
@@ -134,7 +151,11 @@ describe('saveWindowState', () => {
   it('saves state to JSON file', async () => {
     const dir = createTempDir();
     await saveWindowState(dir, {
-      x: 50, y: 100, width: 1000, height: 700, isMaximized: false,
+      x: 50,
+      y: 100,
+      width: 1000,
+      height: 700,
+      isMaximized: false,
     });
 
     const content = readFileSync(join(dir, 'window-state.json'), 'utf-8');

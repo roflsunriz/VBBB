@@ -146,7 +146,9 @@ export function buildCookieHeader(url: string): string {
   }
   // Diagnostic: log matched cookie names and domains (not values)
   const summary = matched.map((c) => `${c.name}@${c.domain}`).join(', ');
-  logger.info(`[DIAG] buildCookieHeader(${url}): matched ${String(matched.length)} cookie(s): ${summary}`);
+  logger.info(
+    `[DIAG] buildCookieHeader(${url}): matched ${String(matched.length)} cookie(s): ${summary}`,
+  );
   return matched.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
@@ -158,7 +160,10 @@ export function buildCookieHeader(url: string): string {
  * We split on that first, then fall back to comma heuristic for
  * legacy single-string values.
  */
-export function parseSetCookieHeaders(headers: Readonly<Record<string, string>>, requestUrl: string): void {
+export function parseSetCookieHeaders(
+  headers: Readonly<Record<string, string>>,
+  requestUrl: string,
+): void {
   const setCookieValue = headers['set-cookie'];
   if (setCookieValue === undefined) return;
 
@@ -244,8 +249,8 @@ export function parseSetCookieHeaders(headers: Readonly<Record<string, string>>,
     setCookie(cookie);
     logger.info(
       `Cookie set: ${name} for domain=${domain} path=${path}` +
-      `${expires !== undefined ? ` expires=${expires}` : ' (session)'}` +
-      `${secure ? ' secure' : ''} (value masked)`,
+        `${expires !== undefined ? ` expires=${expires}` : ' (session)'}` +
+        `${secure ? ' secure' : ''} (value masked)`,
     );
   }
 }

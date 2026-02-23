@@ -68,7 +68,10 @@ describe('feature 2: app-icon', () => {
 // ---------------------------------------------------------------------------
 describe('feature 3: post-editor-close', () => {
   it('PostEditor accepts onClose prop and calls it on success', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/post-editor/PostEditor.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/post-editor/PostEditor.tsx'),
+      'utf-8',
+    );
     // PostEditor now receives onClose as a prop (per-tab close handler)
     expect(src).toContain('onClose');
     expect(src).toContain('onClose()');
@@ -86,7 +89,10 @@ describe('feature 3: post-editor-close', () => {
 // ---------------------------------------------------------------------------
 describe('feature 4: thread-auto-refresh', () => {
   it('PostEditor calls refreshActiveThread on success', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/post-editor/PostEditor.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/post-editor/PostEditor.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('refreshActiveThread');
   });
 
@@ -115,7 +121,10 @@ describe('feature 5: highlight-own-posts', () => {
   });
 
   it('ThreadView uses highlight settings from store', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('highlightSettings');
     expect(src).toContain('highlightOwnPosts');
     expect(src).toContain('highlightRepliesToOwn');
@@ -183,7 +192,10 @@ describe('feature 7: category-tabs', () => {
   });
 
   it('ThreadList renders board tab bar', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/thread-list/ThreadList.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/thread-list/ThreadList.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('boardTabs');
     expect(src).toContain('setActiveBoardTab');
     expect(src).toContain('closeBoardTab');
@@ -243,7 +255,9 @@ describe('feature 9: remote-search-replace', () => {
   it('search:remote-url IPC channel replaced dig.2ch.net', () => {
     const src = readFileSync(resolve(PROJECT_ROOT, 'src/main/services/remote-search.ts'), 'utf-8');
     // dig.2ch.net should only appear in comments, not in actual code
-    const codeLines = src.split('\n').filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'));
+    const codeLines = src
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'));
     const codeOnly = codeLines.join('\n');
     expect(codeOnly).not.toContain('dig.2ch.net');
     expect(src).toContain('ff5ch.syoboi.jp');
@@ -255,7 +269,10 @@ describe('feature 9: remote-search-replace', () => {
   });
 
   it('SearchPanel renders webview for remote mode', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('<webview');
     expect(src).toContain('remoteUrl');
   });
@@ -266,14 +283,20 @@ describe('feature 9: remote-search-replace', () => {
 // ---------------------------------------------------------------------------
 describe('feature 11: webview-thread-open', () => {
   it('SearchPanel intercepts will-navigate on webview', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('will-navigate');
     expect(src).toContain('new-window');
     expect(src).toContain('parseAnyThreadUrl');
   });
 
   it('SearchPanel imports parseThreadUrl from shared module', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'),
+      'utf-8',
+    );
     expect(src).toContain("from '@shared/url-parser'");
   });
 });
@@ -283,20 +306,29 @@ describe('feature 11: webview-thread-open', () => {
 // ---------------------------------------------------------------------------
 describe('feature 12: modal-resize', () => {
   it('Modal component supports resizable prop', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('resizable');
     expect(src).toContain('initialWidth');
     expect(src).toContain('initialHeight');
   });
 
   it('Modal defines minimum resize constraints', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('MIN_MODAL_WIDTH');
     expect(src).toContain('MIN_MODAL_HEIGHT');
   });
 
   it('Modal renders resize handle when resizable', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/common/Modal.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('cursor-se-resize');
     expect(src).toContain('handleResizeMouseDown');
   });
@@ -313,13 +345,22 @@ describe('feature 12: modal-resize', () => {
   });
 
   it('resizable modals have h-full for proper height tracking', () => {
-    const authSrc = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/auth/AuthPanel.tsx'), 'utf-8');
+    const authSrc = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/auth/AuthPanel.tsx'),
+      'utf-8',
+    );
     expect(authSrc).toContain('h-full');
 
-    const proxySrc = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/settings/ProxySettings.tsx'), 'utf-8');
+    const proxySrc = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/settings/ProxySettings.tsx'),
+      'utf-8',
+    );
     expect(proxySrc).toContain('h-full');
 
-    const consoleSrc = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'), 'utf-8');
+    const consoleSrc = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'),
+      'utf-8',
+    );
     expect(consoleSrc).toContain('h-full');
   });
 });
@@ -345,14 +386,20 @@ describe('feature 13: console-log-save', () => {
   });
 
   it('ConsoleModal has save-to-file button', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('handleSaveToFile');
     expect(src).toContain('mdiContentSave');
     expect(src).toContain('diag:save-logs');
   });
 
   it('ConsoleModal formats logs to text for saving', () => {
-    const src = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'), 'utf-8');
+    const src = readFileSync(
+      resolve(PROJECT_ROOT, 'src/renderer/components/console/ConsoleModal.tsx'),
+      'utf-8',
+    );
     expect(src).toContain('formatLogsToText');
   });
 

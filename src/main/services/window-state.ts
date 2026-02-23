@@ -62,19 +62,19 @@ export function loadWindowState(dataDir: string): WindowState {
 
   try {
     const parsed: unknown = JSON.parse(content.toString('utf-8'));
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null
-    ) {
+    if (typeof parsed !== 'object' || parsed === null) {
       return DEFAULT_STATE;
     }
 
     const obj = parsed as Record<string, unknown>;
     const x = typeof obj['x'] === 'number' ? obj['x'] : DEFAULT_STATE.x;
     const y = typeof obj['y'] === 'number' ? obj['y'] : DEFAULT_STATE.y;
-    const width = typeof obj['width'] === 'number' && obj['width'] > 0 ? obj['width'] : DEFAULT_STATE.width;
-    const height = typeof obj['height'] === 'number' && obj['height'] > 0 ? obj['height'] : DEFAULT_STATE.height;
-    const isMaximized = typeof obj['isMaximized'] === 'boolean' ? obj['isMaximized'] : DEFAULT_STATE.isMaximized;
+    const width =
+      typeof obj['width'] === 'number' && obj['width'] > 0 ? obj['width'] : DEFAULT_STATE.width;
+    const height =
+      typeof obj['height'] === 'number' && obj['height'] > 0 ? obj['height'] : DEFAULT_STATE.height;
+    const isMaximized =
+      typeof obj['isMaximized'] === 'boolean' ? obj['isMaximized'] : DEFAULT_STATE.isMaximized;
 
     return validateBounds({ x, y, width, height, isMaximized });
   } catch {

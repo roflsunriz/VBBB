@@ -3,11 +3,23 @@
  * Handles bbs.cgi POST, response type detection, cookie/check retry flow.
  */
 import type { EncodingType } from '@shared/api';
-import { type Board, BoardType, type PostParams, type PostResult, PostResultType } from '@shared/domain';
+import {
+  type Board,
+  BoardType,
+  type PostParams,
+  type PostResult,
+  PostResultType,
+} from '@shared/domain';
 import { MAX_POST_RETRIES } from '@shared/file-format';
 import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
-import { buildCookieHeader, getCookiesForUrl, parseSetCookieHeaders, removeCookie, setCookie } from './cookie-store';
+import {
+  buildCookieHeader,
+  getCookiesForUrl,
+  parseSetCookieHeaders,
+  removeCookie,
+  setCookie,
+} from './cookie-store';
 import { handleDonguriPostResult } from './donguri';
 import { decodeBuffer, httpEncode, replaceWithNCR } from './encoding';
 import { httpFetch } from './http-client';
@@ -26,7 +38,10 @@ const CONFIRMATION_HTML_LIMIT = 4000;
  * Does NOT log values (may contain user input).
  */
 function extractBodyParamKeys(body: string): string {
-  return body.split('&').map((pair) => pair.split('=')[0] ?? '').join(', ');
+  return body
+    .split('&')
+    .map((pair) => pair.split('=')[0] ?? '')
+    .join(', ');
 }
 
 /**
@@ -79,7 +94,9 @@ function normalizeCharset(raw: string): EncodingType | undefined {
  * Detect encoding from a Content-Type HTTP header value.
  * Returns undefined if no charset is found.
  */
-function detectEncodingFromHeader(headers: Readonly<Record<string, string>>): EncodingType | undefined {
+function detectEncodingFromHeader(
+  headers: Readonly<Record<string, string>>,
+): EncodingType | undefined {
   const contentType = headers['content-type'];
   if (contentType === undefined) return undefined;
 
@@ -236,10 +253,7 @@ function resolveRetryUrl(formAction: string | undefined, originalUrl: string): s
  * - Reply (threadId non-empty): bbs, key, time, FROM, mail, MESSAGE, submit="書き込む"
  * - New thread (threadId empty): bbs, time, subject, FROM, mail, MESSAGE, submit="新規スレッド作成"
  */
-function buildPostBody(
-  params: PostParams,
-  board: Board,
-): string {
+function buildPostBody(params: PostParams, board: Board): string {
   const encoding = getPostEncoding(board.boardType);
   const fields: Array<[string, string]> = [];
   const isNewThread = params.threadId.length === 0;
@@ -266,11 +280,12 @@ function buildPostBody(
   fields.push(['FROM', replaceWithNCR(params.name)]);
   fields.push(['mail', replaceWithNCR(params.mail)]);
   fields.push(['MESSAGE', replaceWithNCR(params.message)]);
-  fields.push(['submit', isNewThread ? '\u65B0\u898F\u30B9\u30EC\u30C3\u30C9\u4F5C\u6210' : '\u66F8\u304D\u8FBC\u3080']); // 新規スレッド作成 / 書き込む
+  fields.push([
+    'submit',
+    isNewThread ? '\u65B0\u898F\u30B9\u30EC\u30C3\u30C9\u4F5C\u6210' : '\u66F8\u304D\u8FBC\u3080',
+  ]); // 新規スレッド作成 / 書き込む
 
-  return fields
-    .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
-    .join('&');
+  return fields.map(([key, value]) => `${key}=${httpEncode(value, encoding)}`).join('&');
 }
 
 /**
@@ -310,9 +325,7 @@ function buildRetryBody(
     fields.push([submitBtn.name, submitBtn.value]);
   }
 
-  return fields
-    .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
-    .join('&');
+  return fields.map(([key, value]) => `${key}=${httpEncode(value, encoding)}`).join('&');
 }
 
 /**
@@ -337,7 +350,9 @@ export function detectResultType(html: string): PostResultType {
   // Patterns: クッキーがないか期限切れです / クッキー確認 (covers クッキー確認！)
   //           <!-- _X:cookie --> (reliable HTML comment marker from 5ch)
   if (
-    html.includes('\u30AF\u30C3\u30AD\u30FC\u304C\u306A\u3044\u304B\u671F\u9650\u5207\u308C\u3067\u3059') ||
+    html.includes(
+      '\u30AF\u30C3\u30AD\u30FC\u304C\u306A\u3044\u304B\u671F\u9650\u5207\u308C\u3067\u3059',
+    ) ||
     html.includes('\u30AF\u30C3\u30AD\u30FC\u78BA\u8A8D') ||
     html.includes('<!-- _X:cookie -->')
   ) {
@@ -368,7 +383,9 @@ export function detectResultType(html: string): PostResultType {
   }
 
   // --- grtNinpou ---
-  if (html.includes('\u5FCD\u6CD5\u306E\u8A8D\u6CD5\u3092\u65B0\u898F\u4F5C\u6210\u3057\u307E\u3059')) {
+  if (
+    html.includes('\u5FCD\u6CD5\u306E\u8A8D\u6CD5\u3092\u65B0\u898F\u4F5C\u6210\u3057\u307E\u3059')
+  ) {
     // 忍法の認法を新規作成します
     return PostResultType.Ninpou;
   }
@@ -422,14 +439,15 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
   // Referer: thread URL for replies, board URL for new threads (per protocol §3.1/3.2)
   // Slevo uses NO trailing slash on reply URLs; match that exactly.
-  const referer = params.threadId.length > 0
-    ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}`
-    : `${board.serverUrl}test/read.cgi/${board.bbsId}/`;
+  const referer =
+    params.threadId.length > 0
+      ? `${board.serverUrl}test/read.cgi/${board.bbsId}/${params.threadId}`
+      : `${board.serverUrl}test/read.cgi/${board.bbsId}/`;
 
   // Diagnostic: log the full post context
   logger.info(
     `[DIAG] Post context: boardType=${board.boardType}, encoding=${requestEncoding}, ` +
-    `bbsId=${board.bbsId}, threadId=${params.threadId}, referer=${referer}`,
+      `bbsId=${board.bbsId}, threadId=${params.threadId}, referer=${referer}`,
   );
 
   let hiddenFields: Record<string, string> | undefined;
@@ -442,9 +460,10 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
     // On retry after grtCookie/grtCheck, submit the server's confirmation
     // form directly (preserving its `time` value, submit button text, etc.)
-    const body = hiddenFields !== undefined && retrySubmitBtn !== undefined
-      ? buildRetryBody(hiddenFields, retrySubmitBtn, requestEncoding)
-      : buildPostBody(params, board);
+    const body =
+      hiddenFields !== undefined && retrySubmitBtn !== undefined
+        ? buildRetryBody(hiddenFields, retrySubmitBtn, requestEncoding)
+        : buildPostBody(params, board);
 
     // Infinite loop prevention: check if payload is identical to previous
     if (body === lastPayloadHash && attempt > 0) {
@@ -462,7 +481,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     const bodyBytes = Buffer.byteLength(body, 'utf-8');
     logger.info(
       `[DIAG] Request body (attempt ${String(attempt + 1)}, ${isRetry ? 'retry' : 'initial'}): ` +
-      `params=[${bodyParamKeys}], size=${String(bodyBytes)} bytes`,
+        `params=[${bodyParamKeys}], size=${String(bodyBytes)} bytes`,
     );
 
     // Use the confirmation form's action URL for retries (e.g. includes ?guid=ON),
@@ -480,22 +499,26 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     // Build Cookie header from store (acorn, sid, DMDM, MDMD, SPID, PON, etc.)
     const cookieHeader = buildCookieHeader(targetUrl);
     // Log cookie names and partial values for diagnostics
-    const cookiePairs = cookieHeader.length > 0
-      ? cookieHeader.split('; ').map((c) => {
-          const eqIdx = c.indexOf('=');
-          if (eqIdx < 0) return c;
-          const name = c.substring(0, eqIdx);
-          const val = c.substring(eqIdx + 1);
-          // Show first 20 chars of value to verify correctness
-          const preview = val.length > 20 ? val.substring(0, 20) + '...' : val;
-          return `${name}=${preview}`;
-        })
-      : [];
-    const cookieNames = cookiePairs.length > 0
-      ? cookiePairs.map((p) => p.split('=')[0]).join(', ')
-      : '(none)';
-    logger.info(`Posting to ${targetUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`);
-    logger.info(`[DIAG] Cookie value previews: ${cookiePairs.length > 0 ? cookiePairs.join('; ') : '(none)'}`);
+    const cookiePairs =
+      cookieHeader.length > 0
+        ? cookieHeader.split('; ').map((c) => {
+            const eqIdx = c.indexOf('=');
+            if (eqIdx < 0) return c;
+            const name = c.substring(0, eqIdx);
+            const val = c.substring(eqIdx + 1);
+            // Show first 20 chars of value to verify correctness
+            const preview = val.length > 20 ? val.substring(0, 20) + '...' : val;
+            return `${name}=${preview}`;
+          })
+        : [];
+    const cookieNames =
+      cookiePairs.length > 0 ? cookiePairs.map((p) => p.split('=')[0]).join(', ') : '(none)';
+    logger.info(
+      `Posting to ${targetUrl} (attempt ${String(attempt + 1)}, cookies: ${cookieNames})`,
+    );
+    logger.info(
+      `[DIAG] Cookie value previews: ${cookiePairs.length > 0 ? cookiePairs.join('; ') : '(none)'}`,
+    );
     logger.info(`[DIAG] Referer for this attempt: ${effectiveReferer}`);
 
     // Match Slevo's minimal header set: only Content-Type, Referer, and Cookie.
@@ -511,9 +534,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     }
 
     // Diagnostic: log all request headers (Cookie values already masked by logger)
-    logger.info(
-      `[DIAG] Request headers: ${Object.keys(postHeaders).join(', ')}`,
-    );
+    logger.info(`[DIAG] Request headers: ${Object.keys(postHeaders).join(', ')}`);
 
     const response = await httpFetch({
       url: targetUrl,
@@ -526,29 +547,34 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
     logger.info(
       `[DIAG] Response HTTP ${String(response.status)}, headers: ${formatHeadersDiag(response.headers)}`,
     );
-    logger.info(
-      `[DIAG] Response body size: ${String(response.body.length)} bytes`,
-    );
+    logger.info(`[DIAG] Response body size: ${String(response.body.length)} bytes`);
 
     // Parse and store any cookies from the response
     const hadSetCookie = response.headers['set-cookie'] !== undefined;
     parseSetCookieHeaders(response.headers, postUrl);
     if (hadSetCookie) {
       const updatedCookieHeader = buildCookieHeader(postUrl);
-      const updatedNames = updatedCookieHeader.length > 0
-        ? updatedCookieHeader.split('; ').map((c) => c.split('=')[0]).join(', ')
-        : '(none)';
+      const updatedNames =
+        updatedCookieHeader.length > 0
+          ? updatedCookieHeader
+              .split('; ')
+              .map((c) => c.split('=')[0])
+              .join(', ')
+          : '(none)';
       logger.info(`Set-Cookie received; store now has: ${updatedNames}`);
     }
 
     // Decode response: HTTP Content-Type header → HTML meta charset → request encoding
-    const responseEncoding = detectEncodingFromHeader(response.headers)
-      ?? detectEncodingFromHtmlMeta(response.body)
-      ?? requestEncoding;
+    const responseEncoding =
+      detectEncodingFromHeader(response.headers) ??
+      detectEncodingFromHtmlMeta(response.body) ??
+      requestEncoding;
     const html = decodeBuffer(response.body, responseEncoding);
     const resultType = detectResultType(html);
 
-    logger.info(`Post result: ${resultType} (HTTP ${String(response.status)}, decoded as ${responseEncoding})`);
+    logger.info(
+      `Post result: ${resultType} (HTTP ${String(response.status)}, decoded as ${responseEncoding})`,
+    );
 
     // Update donguri state for donguri-related results
     if (resultType === PostResultType.Donguri || resultType === PostResultType.DonguriError) {
@@ -565,9 +591,11 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       attempt < MAX_POST_RETRIES
     ) {
       // Diagnostic: log full confirmation page HTML for debugging
-      const confirmSnippet = html.length > CONFIRMATION_HTML_LIMIT
-        ? html.substring(0, CONFIRMATION_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
-        : html;
+      const confirmSnippet =
+        html.length > CONFIRMATION_HTML_LIMIT
+          ? html.substring(0, CONFIRMATION_HTML_LIMIT) +
+            `... (truncated, total ${String(html.length)} chars)`
+          : html;
       logger.info(`[DIAG] ${resultType} full response:\n${confirmSnippet}`);
 
       // Extract form data from the confirmation page
@@ -582,13 +610,20 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       retryUrl = resolveRetryUrl(formAction, postUrl);
       logger.info(
         `${resultType} form: action=${formAction ?? '(none)'}, ` +
-        `resolved retryUrl=${retryUrl}, ` +
-        `submit name=${retrySubmitBtn.name ?? '(none)'} value="${retrySubmitBtn.value}"`,
+          `resolved retryUrl=${retryUrl}, ` +
+          `submit name=${retrySubmitBtn.name ?? '(none)'} value="${retrySubmitBtn.value}"`,
       );
 
       // Diagnostic: log all hidden field keys and whether they are standard params
       const standardParamNames = new Set([
-        'FROM', 'mail', 'MESSAGE', 'bbs', 'time', 'key', 'subject', 'submit',
+        'FROM',
+        'mail',
+        'MESSAGE',
+        'bbs',
+        'time',
+        'key',
+        'subject',
+        'submit',
       ]);
       const hiddenSummary = Object.entries(hiddenFields)
         .map(([k, v]) => {
@@ -615,18 +650,15 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       for (const pc of preCookies) {
         preCookieNames.add(pc.name);
         // Log value preview so we can verify cookie vs hidden field differ
-        const cookiePreview = pc.value.length > 30
-          ? pc.value.substring(0, 30) + '...'
-          : pc.value;
+        const cookiePreview = pc.value.length > 30 ? pc.value.substring(0, 30) + '...' : pc.value;
         logger.info(
           `[DIAG] Setting cookie from <pre> tag: ${pc.name}=${cookiePreview} for ${confirmUrlObj.hostname}`,
         );
         // Also log the hidden field value for comparison
         const hiddenVal = hiddenFields[pc.name];
         if (hiddenVal !== undefined) {
-          const hiddenPreview = hiddenVal.length > 30
-            ? hiddenVal.substring(0, 30) + '...'
-            : hiddenVal;
+          const hiddenPreview =
+            hiddenVal.length > 30 ? hiddenVal.substring(0, 30) + '...' : hiddenVal;
           logger.info(
             `[DIAG] Corresponding hidden field: ${pc.name}=${hiddenPreview} (DIFFERENT=${String(pc.value !== htmlDecode(hiddenVal))})`,
           );
@@ -637,9 +669,7 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
         // storing a second copy at the subdomain (acorn@rio2016.5ch.net) would
         // cause TWO cookies with the same name to be sent.  To avoid this,
         // check for an existing match and reuse its domain.
-        const existingMatches = getCookiesForUrl(retryUrl).filter(
-          (c) => c.name === pc.name,
-        );
+        const existingMatches = getCookiesForUrl(retryUrl).filter((c) => c.name === pc.name);
         let cookieDomain = confirmUrlObj.hostname;
         if (existingMatches.length > 0 && existingMatches[0] !== undefined) {
           // Reuse the domain of the existing cookie and remove the old entry
@@ -664,7 +694,9 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       // storing them as cookies so they appear in the Cookie header.
       for (const [fieldName, fieldValue] of Object.entries(hiddenFields)) {
         if (!standardParamNames.has(fieldName) && !preCookieNames.has(fieldName)) {
-          logger.info(`[DIAG] Storing hidden field as cookie (no <pre> match): ${fieldName} for ${confirmUrlObj.hostname}`);
+          logger.info(
+            `[DIAG] Storing hidden field as cookie (no <pre> match): ${fieldName} for ${confirmUrlObj.hostname}`,
+          );
           setCookie({
             name: fieldName,
             value: htmlDecode(fieldValue),
@@ -677,16 +709,16 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       }
 
       const fieldNames = Object.keys(hiddenFields);
-      logger.info(
-        `Retrying with form submission (fields: ${fieldNames.join(', ')})`,
-      );
+      logger.info(`Retrying with form submission (fields: ${fieldNames.join(', ')})`);
 
       // Wait before retrying: a real browser shows the confirmation page to
       // the user, who reads and clicks the submit button after a few seconds.
       // Instant retries (< 1 second) may be flagged as bot behaviour by the
       // 5ch server, resulting in a "9991 Banned" rejection.
       const CONFIRMATION_DELAY_MS = 3000;
-      logger.info(`[DIAG] Waiting ${String(CONFIRMATION_DELAY_MS)}ms before retry (anti-bot timing)`);
+      logger.info(
+        `[DIAG] Waiting ${String(CONFIRMATION_DELAY_MS)}ms before retry (anti-bot timing)`,
+      );
       await new Promise<void>((resolve) => {
         setTimeout(resolve, CONFIRMATION_DELAY_MS);
       });
@@ -696,9 +728,11 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
 
     // Log diagnostic info for non-OK results to aid debugging
     if (resultType === PostResultType.Error) {
-      const snippet = html.length > DIAGNOSTIC_HTML_LIMIT
-        ? html.substring(0, DIAGNOSTIC_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
-        : html;
+      const snippet =
+        html.length > DIAGNOSTIC_HTML_LIMIT
+          ? html.substring(0, DIAGNOSTIC_HTML_LIMIT) +
+            `... (truncated, total ${String(html.length)} chars)`
+          : html;
       logger.warn(`[DIAG] grtError response body:\n${snippet}`);
     }
 

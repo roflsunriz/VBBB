@@ -53,10 +53,7 @@ export function parseJBBSSubjectLine(line: string): SubjectRecord | null {
   if (!fileName.endsWith('.dat')) return null;
 
   // Extract count from end: (123)
-  const countPatterns = [
-    /\((\d+)\)\s*$/,
-    /\uff08(\d+)\uff09\s*$/,
-  ];
+  const countPatterns = [/\((\d+)\)\s*$/, /\uff08(\d+)\uff09\s*$/];
 
   let title = rest;
   let count = 0;
@@ -93,10 +90,7 @@ export function parseJBBSSubjectTxt(content: string): SubjectRecord[] {
 /**
  * Fetch JBBS subject.txt.
  */
-export async function fetchJBBSSubject(
-  board: Board,
-  dataDir: string,
-): Promise<SubjectFetchResult> {
+export async function fetchJBBSSubject(board: Board, dataDir: string): Promise<SubjectFetchResult> {
   const subjectUrl = getSubjectUrl(board);
   const boardDir = getBoardDir(dataDir, board.url);
   const localPath = join(boardDir, 'subject.txt');
@@ -131,7 +125,9 @@ export async function fetchJBBSSubject(
     const localContent = readFileSafe(localPath);
     if (localContent !== null) {
       const text = decodeBuffer(localContent, encoding);
-      logger.warn(`JBBS fetch failed, using cache: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        `JBBS fetch failed, using cache: ${err instanceof Error ? err.message : String(err)}`,
+      );
       return { threads: parseJBBSSubjectTxt(text), notModified: true };
     }
     throw err;

@@ -3,7 +3,13 @@
  * Covers <> format, comma format, count bracket variations, Age/Sage/New/Archive.
  */
 import { describe, it, expect } from 'vitest';
-import { parseSubjectLine, parseSubjectTxt, determineAgeSage, parseFolderIdx, serializeFolderIdx } from '../../src/main/services/subject';
+import {
+  parseSubjectLine,
+  parseSubjectTxt,
+  determineAgeSage,
+  parseFolderIdx,
+  serializeFolderIdx,
+} from '../../src/main/services/subject';
 import { AgeSage, type ThreadIndex } from '../../src/types/domain';
 import { FOLDER_IDX_VERSION } from '../../src/types/file-format';
 
@@ -112,8 +118,8 @@ describe('determineAgeSage', () => {
       { fileName: '222.dat', title: 'B', count: 20 },
     ];
     const existing = [
-      makeIndex(2, '111.dat', 10),  // was at position 2, now at 1 -> Age
-      makeIndex(1, '222.dat', 20),  // was at position 1, now at 2
+      makeIndex(2, '111.dat', 10), // was at position 2, now at 1 -> Age
+      makeIndex(1, '222.dat', 20), // was at position 1, now at 2
     ];
     const result = determineAgeSage(subjects, existing);
     expect(result.get('111.dat')).toBe(AgeSage.Age);
@@ -122,11 +128,11 @@ describe('determineAgeSage', () => {
   it('marks threads with more posts but same/lower rank as Sage', () => {
     const subjects = [
       { fileName: '111.dat', title: 'A', count: 10 },
-      { fileName: '222.dat', title: 'B', count: 25 },  // count increased
+      { fileName: '222.dat', title: 'B', count: 25 }, // count increased
     ];
     const existing = [
       makeIndex(1, '111.dat', 10),
-      makeIndex(2, '222.dat', 20),  // count was 20, now 25, but rank same
+      makeIndex(2, '222.dat', 20), // count was 20, now 25, but rank same
     ];
     const result = determineAgeSage(subjects, existing);
     expect(result.get('222.dat')).toBe(AgeSage.Sage);
@@ -134,10 +140,7 @@ describe('determineAgeSage', () => {
 
   it('marks threads not in new list as Archive', () => {
     const subjects = [{ fileName: '111.dat', title: 'A', count: 10 }];
-    const existing = [
-      makeIndex(1, '111.dat', 10),
-      makeIndex(2, '222.dat', 20),
-    ];
+    const existing = [makeIndex(1, '111.dat', 10), makeIndex(2, '222.dat', 20)];
     const result = determineAgeSage(subjects, existing);
     expect(result.get('222.dat')).toBe(AgeSage.Archive);
   });

@@ -7,7 +7,8 @@ import { parseDatLine, parseDat } from '../../src/main/services/dat';
 
 describe('parseDatLine', () => {
   it('parses standard 5-field DAT line', () => {
-    const line = '名無しさん<>sage<>2024/01/15(月) 12:34:56.78 ID:AbCdEfGh0<>本文テキスト<>スレッドタイトル';
+    const line =
+      '名無しさん<>sage<>2024/01/15(月) 12:34:56.78 ID:AbCdEfGh0<>本文テキスト<>スレッドタイトル';
     const res = parseDatLine(line, 1);
     expect(res).not.toBeNull();
     expect(res?.number).toBe(1);
@@ -54,7 +55,8 @@ describe('parseDatLine', () => {
   });
 
   it('parses machi offlaw line correctly', () => {
-    const line = '1<>スロウライダー<><>2007/06/21(木) 21:28:37 ID:y9R9FVbw<>前スレ<br>本文<>◇◆【酉の市】足立区花畑 ８【発祥の地】◆◇<>6D68-DA39-5033';
+    const line =
+      '1<>スロウライダー<><>2007/06/21(木) 21:28:37 ID:y9R9FVbw<>前スレ<br>本文<>◇◆【酉の市】足立区花畑 ８【発祥の地】◆◇<>6D68-DA39-5033';
     const res = parseDatLine(line, 1);
     expect(res).not.toBeNull();
     expect(res?.number).toBe(1);

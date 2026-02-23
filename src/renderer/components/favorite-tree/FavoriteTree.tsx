@@ -4,7 +4,16 @@
  * Supports right-click context menu for deletion.
  */
 import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
-import { mdiStar, mdiFolderOpen, mdiFolder, mdiForumOutline, mdiBulletinBoard, mdiDelete, mdiMagnify, mdiClose } from '@mdi/js';
+import {
+  mdiStar,
+  mdiFolderOpen,
+  mdiFolder,
+  mdiForumOutline,
+  mdiBulletinBoard,
+  mdiDelete,
+  mdiMagnify,
+  mdiClose,
+} from '@mdi/js';
 import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { FavNode, FavFolder, FavItem } from '@shared/favorite';
 import { parseAnyThreadUrl, parseExternalBoardUrl } from '@shared/url-parser';
@@ -77,7 +86,9 @@ function FavItemRow({
     <div
       className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
       style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
-      onContextMenu={(e) => { onContextMenu(e, item); }}
+      onContextMenu={(e) => {
+        onContextMenu(e, item);
+      }}
     >
       <button
         type="button"
@@ -89,7 +100,9 @@ function FavItemRow({
       </button>
       <button
         type="button"
-        onClick={() => { onRemove(item.id); }}
+        onClick={() => {
+          onRemove(item.id);
+        }}
         className="shrink-0 rounded p-0.5 opacity-0 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-error)] group-hover:opacity-100"
         aria-label="削除"
       >
@@ -117,11 +130,15 @@ function FavFolderRow({
       <div
         className="group flex items-center gap-1 px-2 py-0.5 text-xs hover:bg-[var(--color-bg-hover)]"
         style={{ paddingLeft: `${String(8 + depth * 12)}px` }}
-        onContextMenu={(e) => { onContextMenu(e, folder); }}
+        onContextMenu={(e) => {
+          onContextMenu(e, folder);
+        }}
       >
         <button
           type="button"
-          onClick={() => { onToggle(folder.id); }}
+          onClick={() => {
+            onToggle(folder.id);
+          }}
           className="flex min-w-0 flex-1 items-center gap-1"
         >
           <MdiIcon
@@ -129,20 +146,32 @@ function FavFolderRow({
             size={14}
             className="shrink-0 text-[var(--color-warning)]"
           />
-          <span className="truncate font-medium text-[var(--color-text-primary)]">{folder.title}</span>
+          <span className="truncate font-medium text-[var(--color-text-primary)]">
+            {folder.title}
+          </span>
         </button>
         <button
           type="button"
-          onClick={() => { onRemove(folder.id); }}
+          onClick={() => {
+            onRemove(folder.id);
+          }}
           className="shrink-0 rounded p-0.5 opacity-0 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-error)] group-hover:opacity-100"
           aria-label="削除"
         >
           <MdiIcon path={mdiDelete} size={12} />
         </button>
       </div>
-      {folder.expanded && folder.children.map((child) => (
-        <FavNodeRow key={child.id} node={child} depth={depth + 1} onToggle={onToggle} onRemove={onRemove} onContextMenu={onContextMenu} />
-      ))}
+      {folder.expanded &&
+        folder.children.map((child) => (
+          <FavNodeRow
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            onToggle={onToggle}
+            onRemove={onRemove}
+            onContextMenu={onContextMenu}
+          />
+        ))}
     </>
   );
 }
@@ -161,7 +190,15 @@ function FavNodeRow({
   readonly onContextMenu: (e: React.MouseEvent, node: FavNode) => void;
 }): React.JSX.Element {
   if (node.kind === 'folder') {
-    return <FavFolderRow folder={node} depth={depth} onToggle={onToggle} onRemove={onRemove} onContextMenu={onContextMenu} />;
+    return (
+      <FavFolderRow
+        folder={node}
+        depth={depth}
+        onToggle={onToggle}
+        onRemove={onRemove}
+        onContextMenu={onContextMenu}
+      />
+    );
   }
   return <FavItemRow item={node} depth={depth} onRemove={onRemove} onContextMenu={onContextMenu} />;
 }
@@ -221,19 +258,29 @@ export function FavoriteTree(): React.JSX.Element {
   // Close context menu on click
   useEffect(() => {
     if (ctxMenu === null) return;
-    const handler = (): void => { setCtxMenu(null); };
+    const handler = (): void => {
+      setCtxMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [ctxMenu]);
 
-  const handleToggle = useCallback((folderId: string) => {
-    const updated = toggleFolderExpand(favorites.children, folderId);
-    void saveFavorites({ children: updated });
-  }, [favorites, saveFavorites]);
+  const handleToggle = useCallback(
+    (folderId: string) => {
+      const updated = toggleFolderExpand(favorites.children, folderId);
+      void saveFavorites({ children: updated });
+    },
+    [favorites, saveFavorites],
+  );
 
-  const handleRemove = useCallback((nodeId: string) => {
-    void removeFavorite(nodeId);
-  }, [removeFavorite]);
+  const handleRemove = useCallback(
+    (nodeId: string) => {
+      void removeFavorite(nodeId);
+    },
+    [removeFavorite],
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FavNode) => {
     e.preventDefault();
@@ -293,7 +340,9 @@ export function FavoriteTree(): React.JSX.Element {
         {searchFilter.length > 0 && (
           <button
             type="button"
-            onClick={() => { setSearchFilter(''); }}
+            onClick={() => {
+              setSearchFilter('');
+            }}
             className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
             aria-label="検索をクリア"
           >
@@ -306,11 +355,20 @@ export function FavoriteTree(): React.JSX.Element {
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {filteredChildren.length === 0 ? (
           <p className="px-3 py-4 text-center text-xs text-[var(--color-text-muted)]">
-            {favorites.children.length === 0 ? 'お気に入りはありません' : '一致するお気に入りはありません'}
+            {favorites.children.length === 0
+              ? 'お気に入りはありません'
+              : '一致するお気に入りはありません'}
           </p>
         ) : (
           filteredChildren.map((node) => (
-            <FavNodeRow key={node.id} node={node} depth={0} onToggle={handleToggle} onRemove={handleRemove} onContextMenu={handleContextMenu} />
+            <FavNodeRow
+              key={node.id}
+              node={node}
+              depth={0}
+              onToggle={handleToggle}
+              onRemove={handleRemove}
+              onContextMenu={handleContextMenu}
+            />
           ))
         )}
       </div>
@@ -338,7 +396,11 @@ export function FavoriteTree(): React.JSX.Element {
             onClick={handleCtxRemove}
             role="menuitem"
           >
-            &quot;{ctxMenu.nodeTitle.length > 15 ? `${ctxMenu.nodeTitle.slice(0, 15)}…` : ctxMenu.nodeTitle}&quot; を削除
+            &quot;
+            {ctxMenu.nodeTitle.length > 15
+              ? `${ctxMenu.nodeTitle.slice(0, 15)}…`
+              : ctxMenu.nodeTitle}
+            &quot; を削除
           </button>
         </div>
       )}

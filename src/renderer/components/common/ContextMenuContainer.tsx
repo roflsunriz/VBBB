@@ -40,13 +40,7 @@ export function ContextMenuContainer({
   });
 
   return (
-    <div
-      ref={ref}
-      className={className}
-      style={{ left: x, top: y }}
-      role={role}
-      onClick={onClick}
-    >
+    <div ref={ref} className={className} style={{ left: x, top: y }} role={role} onClick={onClick}>
       {children}
     </div>
   );

@@ -34,7 +34,7 @@ const IPV6_PATTERN = new RegExp(
     '|(?:[0-9a-fA-F]{1,4}:){1,7}:' +
     // Just ::
     '|::' +
-  ')',
+    ')',
   'g',
 );
 
@@ -50,10 +50,13 @@ const IPV6_MASKED_PATTERN = /([0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})+:\*)/g;
 /** Validate that an IPv4 address has octets in 0-255 range */
 function isValidIpv4(ip: string): boolean {
   const parts = ip.split('.');
-  return parts.length === 4 && parts.every((p) => {
-    const n = Number(p);
-    return Number.isInteger(n) && n >= 0 && n <= 255;
-  });
+  return (
+    parts.length === 4 &&
+    parts.every((p) => {
+      const n = Number(p);
+      return Number.isInteger(n) && n >= 0 && n <= 255;
+    })
+  );
 }
 
 /**

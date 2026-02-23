@@ -109,7 +109,9 @@ export function HistoryPanel(): React.JSX.Element {
         {filter.length > 0 && (
           <button
             type="button"
-            onClick={() => { setFilter(''); }}
+            onClick={() => {
+              setFilter('');
+            }}
             className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
             aria-label="検索をクリア"
           >
@@ -129,11 +131,17 @@ export function HistoryPanel(): React.JSX.Element {
           <button
             key={`${entry.boardUrl}-${entry.threadId}`}
             type="button"
-            onClick={() => { handleOpen(entry.boardUrl, entry.threadId, entry.title); }}
+            onClick={() => {
+              handleOpen(entry.boardUrl, entry.threadId, entry.title);
+            }}
             className="flex w-full flex-col gap-0.5 border-b border-[var(--color-border-secondary)] px-2 py-1.5 text-left hover:bg-[var(--color-bg-hover)]"
           >
-            <span className="truncate text-xs text-[var(--color-text-secondary)]">{entry.title}</span>
-            <span className="text-[10px] text-[var(--color-text-muted)]">{formatDate(entry.lastVisited)}</span>
+            <span className="truncate text-xs text-[var(--color-text-secondary)]">
+              {entry.title}
+            </span>
+            <span className="text-[10px] text-[var(--color-text-muted)]">
+              {formatDate(entry.lastVisited)}
+            </span>
           </button>
         ))}
       </div>

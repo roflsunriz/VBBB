@@ -62,9 +62,7 @@ export function addHistoryEntry(
   title: string,
 ): readonly BrowsingHistoryEntry[] {
   // Remove existing entry for this thread
-  history = history.filter(
-    (e) => !(e.boardUrl === boardUrl && e.threadId === threadId),
-  );
+  history = history.filter((e) => !(e.boardUrl === boardUrl && e.threadId === threadId));
 
   // Add to front
   history.unshift({

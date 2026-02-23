@@ -3,7 +3,12 @@
  * Covers httpEncode, sanitize/unsanitize for Folder.idx.
  */
 import { describe, it, expect } from 'vitest';
-import { httpEncode, replaceWithNCR, sanitizeForIdx, unsanitizeFromIdx } from '../../src/main/services/encoding';
+import {
+  httpEncode,
+  replaceWithNCR,
+  sanitizeForIdx,
+  unsanitizeFromIdx,
+} from '../../src/main/services/encoding';
 
 describe('httpEncode', () => {
   it('keeps alphanumeric and safe characters as-is', () => {

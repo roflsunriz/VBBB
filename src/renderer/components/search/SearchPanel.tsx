@@ -84,11 +84,19 @@ const DEFAULT_AD_RULES = [
 ].join('\n');
 
 function loadAdBlockEnabled(): boolean {
-  try { return localStorage.getItem(AD_BLOCK_KEY) !== 'false'; } catch { return true; }
+  try {
+    return localStorage.getItem(AD_BLOCK_KEY) !== 'false';
+  } catch {
+    return true;
+  }
 }
 
 function loadAdBlockRules(): string {
-  try { return localStorage.getItem(AD_BLOCK_RULES_KEY) ?? DEFAULT_AD_RULES; } catch { return DEFAULT_AD_RULES; }
+  try {
+    return localStorage.getItem(AD_BLOCK_RULES_KEY) ?? DEFAULT_AD_RULES;
+  } catch {
+    return DEFAULT_AD_RULES;
+  }
 }
 
 export function SearchPanel(): React.JSX.Element {
@@ -130,14 +138,19 @@ export function SearchPanel(): React.JSX.Element {
     const handleDomReady = (): void => {
       const webviewEl = wv as unknown as { executeJavaScript: (code: string) => void };
       if (typeof webviewEl.executeJavaScript === 'function') {
-        const escaped = adBlockCss.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        const escaped = adBlockCss
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/\n/g, '\\n');
         webviewEl.executeJavaScript(
           `(() => { const s = document.createElement('style'); s.textContent = '${escaped}'; document.head.appendChild(s); })()`,
         );
       }
     };
     wv.addEventListener('dom-ready', handleDomReady);
-    return () => { wv.removeEventListener('dom-ready', handleDomReady); };
+    return () => {
+      wv.removeEventListener('dom-ready', handleDomReady);
+    };
   }, [remoteUrl, adBlockCss]);
 
   // F7: Intercept navigation in webview to open 5ch/external threads natively
@@ -186,64 +199,73 @@ export function SearchPanel(): React.JSX.Element {
     };
   }, [remoteUrl, openThread, selectBoard]);
 
-  const runSearch = useCallback(async (query: string) => {
-    if (query.trim().length === 0) return;
-    setSearching(true);
-    setError(null);
-    try {
-      if (mode === 'local') {
-        const results = await window.electronApi.invoke('search:local-all', {
-          pattern: query.trim(),
-          scope,
-          target,
-          caseSensitive,
-        });
-        setLocalResults(results);
-        setRemoteUrl(null);
-      } else {
-        const url = await window.electronApi.invoke('search:remote-url', query.trim());
-        setRemoteUrl(url);
-        setLocalResults([]);
+  const runSearch = useCallback(
+    async (query: string) => {
+      if (query.trim().length === 0) return;
+      setSearching(true);
+      setError(null);
+      try {
+        if (mode === 'local') {
+          const results = await window.electronApi.invoke('search:local-all', {
+            pattern: query.trim(),
+            scope,
+            target,
+            caseSensitive,
+          });
+          setLocalResults(results);
+          setRemoteUrl(null);
+        } else {
+          const url = await window.electronApi.invoke('search:remote-url', query.trim());
+          setRemoteUrl(url);
+          setLocalResults([]);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setSearching(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSearching(false);
-    }
-  }, [mode, scope, target, caseSensitive]);
+    },
+    [mode, scope, target, caseSensitive],
+  );
 
   const handleSearch = useCallback(() => {
     void runSearch(pattern);
   }, [runSearch, pattern]);
 
-  const handleSearchFromInput = useCallback((query: string) => {
-    setPattern(query);
-    void runSearch(query);
-  }, [runSearch]);
+  const handleSearchFromInput = useCallback(
+    (query: string) => {
+      setPattern(query);
+      void runSearch(query);
+    },
+    [runSearch],
+  );
 
-  const handleResultClick = useCallback((result: LocalSearchAllResult) => {
-    switch (result.kind) {
-      case 'board':
-        void selectBoard({
-          title: result.boardTitle,
-          url: result.boardUrl,
-          bbsId: '',
-          serverUrl: '',
-          boardType: '2ch',
-        });
-        break;
-      case 'subject':
-        void openThread(result.boardUrl, result.threadId, result.threadTitle);
-        break;
-      case 'dat':
-        void openThread(result.boardUrl, result.threadId, result.threadTitle);
-        break;
-      default: {
-        const _never: never = result;
-        void _never;
+  const handleResultClick = useCallback(
+    (result: LocalSearchAllResult) => {
+      switch (result.kind) {
+        case 'board':
+          void selectBoard({
+            title: result.boardTitle,
+            url: result.boardUrl,
+            bbsId: '',
+            serverUrl: '',
+            boardType: '2ch',
+          });
+          break;
+        case 'subject':
+          void openThread(result.boardUrl, result.threadId, result.threadTitle);
+          break;
+        case 'dat':
+          void openThread(result.boardUrl, result.threadId, result.threadTitle);
+          break;
+        default: {
+          const _never: never = result;
+          void _never;
+        }
       }
-    }
-  }, [openThread, selectBoard]);
+    },
+    [openThread, selectBoard],
+  );
 
   return (
     <div className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
@@ -251,14 +273,18 @@ export function SearchPanel(): React.JSX.Element {
       <div className="flex border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]">
         <button
           type="button"
-          onClick={() => { setMode('local'); }}
+          onClick={() => {
+            setMode('local');
+          }}
           className={`flex-1 px-2 py-1 text-xs ${mode === 'local' ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}
         >
           ローカル検索
         </button>
         <button
           type="button"
-          onClick={() => { setMode('remote'); }}
+          onClick={() => {
+            setMode('remote');
+          }}
           className={`flex-1 px-2 py-1 text-xs ${mode === 'remote' ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]' : 'text-[var(--color-text-muted)]'}`}
         >
           リモート検索
@@ -274,7 +300,11 @@ export function SearchPanel(): React.JSX.Element {
               checked={adBlockEnabled}
               onChange={(e) => {
                 setAdBlockEnabled(e.target.checked);
-                try { localStorage.setItem(AD_BLOCK_KEY, String(e.target.checked)); } catch { /* ignore */ }
+                try {
+                  localStorage.setItem(AD_BLOCK_KEY, String(e.target.checked));
+                } catch {
+                  /* ignore */
+                }
               }}
               className="accent-[var(--color-accent)]"
             />
@@ -283,7 +313,9 @@ export function SearchPanel(): React.JSX.Element {
           </label>
           <button
             type="button"
-            onClick={() => { setAdBlockEditorOpen((p) => !p); }}
+            onClick={() => {
+              setAdBlockEditorOpen((p) => !p);
+            }}
             className="rounded px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
           >
             ルール編集
@@ -302,7 +334,11 @@ export function SearchPanel(): React.JSX.Element {
             value={adBlockRules}
             onChange={(e) => {
               setAdBlockRules(e.target.value);
-              try { localStorage.setItem(AD_BLOCK_RULES_KEY, e.target.value); } catch { /* ignore */ }
+              try {
+                localStorage.setItem(AD_BLOCK_RULES_KEY, e.target.value);
+              } catch {
+                /* ignore */
+              }
             }}
             rows={12}
             className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 font-mono text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none"
@@ -311,7 +347,11 @@ export function SearchPanel(): React.JSX.Element {
             type="button"
             onClick={() => {
               setAdBlockRules(DEFAULT_AD_RULES);
-              try { localStorage.setItem(AD_BLOCK_RULES_KEY, DEFAULT_AD_RULES); } catch { /* ignore */ }
+              try {
+                localStorage.setItem(AD_BLOCK_RULES_KEY, DEFAULT_AD_RULES);
+              } catch {
+                /* ignore */
+              }
             }}
             className="mt-1 rounded px-2 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
           >
@@ -328,14 +368,18 @@ export function SearchPanel(): React.JSX.Element {
             onChange={setPattern}
             onSearch={handleSearchFromInput}
             storageKey="vbbb-search-history-search-panel"
-            placeholder={mode === 'local' ? '検索パターン (正規表現)' : 'キーワード (ff5ch.syoboi.jp)'}
+            placeholder={
+              mode === 'local' ? '検索パターン (正規表現)' : 'キーワード (ff5ch.syoboi.jp)'
+            }
             inputClassName="flex-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
             disabled={searching}
           />
           {pattern.length > 0 && (
             <button
               type="button"
-              onClick={() => { setPattern(''); }}
+              onClick={() => {
+                setPattern('');
+              }}
               className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
               aria-label="検索をクリア"
             >
@@ -356,7 +400,9 @@ export function SearchPanel(): React.JSX.Element {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <select
               value={scope}
-              onChange={(e) => { setScope(e.target.value as LocalSearchScope); }}
+              onChange={(e) => {
+                setScope(e.target.value as LocalSearchScope);
+              }}
               className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-1 py-0.5 text-xs text-[var(--color-text-primary)]"
             >
               <option value={LocalSearchScope.All}>すべて</option>
@@ -367,7 +413,9 @@ export function SearchPanel(): React.JSX.Element {
             {(scope === LocalSearchScope.DatCache || scope === LocalSearchScope.All) && (
               <select
                 value={target}
-                onChange={(e) => { setTarget(e.target.value as SearchTarget); }}
+                onChange={(e) => {
+                  setTarget(e.target.value as SearchTarget);
+                }}
                 className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-1 py-0.5 text-xs text-[var(--color-text-primary)]"
               >
                 <option value="all">全フィールド</option>
@@ -381,7 +429,9 @@ export function SearchPanel(): React.JSX.Element {
               <input
                 type="checkbox"
                 checked={caseSensitive}
-                onChange={(e) => { setCaseSensitive(e.target.checked); }}
+                onChange={(e) => {
+                  setCaseSensitive(e.target.checked);
+                }}
               />
               大小区別
             </label>
@@ -390,14 +440,14 @@ export function SearchPanel(): React.JSX.Element {
       </div>
 
       {/* Error */}
-      {error !== null && (
-        <div className="px-2 py-1 text-xs text-[var(--color-error)]">{error}</div>
-      )}
+      {error !== null && <div className="px-2 py-1 text-xs text-[var(--color-error)]">{error}</div>}
 
       {/* Results */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {searching && (
-          <div className="flex items-center justify-center py-4 text-xs text-[var(--color-text-muted)]">検索中...</div>
+          <div className="flex items-center justify-center py-4 text-xs text-[var(--color-text-muted)]">
+            検索中...
+          </div>
         )}
 
         {/* Local results */}
@@ -405,7 +455,9 @@ export function SearchPanel(): React.JSX.Element {
           <button
             key={`${r.kind}-${r.boardUrl}-${r.kind !== 'board' ? r.threadId : ''}-${r.kind === 'dat' ? String(r.resNumber) : ''}-${String(i)}`}
             type="button"
-            onClick={() => { handleResultClick(r); }}
+            onClick={() => {
+              handleResultClick(r);
+            }}
             className="w-full border-b border-[var(--color-border-secondary)] px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
           >
             {r.kind === 'board' && (
@@ -418,13 +470,16 @@ export function SearchPanel(): React.JSX.Element {
               <>
                 <div className="text-[10px] text-[var(--color-text-muted)]">{r.boardTitle}</div>
                 <div className="font-medium text-[var(--color-text-primary)]">
-                  {r.threadTitle} <span className="text-[var(--color-text-muted)]">({r.count})</span>
+                  {r.threadTitle}{' '}
+                  <span className="text-[var(--color-text-muted)]">({r.count})</span>
                 </div>
               </>
             )}
             {r.kind === 'dat' && (
               <>
-                <div className="text-[10px] text-[var(--color-text-muted)]">{r.boardTitle} &gt; {r.threadTitle}</div>
+                <div className="text-[10px] text-[var(--color-text-muted)]">
+                  {r.boardTitle} &gt; {r.threadTitle}
+                </div>
                 <div className="text-[var(--color-text-muted)]">
                   <span className="text-[var(--color-accent)]">{r.resNumber}</span>: {r.matchedLine}
                 </div>

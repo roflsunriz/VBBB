@@ -32,13 +32,13 @@ VBBB から 5ch.net への投稿が全て失敗していた。bbspink.com への
 
 ## 2. タイムライン
 
-| フェーズ | 内容 |
-|----------|------|
-| 初期調査 | 診断ログ (diag-log/) を分析。bbspink.com は Phase 1 で直接成功、5ch.net は Phase 2 で `9991 Banned` を確認 |
-| 第1回修正 | 分析ドキュメント (`posting-mechanism-analysis.md`) に基づき4点修正。Phase 2 の Referer、`?guid=ON`、スペースエンコード (`+`)、NCR 変換を実装 |
-| テスト1回目 | **依然として grtError で失敗**。ドキュメントだけでは不十分と判断 |
-| 第2回修正 | **Slevo のソースコード (`Slevo/`) を直接比較** し、さらに6点の差分を発見・修正。Origin ヘッダ削除、Referer 末尾スラッシュ、User-Agent 形式、余分なヘッダ削除、パラメータ順序を修正 |
-| テスト2回目 | **投稿成功** |
+| フェーズ    | 内容                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 初期調査    | 診断ログ (diag-log/) を分析。bbspink.com は Phase 1 で直接成功、5ch.net は Phase 2 で `9991 Banned` を確認                                                                         |
+| 第1回修正   | 分析ドキュメント (`posting-mechanism-analysis.md`) に基づき4点修正。Phase 2 の Referer、`?guid=ON`、スペースエンコード (`+`)、NCR 変換を実装                                       |
+| テスト1回目 | **依然として grtError で失敗**。ドキュメントだけでは不十分と判断                                                                                                                   |
+| 第2回修正   | **Slevo のソースコード (`Slevo/`) を直接比較** し、さらに6点の差分を発見・修正。Origin ヘッダ削除、Referer 末尾スラッシュ、User-Agent 形式、余分なヘッダ削除、パラメータ順序を修正 |
+| テスト2回目 | **投稿成功**                                                                                                                                                                       |
 
 ---
 
@@ -48,18 +48,18 @@ VBBB から 5ch.net への投稿が全て失敗していた。bbspink.com への
 
 合計 **10件** のバグが発見された。各バグの影響度は以下の通り:
 
-| # | バグ | 影響度 | 修正回 |
-|---|------|--------|--------|
-| 1 | **Origin ヘッダを送信していた** | **致命的** | 第2回 |
-| 2 | Phase 2 の Referer が `bbs.cgi` URL だった | 致命的 | 第1回 |
-| 3 | Phase 1 URL に `?guid=ON` がなかった | 高 | 第1回 |
-| 4 | Referer に末尾スラッシュがあった | 中 | 第2回 |
-| 5 | User-Agent に括弧がなかった | 中 | 第2回 |
-| 6 | `Cache-Control: no-cache` / `Pragma: no-cache` を POST で送信 | 中 | 第2回 |
-| 7 | `Accept-Language: ja` を送信していた | 低 | 第2回 |
-| 8 | スペースが `%20` にエンコードされていた (`+` が正しい) | 中 | 第1回 |
-| 9 | NCR 変換が未実装だった | 低〜中 | 第1回 |
-| 10 | フォームパラメータ順序が Slevo と異なっていた | 低 | 第2回 |
+| #   | バグ                                                          | 影響度     | 修正回 |
+| --- | ------------------------------------------------------------- | ---------- | ------ |
+| 1   | **Origin ヘッダを送信していた**                               | **致命的** | 第2回  |
+| 2   | Phase 2 の Referer が `bbs.cgi` URL だった                    | 致命的     | 第1回  |
+| 3   | Phase 1 URL に `?guid=ON` がなかった                          | 高         | 第1回  |
+| 4   | Referer に末尾スラッシュがあった                              | 中         | 第2回  |
+| 5   | User-Agent に括弧がなかった                                   | 中         | 第2回  |
+| 6   | `Cache-Control: no-cache` / `Pragma: no-cache` を POST で送信 | 中         | 第2回  |
+| 7   | `Accept-Language: ja` を送信していた                          | 低         | 第2回  |
+| 8   | スペースが `%20` にエンコードされていた (`+` が正しい)        | 中         | 第1回  |
+| 9   | NCR 変換が未実装だった                                        | 低〜中     | 第1回  |
+| 10  | フォームパラメータ順序が Slevo と異なっていた                 | 低         | 第2回  |
 
 ### 3.2 最も致命的だったバグ: Origin ヘッダ
 
@@ -74,6 +74,7 @@ bbspink.com で問題が発生しなかったのは、Phase 1 で直接成功し
 第1回修正は **プロトコル仕様ドキュメント** に基づいて修正を行った。ドキュメントは「何を送信すべきか」を記載していたが、**「何を送信してはいけないか」** が明示的に記載されていなかった。
 
 具体的には:
+
 - ドキュメントは `Referer` と `User-Agent` が **必須** と記載 → 正しく修正済み
 - しかし `Origin` / `Accept-Language` / `Cache-Control` / `Pragma` が **禁止** とは記載されていなかった
 - Referer の末尾スラッシュの有無も明記されていなかった
@@ -87,13 +88,13 @@ bbspink.com で問題が発生しなかったのは、Phase 1 で直接成功し
 
 ### 4.1 変更ファイル一覧
 
-| ファイル | 変更概要 |
-|----------|----------|
-| `src/main/services/post.ts` | Origin 削除、Accept-Language 削除、Referer 末尾スラッシュ削除、Phase 2 Referer 修正、パラメータ順序変更 |
-| `src/main/services/http-client.ts` | POST 時に Cache-Control/Pragma を送信しない |
-| `src/main/services/encoding.ts` | スペース `%20` → `+`、`replaceWithNCR()` 追加 |
-| `src/types/file-format.ts` | User-Agent 括弧追加 `Monazilla/1.00 (VBBB/0.1.0)` |
-| `tests/unit/encoding.test.ts` | スペースエンコードテスト修正、NCR テスト追加 |
+| ファイル                           | 変更概要                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/main/services/post.ts`        | Origin 削除、Accept-Language 削除、Referer 末尾スラッシュ削除、Phase 2 Referer 修正、パラメータ順序変更 |
+| `src/main/services/http-client.ts` | POST 時に Cache-Control/Pragma を送信しない                                                             |
+| `src/main/services/encoding.ts`    | スペース `%20` → `+`、`replaceWithNCR()` 追加                                                           |
+| `src/types/file-format.ts`         | User-Agent 括弧追加 `Monazilla/1.00 (VBBB/0.1.0)`                                                       |
+| `tests/unit/encoding.test.ts`      | スペースエンコードテスト修正、NCR テスト追加                                                            |
 
 ### 4.2 VBBB vs Slevo 送信ヘッダ比較（修正後）
 
@@ -118,6 +119,7 @@ Referer: https://{host}/test/read.cgi/{board}/{threadKey}
 ```
 
 **修正前に余分に送信していたヘッダ（全て削除済み）:**
+
 - ~~`Origin: https://{host}`~~ ← **最大の原因**
 - ~~`Accept-Language: ja`~~
 - ~~`Cache-Control: no-cache`~~
@@ -228,13 +230,13 @@ submit=書き込む                  MESSAGE={message}
 
 ### 7.2 よくあるエラーと原因
 
-| エラー | 最も疑わしい原因 |
-|--------|-----------------|
-| `9991 Banned` | 余分なヘッダ (Origin 等)、Referer 不正、User-Agent 形式不正 |
-| `grtError` + `書き込めません` | スレッドが落ちている（DAT 落ち） |
-| `grtError` + `Referer情報が変です` | Referer の形式/ドメイン不一致 |
-| `grtCookie` が永久ループ | Cookie 保存/送信の実装バグ |
-| `grtError` + 文字化けした HTML | レスポンスのデコードが UTF-8 になっている（CP932 で行うべき） |
+| エラー                             | 最も疑わしい原因                                              |
+| ---------------------------------- | ------------------------------------------------------------- |
+| `9991 Banned`                      | 余分なヘッダ (Origin 等)、Referer 不正、User-Agent 形式不正   |
+| `grtError` + `書き込めません`      | スレッドが落ちている（DAT 落ち）                              |
+| `grtError` + `Referer情報が変です` | Referer の形式/ドメイン不一致                                 |
+| `grtCookie` が永久ループ           | Cookie 保存/送信の実装バグ                                    |
+| `grtError` + 文字化けした HTML     | レスポンスのデコードが UTF-8 になっている（CP932 で行うべき） |
 
 ### 7.3 Slevo ソースコードとの比較手順
 
@@ -291,19 +293,19 @@ Referer の末尾スラッシュ1文字、User-Agent の括弧の有無など、
 
 ## 付録: 修正前後の差分表（完全版）
 
-| 項目 | 修正前 (VBBB) | 修正後 (VBBB) | Slevo |
-|------|---------------|---------------|-------|
-| POST URL | `{server}/test/bbs.cgi` | `{server}/test/bbs.cgi?guid=ON` | `https://{host}/test/bbs.cgi?guid=ON` |
-| User-Agent | `Monazilla/1.00 VBBB/0.1.0` | `Monazilla/1.00 (VBBB/0.1.0)` | `Monazilla/1.00 (Slevo/{ver})` |
-| Origin | `https://{host}` | **送信しない** | **送信しない** |
-| Accept-Language | `ja` | **送信しない** | **送信しない** |
-| Cache-Control (POST) | `no-cache` | **送信しない** | **送信しない** |
-| Pragma (POST) | `no-cache` | **送信しない** | **送信しない** |
-| Referer (返信) | `…/{board}/{thread}/` | `…/{board}/{thread}` | `…/{board}/{thread}` |
-| Referer (Phase 2) | `…/test/bbs.cgi` URL | 元の Referer と同一 | 元の Referer と同一 |
-| スペースエンコード | `%20` | `+` | `+` |
-| NCR 変換 | なし | `replaceWithNCR()` | `replaceEmojisWithNCR()` |
-| パラメータ順 | FROM,mail,MESSAGE,bbs,time,key | bbs,key,time,FROM,mail,MESSAGE | bbs,key,time,FROM,mail,MESSAGE |
+| 項目                 | 修正前 (VBBB)                  | 修正後 (VBBB)                   | Slevo                                 |
+| -------------------- | ------------------------------ | ------------------------------- | ------------------------------------- |
+| POST URL             | `{server}/test/bbs.cgi`        | `{server}/test/bbs.cgi?guid=ON` | `https://{host}/test/bbs.cgi?guid=ON` |
+| User-Agent           | `Monazilla/1.00 VBBB/0.1.0`    | `Monazilla/1.00 (VBBB/0.1.0)`   | `Monazilla/1.00 (Slevo/{ver})`        |
+| Origin               | `https://{host}`               | **送信しない**                  | **送信しない**                        |
+| Accept-Language      | `ja`                           | **送信しない**                  | **送信しない**                        |
+| Cache-Control (POST) | `no-cache`                     | **送信しない**                  | **送信しない**                        |
+| Pragma (POST)        | `no-cache`                     | **送信しない**                  | **送信しない**                        |
+| Referer (返信)       | `…/{board}/{thread}/`          | `…/{board}/{thread}`            | `…/{board}/{thread}`                  |
+| Referer (Phase 2)    | `…/test/bbs.cgi` URL           | 元の Referer と同一             | 元の Referer と同一                   |
+| スペースエンコード   | `%20`                          | `+`                             | `+`                                   |
+| NCR 変換             | なし                           | `replaceWithNCR()`              | `replaceEmojisWithNCR()`              |
+| パラメータ順         | FROM,mail,MESSAGE,bbs,time,key | bbs,key,time,FROM,mail,MESSAGE  | bbs,key,time,FROM,mail,MESSAGE        |
 
 ---
 

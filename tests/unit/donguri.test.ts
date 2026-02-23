@@ -52,46 +52,31 @@ describe('clearAcornCookie', () => {
 
 describe('handleDonguriPostResult', () => {
   it('handles grtDonguri result', () => {
-    const state = handleDonguriPostResult(
-      PostResultType.Donguri,
-      'どんぐりを埋めました',
-    );
+    const state = handleDonguriPostResult(PostResultType.Donguri, 'どんぐりを埋めました');
     expect(state.status).toBe('consumed');
     expect(state.message).toContain('どんぐりを消費');
   });
 
   it('handles broken_acorn error', () => {
-    const state = handleDonguriPostResult(
-      PostResultType.DonguriError,
-      'broken_acorn detected',
-    );
+    const state = handleDonguriPostResult(PostResultType.DonguriError, 'broken_acorn detected');
     expect(state.status).toBe('broken');
     expect(state.message).toContain('broken_acorn');
   });
 
   it('handles [1044] error', () => {
-    const state = handleDonguriPostResult(
-      PostResultType.DonguriError,
-      'Error [1044] occurred',
-    );
+    const state = handleDonguriPostResult(PostResultType.DonguriError, 'Error [1044] occurred');
     expect(state.status).toBe('broken');
     expect(state.message).toContain('[1044]');
   });
 
   it('handles [1045] error', () => {
-    const state = handleDonguriPostResult(
-      PostResultType.DonguriError,
-      'Error [1045]',
-    );
+    const state = handleDonguriPostResult(PostResultType.DonguriError, 'Error [1045]');
     expect(state.status).toBe('broken');
     expect(state.message).toContain('[1045]');
   });
 
   it('handles [0088] error', () => {
-    const state = handleDonguriPostResult(
-      PostResultType.DonguriError,
-      'Error [0088]',
-    );
+    const state = handleDonguriPostResult(PostResultType.DonguriError, 'Error [0088]');
     expect(state.status).toBe('broken');
     expect(state.message).toContain('[0088]');
   });

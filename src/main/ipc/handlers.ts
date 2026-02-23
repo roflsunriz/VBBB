@@ -24,21 +24,49 @@ import { searchLocal, searchLocalAll } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
 import { loadPostHistory, savePostHistory } from '../services/post-history';
-import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory, loadBrowsingHistory, saveBrowsingHistory } from '../services/browsing-history';
+import {
+  addHistoryEntry,
+  clearBrowsingHistory,
+  getBrowsingHistory,
+  loadBrowsingHistory,
+  saveBrowsingHistory,
+} from '../services/browsing-history';
 import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
-import { getAllCookies, getCookiesForUrl, setCookie, removeCookie, saveCookies, loadCookies } from '../services/cookie-store';
+import {
+  getAllCookies,
+  getCookiesForUrl,
+  setCookie,
+  removeCookie,
+  saveCookies,
+  loadCookies,
+} from '../services/cookie-store';
 import { getDonguriState, loginDonguri, refreshDonguriState } from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
 import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
 import {
-  addRoundBoard, addRoundItem, getRoundBoards, getRoundItems,
-  getTimerConfig, loadRoundLists, removeRoundBoard, removeRoundItem,
-  saveRoundBoard, saveRoundItem, setTimerConfig,
+  addRoundBoard,
+  addRoundItem,
+  getRoundBoards,
+  getRoundItems,
+  getTimerConfig,
+  loadRoundLists,
+  removeRoundBoard,
+  removeRoundItem,
+  saveRoundBoard,
+  saveRoundItem,
+  setTimerConfig,
 } from '../services/round-list';
 import { buildRemoteSearchUrl } from '../services/remote-search';
 import type { SavedTab, SessionState } from '@shared/history';
-import { loadSavedTabs, loadSessionState, saveSessionState, saveSessionStateSync, saveTabs, saveTabsSync } from '../services/tab-persistence';
+import {
+  loadSavedTabs,
+  loadSessionState,
+  saveSessionState,
+  saveSessionStateSync,
+  saveTabs,
+  saveTabsSync,
+} from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
 import { checkForUpdate, downloadAndInstall } from '../services/updater';
@@ -144,7 +172,9 @@ export async function registerIpcHandlers(): Promise<void> {
     // This protects against 5ch returning non-standard HTML (CAPTCHA, error page)
     // that parseBBSMenuHtml cannot extract boards from.
     if (menu.categories.length === 0 && oldBoards.length > 0) {
-      logger.warn('Fetched BBS menu has 0 categories but boardCache has entries — skipping cache save to prevent corruption');
+      logger.warn(
+        'Fetched BBS menu has 0 categories but boardCache has entries — skipping cache save to prevent corruption',
+      );
       return menu;
     }
 
@@ -220,9 +250,10 @@ export async function registerIpcHandlers(): Promise<void> {
     }
     const board = lookupBoard(validated.data.boardUrl);
     const plugin = getBoardPlugin(board.boardType);
-    const result = plugin !== undefined
-      ? await plugin.postResponse(validated.data, board)
-      : await postResponse(validated.data, board);
+    const result =
+      plugin !== undefined
+        ? await plugin.postResponse(validated.data, board)
+        : await postResponse(validated.data, board);
 
     // Persist any cookies received during the post flow
     // (Set-Cookie from bbs.cgi and confirmation tokens from hidden fields)
@@ -253,8 +284,12 @@ export async function registerIpcHandlers(): Promise<void> {
           ...idx,
           ...(updates.kokomade !== undefined ? { kokomade: updates.kokomade } : {}),
           ...(updates.scrollTop !== undefined ? { scrollTop: updates.scrollTop } : {}),
-          ...(updates.scrollResNumber !== undefined ? { scrollResNumber: updates.scrollResNumber } : {}),
-          ...(updates.scrollResOffset !== undefined ? { scrollResOffset: updates.scrollResOffset } : {}),
+          ...(updates.scrollResNumber !== undefined
+            ? { scrollResNumber: updates.scrollResNumber }
+            : {}),
+          ...(updates.scrollResOffset !== undefined
+            ? { scrollResOffset: updates.scrollResOffset }
+            : {}),
           ...(updates.lastModified !== undefined ? { lastModified: updates.lastModified } : {}),
         };
       });
@@ -624,9 +659,10 @@ export async function registerIpcHandlers(): Promise<void> {
         let counter = 1;
         while (seen.has(destName)) {
           const dot = baseName.lastIndexOf('.');
-          destName = dot !== -1
-            ? `${baseName.slice(0, dot)}_${String(counter)}${baseName.slice(dot)}`
-            : `${baseName}_${String(counter)}`;
+          destName =
+            dot !== -1
+              ? `${baseName.slice(0, dot)}_${String(counter)}${baseName.slice(dot)}`
+              : `${baseName}_${String(counter)}`;
           counter++;
         }
         seen.add(destName);
@@ -696,14 +732,37 @@ export async function registerIpcHandlers(): Promise<void> {
     return { saved: true, path: result.filePath };
   });
 
+  handle('dsl:save-file', async (content: string, suggestedName: string) => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win === null) return { saved: false, path: '' };
+
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: suggestedName,
+      filters: [
+        { name: 'VBBS Script', extensions: ['vbbs'] },
+        { name: 'Text Files', extensions: ['txt'] },
+      ],
+    });
+
+    if (result.canceled || result.filePath === undefined) {
+      return { saved: false, path: '' };
+    }
+
+    await writeFile(result.filePath, content, 'utf-8');
+    return { saved: true, path: result.filePath };
+  });
+
   handle('ip:lookup', async (ip: string): Promise<IpLookupResult> => {
     // Normalize BBS masked IPv6 (e.g. "240b:11:442:d510:*" → "240b:11:442:d510::")
     const lookupIp = ip.endsWith(':*') ? `${ip.slice(0, -1)}:` : ip;
-    const response = await httpFetch({
-      url: `http://ip-api.com/json/${encodeURIComponent(lookupIp)}?lang=ja&fields=country,regionName,city,isp,org,as,query`,
-      method: 'GET',
-      acceptGzip: true,
-    }, { maxRetries: 1, initialDelayMs: 500, maxDelayMs: 2000, retryableStatuses: [429, 503] });
+    const response = await httpFetch(
+      {
+        url: `http://ip-api.com/json/${encodeURIComponent(lookupIp)}?lang=ja&fields=country,regionName,city,isp,org,as,query`,
+        method: 'GET',
+        acceptGzip: true,
+      },
+      { maxRetries: 1, initialDelayMs: 500, maxDelayMs: 2000, retryableStatuses: [429, 503] },
+    );
     if (response.status !== 200) {
       throw new Error(`IP API error: ${String(response.status)}`);
     }

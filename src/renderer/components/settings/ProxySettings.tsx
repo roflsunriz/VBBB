@@ -24,13 +24,17 @@ function ProxyEndpointForm({ label, value, onChange }: ProxyEndpointFormProps): 
 
   return (
     <fieldset className="rounded border border-[var(--color-border-primary)] p-3">
-      <legend className="px-2 text-xs font-semibold text-[var(--color-text-secondary)]">{label}</legend>
+      <legend className="px-2 text-xs font-semibold text-[var(--color-text-secondary)]">
+        {label}
+      </legend>
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-xs">
           <input
             type="checkbox"
             checked={value.enabled}
-            onChange={(e) => { updateField('enabled', e.target.checked); }}
+            onChange={(e) => {
+              updateField('enabled', e.target.checked);
+            }}
             className="accent-[var(--color-accent)]"
           />
           有効
@@ -41,7 +45,9 @@ function ProxyEndpointForm({ label, value, onChange }: ProxyEndpointFormProps): 
             <input
               type="text"
               value={value.address}
-              onChange={(e) => { updateField('address', e.target.value); }}
+              onChange={(e) => {
+                updateField('address', e.target.value);
+              }}
               disabled={!value.enabled}
               placeholder="proxy.example.com"
               className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
@@ -70,7 +76,9 @@ function ProxyEndpointForm({ label, value, onChange }: ProxyEndpointFormProps): 
             <input
               type="text"
               value={value.userId}
-              onChange={(e) => { updateField('userId', e.target.value); }}
+              onChange={(e) => {
+                updateField('userId', e.target.value);
+              }}
               disabled={!value.enabled}
               className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
             />
@@ -80,7 +88,9 @@ function ProxyEndpointForm({ label, value, onChange }: ProxyEndpointFormProps): 
             <input
               type="password"
               value={value.password}
-              onChange={(e) => { updateField('password', e.target.value); }}
+              onChange={(e) => {
+                updateField('password', e.target.value);
+              }}
               disabled={!value.enabled}
               className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] disabled:opacity-50"
             />
@@ -137,20 +147,36 @@ export function ProxySettings({ onClose }: ProxySettingsProps): React.JSX.Elemen
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MdiIcon path={mdiShieldLock} size={16} className="text-[var(--color-accent)]" />
-          <span className="text-sm font-semibold text-[var(--color-text-primary)]">プロキシ設定</span>
+          <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+            プロキシ設定
+          </span>
         </div>
-        <button type="button" onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+        >
           <MdiIcon path={mdiClose} size={16} />
         </button>
       </div>
 
-      <ProxyEndpointForm label="読み込み用プロキシ (ReadProxy)" value={config.readProxy} onChange={updateReadProxy} />
-      <ProxyEndpointForm label="書き込み用プロキシ (WriteProxy)" value={config.writeProxy} onChange={updateWriteProxy} />
+      <ProxyEndpointForm
+        label="読み込み用プロキシ (ReadProxy)"
+        value={config.readProxy}
+        onChange={updateReadProxy}
+      />
+      <ProxyEndpointForm
+        label="書き込み用プロキシ (WriteProxy)"
+        value={config.writeProxy}
+        onChange={updateWriteProxy}
+      />
 
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => { void handleSave(); }}
+          onClick={() => {
+            void handleSave();
+          }}
           disabled={saving}
           className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
         >

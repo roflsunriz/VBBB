@@ -109,7 +109,11 @@ export function parseBBSMenuHtml(html: string): BBSMenu {
       const title = boardMatch[2].trim();
 
       // Skip non-board URLs (external sites, etc.)
-      if (!rawUrl.includes('.5ch.net/') && !rawUrl.includes('.2ch.net/') && !rawUrl.includes('.bbspink.com/')) {
+      if (
+        !rawUrl.includes('.5ch.net/') &&
+        !rawUrl.includes('.2ch.net/') &&
+        !rawUrl.includes('.bbspink.com/')
+      ) {
         continue;
       }
 

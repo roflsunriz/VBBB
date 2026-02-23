@@ -4,7 +4,12 @@
  *         parseExternalBoardUrl (feature 10: add board dialog)
  */
 import { describe, it, expect } from 'vitest';
-import { parseThreadUrl, parseExternalBoardUrl, parseAnyThreadUrl, buildResPermalink } from '../../src/types/url-parser';
+import {
+  parseThreadUrl,
+  parseExternalBoardUrl,
+  parseAnyThreadUrl,
+  buildResPermalink,
+} from '../../src/types/url-parser';
 import { BoardType } from '../../src/types/domain';
 
 // ---------------------------------------------------------------------------
@@ -81,7 +86,9 @@ describe('parseExternalBoardUrl', () => {
 
   // Shitaraba thread
   it('parses a Shitaraba thread URL', () => {
-    const result = parseExternalBoardUrl('https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/');
+    const result = parseExternalBoardUrl(
+      'https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/',
+    );
     expect(result).not.toBeNull();
     expect(result?.board.boardType).toBe(BoardType.Shitaraba);
     expect(result?.board.bbsId).toBe('12345');
@@ -101,7 +108,9 @@ describe('parseExternalBoardUrl', () => {
 
   // JBBS thread (livedoor)
   it('parses a JBBS (livedoor) thread URL', () => {
-    const result = parseExternalBoardUrl('https://jbbs.livedoor.jp/bbs/read.cgi/computer/99999/1111111111/');
+    const result = parseExternalBoardUrl(
+      'https://jbbs.livedoor.jp/bbs/read.cgi/computer/99999/1111111111/',
+    );
     expect(result).not.toBeNull();
     expect(result?.board.boardType).toBe(BoardType.JBBS);
     expect(result?.threadId).toBe('1111111111');
@@ -186,7 +195,9 @@ describe('parseAnyThreadUrl', () => {
   });
 
   it('parses Shitaraba read.cgi thread URL', () => {
-    const result = parseAnyThreadUrl('https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/');
+    const result = parseAnyThreadUrl(
+      'https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/',
+    );
     expect(result).not.toBeNull();
     expect(result?.board.url).toBe('https://jbbs.shitaraba.jp/game/12345/');
     expect(result?.board.boardType).toBe(BoardType.Shitaraba);
@@ -219,33 +230,39 @@ describe('parseAnyThreadUrl', () => {
 // ---------------------------------------------------------------------------
 describe('buildResPermalink', () => {
   it('builds 5ch permalink', () => {
-    expect(buildResPermalink('https://hayabusa9.5ch.net/news/', '1234567890', 123))
-      .toBe('https://hayabusa9.5ch.net/test/read.cgi/news/1234567890/123');
+    expect(buildResPermalink('https://hayabusa9.5ch.net/news/', '1234567890', 123)).toBe(
+      'https://hayabusa9.5ch.net/test/read.cgi/news/1234567890/123',
+    );
   });
 
   it('builds 5ch permalink for another board', () => {
-    expect(buildResPermalink('https://eagle.5ch.net/livejupiter/', '9876543210', 1))
-      .toBe('https://eagle.5ch.net/test/read.cgi/livejupiter/9876543210/1');
+    expect(buildResPermalink('https://eagle.5ch.net/livejupiter/', '9876543210', 1)).toBe(
+      'https://eagle.5ch.net/test/read.cgi/livejupiter/9876543210/1',
+    );
   });
 
   it('builds bbspink permalink (same format as 5ch)', () => {
-    expect(buildResPermalink('https://mercury.bbspink.com/test/', '1111111111', 50))
-      .toBe('https://mercury.bbspink.com/test/read.cgi/test/1111111111/50');
+    expect(buildResPermalink('https://mercury.bbspink.com/test/', '1111111111', 50)).toBe(
+      'https://mercury.bbspink.com/test/read.cgi/test/1111111111/50',
+    );
   });
 
   it('builds Shitaraba permalink', () => {
-    expect(buildResPermalink('https://jbbs.shitaraba.jp/game/12345/', '1234567890', 10))
-      .toBe('https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/10');
+    expect(buildResPermalink('https://jbbs.shitaraba.jp/game/12345/', '1234567890', 10)).toBe(
+      'https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/10',
+    );
   });
 
   it('builds JBBS (livedoor) permalink', () => {
-    expect(buildResPermalink('https://jbbs.livedoor.jp/computer/99999/', '1111111111', 5))
-      .toBe('https://jbbs.livedoor.jp/bbs/read.cgi/computer/99999/1111111111/5');
+    expect(buildResPermalink('https://jbbs.livedoor.jp/computer/99999/', '1111111111', 5)).toBe(
+      'https://jbbs.livedoor.jp/bbs/read.cgi/computer/99999/1111111111/5',
+    );
   });
 
   it('builds Machi BBS permalink', () => {
-    expect(buildResPermalink('https://machi.to/hokkaidou/', '1234567890', 42))
-      .toBe('https://machi.to/bbs/read.cgi/hokkaidou/1234567890/42');
+    expect(buildResPermalink('https://machi.to/hokkaidou/', '1234567890', 42)).toBe(
+      'https://machi.to/bbs/read.cgi/hokkaidou/1234567890/42',
+    );
   });
 
   it('returns empty string for invalid URL', () => {
@@ -257,8 +274,9 @@ describe('buildResPermalink', () => {
   });
 
   it('handles http (non-https) URLs', () => {
-    expect(buildResPermalink('http://old.2ch.net/board/', '1234567890', 99))
-      .toBe('http://old.2ch.net/test/read.cgi/board/1234567890/99');
+    expect(buildResPermalink('http://old.2ch.net/board/', '1234567890', 99)).toBe(
+      'http://old.2ch.net/test/read.cgi/board/1234567890/99',
+    );
   });
 
   it('roundtrip: parse then build produces consistent URL', () => {
@@ -271,7 +289,9 @@ describe('buildResPermalink', () => {
   });
 
   it('roundtrip: Shitaraba parse then build', () => {
-    const parsed = parseAnyThreadUrl('https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/');
+    const parsed = parseAnyThreadUrl(
+      'https://jbbs.shitaraba.jp/bbs/read.cgi/game/12345/1234567890/',
+    );
     expect(parsed).not.toBeNull();
     if (parsed !== null) {
       const permalink = buildResPermalink(parsed.board.url, parsed.threadId, 7);

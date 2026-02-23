@@ -51,7 +51,11 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
     setUpliftLoading(true);
     setUpliftMessage('');
     try {
-      const result = await window.electronApi.invoke('auth:uplift-login', upliftUserId, upliftPassword);
+      const result = await window.electronApi.invoke(
+        'auth:uplift-login',
+        upliftUserId,
+        upliftPassword,
+      );
       setUpliftMessage(result.message);
       if (result.success) {
         setUpliftUserId('');
@@ -107,7 +111,11 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
           <MdiIcon path={mdiAccountKey} size={16} className="text-[var(--color-accent)]" />
           <span className="text-sm font-semibold text-[var(--color-text-primary)]">認証設定</span>
         </div>
-        <button type="button" onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+        >
           <MdiIcon path={mdiClose} size={16} />
         </button>
       </div>
@@ -116,7 +124,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
       <div className="flex gap-1 border-b border-[var(--color-border-primary)]">
         <button
           type="button"
-          onClick={() => { setActiveTab('uplift'); }}
+          onClick={() => {
+            setActiveTab('uplift');
+          }}
           className={`px-3 py-1 text-xs ${
             activeTab === 'uplift'
               ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
@@ -127,7 +137,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { setActiveTab('be'); }}
+          onClick={() => {
+            setActiveTab('be');
+          }}
           className={`px-3 py-1 text-xs ${
             activeTab === 'be'
               ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
@@ -146,7 +158,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
               <span className="text-xs text-green-400">UPLIFT: ログイン中</span>
               <button
                 type="button"
-                onClick={() => { void handleUpliftLogout(); }}
+                onClick={() => {
+                  void handleUpliftLogout();
+                }}
                 className="flex items-center gap-1 rounded bg-red-700 px-2 py-0.5 text-xs text-white hover:bg-red-600"
               >
                 <MdiIcon path={mdiLogout} size={12} />
@@ -160,7 +174,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
                 <input
                   type="text"
                   value={upliftUserId}
-                  onChange={(e) => { setUpliftUserId(e.target.value); }}
+                  onChange={(e) => {
+                    setUpliftUserId(e.target.value);
+                  }}
                   className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                 />
               </label>
@@ -169,13 +185,17 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
                 <input
                   type="password"
                   value={upliftPassword}
-                  onChange={(e) => { setUpliftPassword(e.target.value); }}
+                  onChange={(e) => {
+                    setUpliftPassword(e.target.value);
+                  }}
                   className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                 />
               </label>
               <button
                 type="button"
-                onClick={() => { void handleUpliftLogin(); }}
+                onClick={() => {
+                  void handleUpliftLogin();
+                }}
                 disabled={upliftLoading}
                 className="flex items-center gap-1 self-start rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
               >
@@ -198,7 +218,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
               <span className="text-xs text-green-400">Be: ログイン中</span>
               <button
                 type="button"
-                onClick={() => { void handleBeLogout(); }}
+                onClick={() => {
+                  void handleBeLogout();
+                }}
                 className="flex items-center gap-1 rounded bg-red-700 px-2 py-0.5 text-xs text-white hover:bg-red-600"
               >
                 <MdiIcon path={mdiLogout} size={12} />
@@ -212,7 +234,9 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
                 <input
                   type="email"
                   value={beMail}
-                  onChange={(e) => { setBeMail(e.target.value); }}
+                  onChange={(e) => {
+                    setBeMail(e.target.value);
+                  }}
                   className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                 />
               </label>
@@ -221,13 +245,17 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
                 <input
                   type="password"
                   value={bePassword}
-                  onChange={(e) => { setBePassword(e.target.value); }}
+                  onChange={(e) => {
+                    setBePassword(e.target.value);
+                  }}
                   className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                 />
               </label>
               <button
                 type="button"
-                onClick={() => { void handleBeLogin(); }}
+                onClick={() => {
+                  void handleBeLogin();
+                }}
                 disabled={beLoading}
                 className="flex items-center gap-1 self-start rounded bg-[var(--color-accent)] px-3 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
               >
@@ -245,7 +273,14 @@ export function AuthPanel({ onClose }: AuthPanelProps): React.JSX.Element {
       {/* Donguri status (informational) */}
       <div className="border-t border-[var(--color-border-primary)] pt-2">
         <span className="text-xs text-[var(--color-text-muted)]">
-          どんぐり: {authState.donguri.status === 'active' ? 'アクティブ' : authState.donguri.status === 'broken' ? '破損' : authState.donguri.status === 'consumed' ? '消費済み' : '未設定'}
+          どんぐり:{' '}
+          {authState.donguri.status === 'active'
+            ? 'アクティブ'
+            : authState.donguri.status === 'broken'
+              ? '破損'
+              : authState.donguri.status === 'consumed'
+                ? '消費済み'
+                : '未設定'}
           {authState.donguri.message.length > 0 ? ` - ${authState.donguri.message}` : ''}
         </span>
       </div>

@@ -45,54 +45,55 @@ interface UseDragReorderReturn {
   readonly dragOverIndex: number | null;
 }
 
-export function useDragReorder({ itemCount, onReorder }: UseDragReorderOptions): UseDragReorderReturn {
+export function useDragReorder({
+  itemCount,
+  onReorder,
+}: UseDragReorderOptions): UseDragReorderReturn {
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Use ref to avoid stale closure in event handlers
   const dragSourceRef = useRef<number | null>(null);
 
-  const handleDragStart = useCallback(
-    (index: number, e: React.DragEvent) => {
-      dragSourceRef.current = index;
-      setDragSourceIndex(index);
-      // Set a minimal drag image text for browser compatibility
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(index));
-      // Make the dragged element semi-transparent
-      if (e.currentTarget instanceof HTMLElement) {
-        requestAnimationFrame(() => {
-          if (e.currentTarget instanceof HTMLElement) {
-            e.currentTarget.style.opacity = '0.5';
-          }
-        });
-      }
-    },
-    [],
-  );
+  const handleDragStart = useCallback((index: number, e: React.DragEvent) => {
+    dragSourceRef.current = index;
+    setDragSourceIndex(index);
+    // Set a minimal drag image text for browser compatibility
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    // Make the dragged element semi-transparent
+    if (e.currentTarget instanceof HTMLElement) {
+      requestAnimationFrame(() => {
+        if (e.currentTarget instanceof HTMLElement) {
+          e.currentTarget.style.opacity = '0.5';
+        }
+      });
+    }
+  }, []);
 
-  const handleDragOver = useCallback(
-    (index: number, e: React.DragEvent) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      setDragOverIndex(index);
-    },
-    [],
-  );
+  const handleDragOver = useCallback((index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  }, []);
 
-  const handleDragEnter = useCallback(
-    (index: number, e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOverIndex(index);
-    },
-    [],
-  );
+  const handleDragEnter = useCallback((index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  }, []);
 
   const handleDrop = useCallback(
     (index: number, e: React.DragEvent) => {
       e.preventDefault();
       const from = dragSourceRef.current;
-      if (from !== null && from !== index && from >= 0 && from < itemCount && index >= 0 && index < itemCount) {
+      if (
+        from !== null &&
+        from !== index &&
+        from >= 0 &&
+        from < itemCount &&
+        index >= 0 &&
+        index < itemCount
+      ) {
         onReorder(from, index);
       }
       dragSourceRef.current = null;
@@ -102,23 +103,28 @@ export function useDragReorder({ itemCount, onReorder }: UseDragReorderOptions):
     [itemCount, onReorder],
   );
 
-  const handleDragEnd = useCallback(
-    () => {
-      // Restore opacity on the source element
-      dragSourceRef.current = null;
-      setDragSourceIndex(null);
-      setDragOverIndex(null);
-    },
-    [],
-  );
+  const handleDragEnd = useCallback(() => {
+    // Restore opacity on the source element
+    dragSourceRef.current = null;
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
+  }, []);
 
   const getDragProps = useCallback(
     (index: number): DragProps => ({
       draggable: true as const,
-      onDragStart: (e: React.DragEvent) => { handleDragStart(index, e); },
-      onDragOver: (e: React.DragEvent) => { handleDragOver(index, e); },
-      onDragEnter: (e: React.DragEvent) => { handleDragEnter(index, e); },
-      onDrop: (e: React.DragEvent) => { handleDrop(index, e); },
+      onDragStart: (e: React.DragEvent) => {
+        handleDragStart(index, e);
+      },
+      onDragOver: (e: React.DragEvent) => {
+        handleDragOver(index, e);
+      },
+      onDragEnter: (e: React.DragEvent) => {
+        handleDragEnter(index, e);
+      },
+      onDrop: (e: React.DragEvent) => {
+        handleDrop(index, e);
+      },
       onDragEnd: handleDragEnd,
     }),
     [handleDragStart, handleDragOver, handleDragEnter, handleDrop, handleDragEnd],

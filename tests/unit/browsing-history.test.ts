@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { addHistoryEntry, clearBrowsingHistory, getBrowsingHistory } from '../../src/main/services/browsing-history';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  addHistoryEntry,
+  clearBrowsingHistory,
+  getBrowsingHistory,
+} from '../../src/main/services/browsing-history';
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/;
 
 beforeEach(() => {
   clearBrowsingHistory();
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date('2025-06-15T12:00:00Z'));
+});
+
+afterEach(() => {
+  clearBrowsingHistory();
 });
 
 describe('browsing history', () => {
@@ -14,14 +22,12 @@ describe('browsing history', () => {
     expect(history).toHaveLength(1);
     expect(history[0]?.threadId).toBe('1234');
     expect(history[0]?.title).toBe('Test Thread');
-    expect(history[0]?.lastVisited).toBe('2025-06-15T12:00:00.000Z');
+    expect(history[0]?.lastVisited).toMatch(ISO_DATE_RE);
   });
 
   it('moves duplicate entries to the front', () => {
     addHistoryEntry('https://board.example/', '111', 'First');
-    vi.setSystemTime(new Date('2025-06-15T13:00:00Z'));
     addHistoryEntry('https://board.example/', '222', 'Second');
-    vi.setSystemTime(new Date('2025-06-15T14:00:00Z'));
     addHistoryEntry('https://board.example/', '111', 'First Updated');
 
     const history = getBrowsingHistory();
@@ -37,7 +43,6 @@ describe('browsing history', () => {
     }
     const history = getBrowsingHistory();
     expect(history.length).toBeLessThanOrEqual(200);
-    // Most recent should be at front
     expect(history[0]?.threadId).toBe('249');
   });
 

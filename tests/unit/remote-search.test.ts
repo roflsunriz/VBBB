@@ -7,8 +7,18 @@ import { describe, it, expect } from 'vitest';
 describe('remote search result validation', () => {
   it('validates well-formed results', () => {
     const response: unknown[] = [
-      { subject: 'Test Thread', ita: 'news', resno: 100, url: 'https://example.com/test/read.cgi/news/1234567890/' },
-      { subject: 'Another', ita: 'prog', resno: 50, url: 'https://example.com/test/read.cgi/prog/9876543210/' },
+      {
+        subject: 'Test Thread',
+        ita: 'news',
+        resno: 100,
+        url: 'https://example.com/test/read.cgi/news/1234567890/',
+      },
+      {
+        subject: 'Another',
+        ita: 'prog',
+        resno: 50,
+        url: 'https://example.com/test/read.cgi/prog/9876543210/',
+      },
     ];
 
     const results = response.filter(

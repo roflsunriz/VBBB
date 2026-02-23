@@ -31,7 +31,9 @@ describe('sanitizeHtml', () => {
   });
 
   it('removes iframe and object tags', () => {
-    const result = sanitizeHtml('<iframe src="evil.html"></iframe><object data="evil.swf"></object>');
+    const result = sanitizeHtml(
+      '<iframe src="evil.html"></iframe><object data="evil.swf"></object>',
+    );
     expect(result).not.toContain('<iframe');
     expect(result).not.toContain('<object');
   });

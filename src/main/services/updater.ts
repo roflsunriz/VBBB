@@ -70,9 +70,7 @@ export function checkForUpdate(): Promise<UpdateCheckResult> {
  * After download completes, quits and silently installs the new version,
  * then restarts the app automatically.
  */
-export function downloadAndInstall(
-  onProgress: (progress: UpdateProgress) => void,
-): Promise<void> {
+export function downloadAndInstall(onProgress: (progress: UpdateProgress) => void): Promise<void> {
   logger.info('ダウンロード開始');
 
   return new Promise<void>((resolve, reject) => {

@@ -86,7 +86,10 @@ export function createLogger(tag: string): Logger {
     error(message: string, err?: Error): void {
       const masked = maskSensitive(message);
       const errMsg = err !== undefined ? ` ${maskSensitive(err.message)}` : '';
-      console.error(`${prefix} ERROR: ${masked}`, err !== undefined ? maskSensitive(err.message) : '');
+      console.error(
+        `${prefix} ERROR: ${masked}`,
+        err !== undefined ? maskSensitive(err.message) : '',
+      );
       pushEntry('error', tag, `${masked}${errMsg}`);
     },
   };

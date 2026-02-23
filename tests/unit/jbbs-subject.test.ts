@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseJBBSSubjectLine, parseJBBSSubjectTxt } from '../../src/main/services/plugins/jbbs-subject';
+import {
+  parseJBBSSubjectLine,
+  parseJBBSSubjectTxt,
+} from '../../src/main/services/plugins/jbbs-subject';
 
 describe('parseJBBSSubjectLine', () => {
   it('parses a standard JBBS subject line with .cgi extension', () => {

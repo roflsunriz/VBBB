@@ -95,6 +95,13 @@ export function buildAppMenu(): void {
             dispatchAction({ type: 'open-modal', modal: 'round' });
           },
         },
+        {
+          label: 'DSLエディタ',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => {
+            dispatchAction({ type: 'open-modal', modal: 'dsl-editor' });
+          },
+        },
         { type: 'separator' },
         {
           label: 'NG管理',

@@ -6,7 +6,16 @@
 import type { AuthState } from './auth';
 import type { StoredCookie } from './cookie';
 import type { DiagLogEntry, DiagLogLevel } from './diagnostic';
-import type { BBSMenu, DatFetchResult, KotehanConfig, PostParams, PostResult, SambaInfo, SubjectFetchResult, ThreadIndex } from './domain';
+import type {
+  BBSMenu,
+  DatFetchResult,
+  KotehanConfig,
+  PostParams,
+  PostResult,
+  SambaInfo,
+  SubjectFetchResult,
+  ThreadIndex,
+} from './domain';
 import type { FavNode, FavTree } from './favorite';
 import type { BrowsingHistoryEntry, SavedTab, SessionState } from './history';
 import type { NgRule } from './ng';
@@ -14,7 +23,12 @@ import type { PostHistoryEntry } from './post-history';
 import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
 import type { MenuAction } from './menu';
-import type { LocalSearchAllQuery, LocalSearchAllResult, LocalSearchQuery, SearchResult } from './search';
+import type {
+  LocalSearchAllQuery,
+  LocalSearchAllResult,
+  LocalSearchQuery,
+  SearchResult,
+} from './search';
 import type { UpdateCheckResult } from './update';
 
 export interface IpcChannelMap {
@@ -180,7 +194,17 @@ export interface IpcChannelMap {
   };
   /** Update a single thread's index entry (kokomade, scrollTop, lastModified, etc.) */
   'bbs:update-thread-index': {
-    args: [boardUrl: string, threadId: string, updates: { kokomade?: number; scrollTop?: number; scrollResNumber?: number; scrollResOffset?: number; lastModified?: string | null }];
+    args: [
+      boardUrl: string,
+      threadId: string,
+      updates: {
+        kokomade?: number;
+        scrollTop?: number;
+        scrollResNumber?: number;
+        scrollResOffset?: number;
+        lastModified?: string | null;
+      },
+    ];
     result: void;
   };
   /** Load saved tabs */
@@ -347,6 +371,11 @@ export interface IpcChannelMap {
   'ip:lookup': {
     args: [ip: string];
     result: IpLookupResult;
+  };
+  /** Save DSL script to a file via save dialog */
+  'dsl:save-file': {
+    args: [content: string, suggestedName: string];
+    result: { saved: boolean; path: string };
   };
   /** Check for a new version via GitHub Releases API */
   'update:check': {

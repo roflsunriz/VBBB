@@ -12,7 +12,11 @@ interface MediaPlaceholderProps {
   readonly mediaType: 'image' | 'video';
 }
 
-export function MediaPlaceholder({ width, height, mediaType }: MediaPlaceholderProps): React.JSX.Element {
+export function MediaPlaceholder({
+  width,
+  height,
+  mediaType,
+}: MediaPlaceholderProps): React.JSX.Element {
   return (
     <span
       className="my-1 inline-flex items-center justify-center rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)]"
@@ -33,9 +37,7 @@ export function MediaPlaceholder({ width, height, mediaType }: MediaPlaceholderP
             <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
           )}
         </svg>
-        <span className="text-[10px] opacity-60">
-          {mediaType === 'image' ? '画像' : '動画'}
-        </span>
+        <span className="text-[10px] opacity-60">{mediaType === 'image' ? '画像' : '動画'}</span>
       </span>
     </span>
   );

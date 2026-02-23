@@ -34,9 +34,7 @@ function buildMachiPostBody(params: PostParams, board: Board): string {
     ['submit', '\u66F8\u304D\u8FBC\u3080'], // 書き込む
   ];
 
-  return fields
-    .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
-    .join('&');
+  return fields.map(([key, value]) => `${key}=${httpEncode(value, encoding)}`).join('&');
 }
 
 /**
@@ -48,7 +46,7 @@ function detectMachiResultType(html: string): PostResultType {
   if (
     html.includes('\u66F8\u304D\u3053\u307F\u304C\u7D42\u308F\u308A\u307E\u3057\u305F') || // 書きこみが終わりました
     html.includes('\u66F8\u304D\u8FBC\u307F\u304C\u7D42\u308F\u308A\u307E\u3057\u305F') || // 書き込みが終わりました
-    html.includes('\u7D42\u308F\u308A\u307E\u3057\u305F')                                   // 終わりました (broader match)
+    html.includes('\u7D42\u308F\u308A\u307E\u3057\u305F') // 終わりました (broader match)
   ) {
     return PostResultType.OK;
   }
@@ -74,11 +72,10 @@ function detectMachiResultType(html: string): PostResultType {
 /**
  * Post a response to Machi BBS.
  */
-export async function postMachiResponse(
-  params: PostParams,
-  board: Board,
-): Promise<PostResult> {
-  logger.info(`[DIAG] postMachiResponse called — boardUrl=${board.url}, boardType=${board.boardType}, bbsId=${board.bbsId}, threadId=${params.threadId}`);
+export async function postMachiResponse(params: PostParams, board: Board): Promise<PostResult> {
+  logger.info(
+    `[DIAG] postMachiResponse called — boardUrl=${board.url}, boardType=${board.boardType}, bbsId=${board.bbsId}, threadId=${params.threadId}`,
+  );
 
   const postUrl = getPostUrl(board);
   const referer = getReferer(board, params.threadId);
@@ -87,7 +84,12 @@ export async function postMachiResponse(
 
   logger.info(`[DIAG] Machi posting to ${postUrl}`);
   logger.info(`[DIAG] Machi Referer: ${referer}`);
-  logger.info(`[DIAG] Machi body param keys: ${body.split('&').map((p) => p.split('=')[0] ?? '').join(', ')}`);
+  logger.info(
+    `[DIAG] Machi body param keys: ${body
+      .split('&')
+      .map((p) => p.split('=')[0] ?? '')
+      .join(', ')}`,
+  );
   logger.info(`[DIAG] Machi body size: ${String(Buffer.byteLength(body, 'utf-8'))} bytes`);
 
   try {
@@ -99,7 +101,11 @@ export async function postMachiResponse(
       headers['Cookie'] = cookieHeader;
     }
 
-    logger.info(`[DIAG] Machi request headers: ${Object.entries(headers).map(([k, v]) => k === 'Cookie' ? `${k}=(present)` : `${k}: ${v}`).join(', ')}`);
+    logger.info(
+      `[DIAG] Machi request headers: ${Object.entries(headers)
+        .map(([k, v]) => (k === 'Cookie' ? `${k}=(present)` : `${k}: ${v}`))
+        .join(', ')}`,
+    );
 
     const response = await httpFetch({
       url: postUrl,
@@ -112,15 +118,18 @@ export async function postMachiResponse(
 
     const html = decodeBuffer(response.body, 'Shift_JIS');
 
-    logger.info(`[DIAG] Machi response HTTP ${String(response.status)}, body ${String(response.body.length)} bytes`);
-    const htmlPreview = html.length > DIAG_HTML_LIMIT
-      ? html.substring(0, DIAG_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
-      : html;
+    logger.info(
+      `[DIAG] Machi response HTTP ${String(response.status)}, body ${String(response.body.length)} bytes`,
+    );
+    const htmlPreview =
+      html.length > DIAG_HTML_LIMIT
+        ? html.substring(0, DIAG_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
+        : html;
     logger.info(`[DIAG] Machi response HTML:\n${htmlPreview}`);
 
     // Log response headers for diagnostics
     const respHeaderSummary = Object.entries(response.headers)
-      .map(([k, v]) => k.toLowerCase() === 'set-cookie' ? `${k}: (present)` : `${k}: ${v}`)
+      .map(([k, v]) => (k.toLowerCase() === 'set-cookie' ? `${k}: (present)` : `${k}: ${v}`))
       .join(' | ');
     logger.info(`[DIAG] Machi response headers: ${respHeaderSummary}`);
 

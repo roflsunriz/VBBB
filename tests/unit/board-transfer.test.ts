@@ -14,12 +14,8 @@ function makeBoard(url: string, bbsId: string): Board {
 
 describe('detectTransfers', () => {
   it('detects host change with same path as a transfer', () => {
-    const oldBoards = [
-      makeBoard('https://old.5ch.net/newsplus/', 'newsplus'),
-    ];
-    const newBoards = [
-      makeBoard('https://new.5ch.net/newsplus/', 'newsplus'),
-    ];
+    const oldBoards = [makeBoard('https://old.5ch.net/newsplus/', 'newsplus')];
+    const newBoards = [makeBoard('https://new.5ch.net/newsplus/', 'newsplus')];
     const transfers = detectTransfers(oldBoards, newBoards);
     expect(transfers.size).toBe(1);
     expect(transfers.get('https://old.5ch.net/newsplus/')).toBe('https://new.5ch.net/newsplus/');

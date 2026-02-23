@@ -3,7 +3,8 @@ import { parseJBBSDatLine, parseJBBSDat } from '../../src/main/services/plugins/
 
 describe('parseJBBSDatLine', () => {
   it('parses a standard 7-field JBBS DAT line', () => {
-    const line = '1<>名無しさん<>sage<>2024/01/15(月) 12:34:56<>本文テスト<>スレッドタイトル<>ABC123';
+    const line =
+      '1<>名無しさん<>sage<>2024/01/15(月) 12:34:56<>本文テスト<>スレッドタイトル<>ABC123';
     const res = parseJBBSDatLine(line);
 
     expect(res).not.toBeNull();

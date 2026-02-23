@@ -8,7 +8,9 @@ const FULLWIDTH_DIGIT_OFFSET = '０'.charCodeAt(0) - '0'.charCodeAt(0);
 
 /** Normalize full-width digits to half-width */
 function normalizeDigits(s: string): string {
-  return s.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - FULLWIDTH_DIGIT_OFFSET));
+  return s.replace(/[０-９]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - FULLWIDTH_DIGIT_OFFSET),
+  );
 }
 
 /**
@@ -27,15 +29,16 @@ export interface AnchorRef {
  * With optional ranges (N-M) and lists (N,M,O).
  * Full-width digits, commas, and dashes are also recognized.
  */
-const ANCHOR_PATTERN =
-  /(?:&gt;|＞){1,2}([０-９\d]+(?:[,，][０-９\d]+)*(?:[-ー－][０-９\d]+)?)/g;
+const ANCHOR_PATTERN = /(?:&gt;|＞){1,2}([０-９\d]+(?:[,，][０-９\d]+)*(?:[-ー－][０-９\d]+)?)/g;
 
 /**
  * Parse a single anchor body (the part after >> ) into response numbers.
  * Supports: "123", "100-105", "1,3,5"
  */
 function parseAnchorBody(body: string): readonly number[] {
-  const normalized = normalizeDigits(body).replace(/[，]/g, ',').replace(/[ー－]/g, '-');
+  const normalized = normalizeDigits(body)
+    .replace(/[，]/g, ',')
+    .replace(/[ー－]/g, '-');
 
   // Range pattern: N-M
   const rangeMatch = /^(\d+)-(\d+)$/.exec(normalized);

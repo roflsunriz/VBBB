@@ -116,7 +116,12 @@ export function loadRoundLists(dataDir: string): void {
   if (timerContent !== null) {
     try {
       const parsed: unknown = JSON.parse(timerContent.toString('utf-8'));
-      if (typeof parsed === 'object' && parsed !== null && 'enabled' in parsed && 'intervalMinutes' in parsed) {
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'enabled' in parsed &&
+        'intervalMinutes' in parsed
+      ) {
         timerConfig = {
           enabled: Boolean((parsed as { enabled: unknown }).enabled),
           intervalMinutes: Number((parsed as { intervalMinutes: unknown }).intervalMinutes),

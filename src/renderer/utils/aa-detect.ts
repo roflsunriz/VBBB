@@ -15,24 +15,103 @@
 /** Characters commonly found in 2ch-style ASCII art */
 const AA_SPECIAL_CHARS = new Set([
   // Box drawing
-  '─', '━', '│', '┃', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼', '╋',
-  '┏', '┓', '┗', '┛', '┣', '┫', '┳', '┻',
+  '─',
+  '━',
+  '│',
+  '┃',
+  '┌',
+  '┐',
+  '└',
+  '┘',
+  '├',
+  '┤',
+  '┬',
+  '┴',
+  '┼',
+  '╋',
+  '┏',
+  '┓',
+  '┗',
+  '┛',
+  '┣',
+  '┫',
+  '┳',
+  '┻',
   // Lines & bars
-  '＿', '￣', '＝', '≡', '∥', '‖',
+  '＿',
+  '￣',
+  '＝',
+  '≡',
+  '∥',
+  '‖',
   // Decorative symbols
-  '★', '☆', '●', '○', '◎', '◇', '◆', '△', '▲', '▽', '▼', '□', '■',
-  '♪', '♂', '♀', '♠', '♣', '♥', '♦',
+  '★',
+  '☆',
+  '●',
+  '○',
+  '◎',
+  '◇',
+  '◆',
+  '△',
+  '▲',
+  '▽',
+  '▼',
+  '□',
+  '■',
+  '♪',
+  '♂',
+  '♀',
+  '♠',
+  '♣',
+  '♥',
+  '♦',
   // Face/body parts used in AA
-  'ω', 'д', 'Д', '∀', 'ε', 'ι', 'ρ', 'σ', 'ξ', 'ζ',
+  'ω',
+  'д',
+  'Д',
+  '∀',
+  'ε',
+  'ι',
+  'ρ',
+  'σ',
+  'ξ',
+  'ζ',
   // Half-width katakana commonly used in AA
-  'ﾉ', 'ﾐ', 'ﾊ', 'ﾍ', 'ﾎ', 'ﾑ', 'ﾒ', 'ﾘ', 'ﾙ', 'ﾝ', 'ﾞ', 'ﾟ',
+  'ﾉ',
+  'ﾐ',
+  'ﾊ',
+  'ﾍ',
+  'ﾎ',
+  'ﾑ',
+  'ﾒ',
+  'ﾘ',
+  'ﾙ',
+  'ﾝ',
+  'ﾞ',
+  'ﾟ',
   // Math & structural
-  '∧', '∨', '∩', '∪', '⊂', '⊃',
+  '∧',
+  '∨',
+  '∩',
+  '∪',
+  '⊂',
+  '⊃',
   // Full-width structural
-  '＜', '＞', '（', '）', '｛', '｝', '＋', '×', '÷',
-  '※', '†', '‡',
+  '＜',
+  '＞',
+  '（',
+  '）',
+  '｛',
+  '｝',
+  '＋',
+  '×',
+  '÷',
+  '※',
+  '†',
+  '‡',
   // Wave/tilde
-  '〜', '～',
+  '〜',
+  '～',
 ]);
 
 /** Minimum non-empty lines required for AA classification */
@@ -54,7 +133,8 @@ const MIN_AA_CHAR_LINES = 3;
 const AA_CHAR_LINE_RATIO = 0.5;
 
 /** Pattern matching consecutive whitespace used for AA alignment */
-const ALIGNMENT_SPACE_PATTERN = /[ \u00A0]{3,}|[\u3000]{2,}|[ \u00A0]{2,}[\u3000]|[\u3000][ \u00A0]{2,}/;
+const ALIGNMENT_SPACE_PATTERN =
+  /[ \u00A0]{3,}|[\u3000]{2,}|[ \u00A0]{2,}[\u3000]|[\u3000][ \u00A0]{2,}/;
 
 /** Quote line pattern (>>N references or green-text quotes) */
 const QUOTE_LINE_PATTERN = /^>/;
@@ -120,7 +200,8 @@ export function isAsciiArt(bodyHtml: string): boolean {
   if (spacingLines >= MIN_AA_LINES) return true;
 
   // Secondary: many lines with AA-specific characters
-  if (aaCharLines >= MIN_AA_CHAR_LINES && aaCharLines / analyzedLines >= AA_CHAR_LINE_RATIO) return true;
+  if (aaCharLines >= MIN_AA_CHAR_LINES && aaCharLines / analyzedLines >= AA_CHAR_LINE_RATIO)
+    return true;
 
   // Tertiary: combination of spacing and AA characters
   if (spacingLines >= 1 && aaCharLines >= MIN_AA_LINES) return true;

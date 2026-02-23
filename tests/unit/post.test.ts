@@ -9,7 +9,9 @@ import { PostResultType } from '../../src/types/domain';
 describe('detectResultType', () => {
   it('detects grtOK', () => {
     expect(detectResultType('書きこみが終わりました')).toBe(PostResultType.OK);
-    expect(detectResultType('<html><body>書きこみが終わりました</body></html>')).toBe(PostResultType.OK);
+    expect(detectResultType('<html><body>書きこみが終わりました</body></html>')).toBe(
+      PostResultType.OK,
+    );
   });
 
   it('detects grtCookie', () => {
@@ -17,12 +19,16 @@ describe('detectResultType', () => {
     expect(detectResultType('クッキー確認！')).toBe(PostResultType.Cookie);
     // Broader patterns: without trailing punctuation / HTML comment marker
     expect(detectResultType('クッキー確認')).toBe(PostResultType.Cookie);
-    expect(detectResultType('<html><!-- _X:cookie --><body>some content</body></html>')).toBe(PostResultType.Cookie);
+    expect(detectResultType('<html><!-- _X:cookie --><body>some content</body></html>')).toBe(
+      PostResultType.Cookie,
+    );
     // Real server response: combined cookie+check page
-    expect(detectResultType(
-      '<html><!-- _X:cookie --><head><title>■ 書き込み確認 ■</title></head>' +
-      '<body><b>書きこみ＆クッキー確認</b></body></html>',
-    )).toBe(PostResultType.Cookie);
+    expect(
+      detectResultType(
+        '<html><!-- _X:cookie --><head><title>■ 書き込み確認 ■</title></head>' +
+          '<body><b>書きこみ＆クッキー確認</b></body></html>',
+      ),
+    ).toBe(PostResultType.Cookie);
   });
 
   it('detects grtCheck', () => {

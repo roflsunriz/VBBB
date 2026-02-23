@@ -25,7 +25,12 @@ const OFFSET_Y = 12;
 /** Margin from viewport edge */
 const VIEWPORT_MARGIN = 8;
 
-export function ResPopup({ resNumbers, responses, position, onClose }: ResPopupProps): React.JSX.Element | null {
+export function ResPopup({
+  resNumbers,
+  responses,
+  position,
+  onClose,
+}: ResPopupProps): React.JSX.Element | null {
   const popupRef = useRef<HTMLDivElement>(null);
 
   // Find matching responses (limited to MAX_POPUP_RES)
@@ -81,10 +86,16 @@ export function ResPopup({ resNumbers, responses, position, onClose }: ResPopupP
       {matchedResponses.map((res) => {
         const bodyIsAa = isAsciiArt(res.body);
         return (
-          <div key={res.number} className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0">
+          <div
+            key={res.number}
+            className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0"
+          >
             <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5 text-xs">
               <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
-              <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
+              <span
+                className="text-[var(--color-res-name)]"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
+              />
               {res.mail.length > 0 && (
                 <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
               )}

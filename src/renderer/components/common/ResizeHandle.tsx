@@ -17,8 +17,12 @@ export function ResizeHandle({ onResize, onResizeEnd }: ResizeHandleProps): Reac
   const onResizeRef = useRef(onResize);
   const onResizeEndRef = useRef(onResizeEnd);
 
-  useEffect(() => { onResizeRef.current = onResize; }, [onResize]);
-  useEffect(() => { onResizeEndRef.current = onResizeEnd; }, [onResizeEnd]);
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
+  useEffect(() => {
+    onResizeEndRef.current = onResizeEnd;
+  }, [onResizeEnd]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragging.current) return;

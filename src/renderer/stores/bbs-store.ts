@@ -2,7 +2,18 @@
  * Zustand store for BBS browser state.
  */
 import { create } from 'zustand';
-import type { BBSMenu, Board, BoardSortDir, BoardSortKey, DatFetchResult, KotehanConfig, Res, SambaInfo, SubjectRecord, ThreadIndex } from '@shared/domain';
+import type {
+  BBSMenu,
+  Board,
+  BoardSortDir,
+  BoardSortKey,
+  DatFetchResult,
+  KotehanConfig,
+  Res,
+  SambaInfo,
+  SubjectRecord,
+  ThreadIndex,
+} from '@shared/domain';
 import { DatFetchStatus } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
 import type { BrowsingHistoryEntry, DisplayRange, SavedTab, SessionState } from '@shared/history';
@@ -133,7 +144,12 @@ interface BBSState {
   openThread: (boardUrl: string, threadId: string, title: string) => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
-  updateTabScroll: (tabId: string, scrollTop: number, scrollResNumber?: number, scrollResOffset?: number) => void;
+  updateTabScroll: (
+    tabId: string,
+    scrollTop: number,
+    scrollResNumber?: number,
+    scrollResOffset?: number,
+  ) => void;
   updateTabKokomade: (tabId: string, kokomade: number) => void;
   updateTabDisplayRange: (tabId: string, displayRange: DisplayRange) => void;
   /** Per-tab post editor */
@@ -175,11 +191,19 @@ const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
 const BOARD_SORT_SETTINGS_KEY = 'vbbb-board-sort-settings';
 
 const VALID_SORT_KEYS: ReadonlySet<string> = new Set([
-  'index', 'title', 'count', 'ikioi', 'completionRate', 'firstPostDate',
+  'index',
+  'title',
+  'count',
+  'ikioi',
+  'completionRate',
+  'firstPostDate',
 ]);
 const VALID_SORT_DIRS: ReadonlySet<string> = new Set(['asc', 'desc']);
 
-type BoardSortRecord = Record<string, { readonly sortKey: BoardSortKey; readonly sortDir: BoardSortDir }>;
+type BoardSortRecord = Record<
+  string,
+  { readonly sortKey: BoardSortKey; readonly sortDir: BoardSortDir }
+>;
 
 function loadBoardSortSettings(): BoardSortRecord {
   try {
@@ -190,16 +214,24 @@ function loadBoardSortSettings(): BoardSortRecord {
         return parsed as BoardSortRecord;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return {};
 }
 
-function saveBoardSortSetting(boardUrl: string, sortKey: BoardSortKey, sortDir: BoardSortDir): void {
+function saveBoardSortSetting(
+  boardUrl: string,
+  sortKey: BoardSortKey,
+  sortDir: BoardSortDir,
+): void {
   try {
     const all = loadBoardSortSettings();
     const next: BoardSortRecord = { ...all, [boardUrl]: { sortKey, sortDir } };
     localStorage.setItem(BOARD_SORT_SETTINGS_KEY, JSON.stringify(next));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function loadHighlightSettings(): HighlightSettings {
@@ -262,9 +294,11 @@ function pushStatus(category: StatusLogCategory, level: StatusLogLevel, message:
 function isExternalBoardUrl(boardUrl: string): boolean {
   try {
     const hostname = new URL(boardUrl).hostname.toLowerCase();
-    return hostname.includes('jbbs.shitaraba') ||
+    return (
+      hostname.includes('jbbs.shitaraba') ||
       hostname.includes('jbbs.livedoor') ||
-      hostname.includes('machi.to');
+      hostname.includes('machi.to')
+    );
   } catch {
     return false;
   }
@@ -307,7 +341,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         const parsed: unknown = JSON.parse(stored);
         if (Array.isArray(parsed)) return parsed as readonly Board[];
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return [] as readonly Board[];
   })(),
 
@@ -332,13 +368,25 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       // that produces zero categories after parsing.
       const current = get().menu;
       if (fetched.categories.length === 0 && current !== null && current.categories.length > 0) {
-        pushStatus('board', 'warn', `板一覧取得結果が空 (0 カテゴリ) — 既存メニュー (${String(current.categories.length)} カテゴリ) を維持します`);
+        pushStatus(
+          'board',
+          'warn',
+          `板一覧取得結果が空 (0 カテゴリ) — 既存メニュー (${String(current.categories.length)} カテゴリ) を維持します`,
+        );
         set({ menuLoading: false, statusMessage: '板一覧の取得結果が空のため既存データを維持' });
         return;
       }
 
-      set({ menu: fetched, menuLoading: false, statusMessage: `${String(fetched.categories.length)} カテゴリを読み込みました` });
-      pushStatus('board', 'success', `板一覧取得完了: ${String(fetched.categories.length)} カテゴリ`);
+      set({
+        menu: fetched,
+        menuLoading: false,
+        statusMessage: `${String(fetched.categories.length)} カテゴリを読み込みました`,
+      });
+      pushStatus(
+        'board',
+        'success',
+        `板一覧取得完了: ${String(fetched.categories.length)} カテゴリ`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set({ menuLoading: false, menuError: message, statusMessage: '板一覧の取得に失敗しました' });
@@ -414,9 +462,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         ? savedSort.sortKey
         : 'index';
     const persistedSortDir: BoardSortDir =
-      savedSort !== undefined && VALID_SORT_DIRS.has(savedSort.sortDir)
-        ? savedSort.sortDir
-        : 'asc';
+      savedSort !== undefined && VALID_SORT_DIRS.has(savedSort.sortDir) ? savedSort.sortDir : 'asc';
 
     // Create new board tab
     const newTab: BoardTab = {
@@ -457,7 +503,13 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       set((state) => ({
         boardTabs: state.boardTabs.map((t) =>
           t.id === boardTabId
-            ? { ...t, subjects: result.threads, threadIndices: indices, subjectLoading: false, subjectError: null }
+            ? {
+                ...t,
+                subjects: result.threads,
+                threadIndices: indices,
+                subjectLoading: false,
+                subjectError: null,
+              }
             : t,
         ),
         // Update derived state only if this is still the active tab
@@ -472,14 +524,16 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: `${board.title}: ${String(result.threads.length)} スレッド`,
       }));
-      pushStatus('board', 'success', `${board.title}: ${String(result.threads.length)} スレッド取得`);
+      pushStatus(
+        'board',
+        'success',
+        `${board.title}: ${String(result.threads.length)} スレッド取得`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set((state) => ({
         boardTabs: state.boardTabs.map((t) =>
-          t.id === boardTabId
-            ? { ...t, subjectLoading: false, subjectError: message }
-            : t,
+          t.id === boardTabId ? { ...t, subjectLoading: false, subjectError: message } : t,
         ),
         ...(state.activeBoardTabId === boardTabId
           ? { subjectLoading: false, subjectError: message }
@@ -702,7 +756,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       const scrollResNumber = idx?.scrollResNumber ?? 0;
       const scrollResOffset = idx?.scrollResOffset ?? 0;
 
-      pushStatus('thread', 'info', `[kokomade] openThread: threadId=${threadId}, source=${idxSource}, kokomade=${String(kokomade)}, resCount=${String(result.responses.length)}`);
+      pushStatus(
+        'thread',
+        'info',
+        `[kokomade] openThread: threadId=${threadId}, source=${idxSource}, kokomade=${String(kokomade)}, resCount=${String(result.responses.length)}`,
+      );
 
       // If the incoming title is mechanical/placeholder, resolve from DAT #1 title.
       let resolvedTitle = title;
@@ -716,7 +774,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         resolvedTitle = threadId;
       }
 
-      const isDatFallen = result.status === DatFetchStatus.Archived || result.status === DatFetchStatus.DatFallen;
+      const isDatFallen =
+        result.status === DatFetchStatus.Archived || result.status === DatFetchStatus.DatFallen;
 
       const newTab: ThreadTab = {
         id: tabId,
@@ -740,20 +799,30 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         activeTabId: tabId,
         statusMessage: `${resolvedTitle}: ${String(result.responses.length)} レス`,
       }));
-      pushStatus('thread', 'success', `${resolvedTitle}: ${String(result.responses.length)} レス取得`);
+      pushStatus(
+        'thread',
+        'success',
+        `${resolvedTitle}: ${String(result.responses.length)} レス取得`,
+      );
 
       void getApi().invoke('history:add', boardUrl, threadId, resolvedTitle);
 
       // Persist lastModified from DAT fetch to Folder.idx and update in-memory threadIndices
       if (result.lastModified !== null) {
-        void getApi().invoke('bbs:update-thread-index', boardUrl, threadId, { lastModified: result.lastModified });
+        void getApi().invoke('bbs:update-thread-index', boardUrl, threadId, {
+          lastModified: result.lastModified,
+        });
         set((state) => {
           const updateIdx = (indices: readonly ThreadIndex[]): readonly ThreadIndex[] =>
-            indices.map((i) => i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i);
+            indices.map((i) =>
+              i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i,
+            );
           return {
             threadIndices: updateIdx(state.threadIndices),
             boardTabs: state.boardTabs.map((bt) =>
-              bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+              bt.id === state.activeBoardTabId
+                ? { ...bt, threadIndices: updateIdx(bt.threadIndices) }
+                : bt,
             ),
           };
         });
@@ -795,7 +864,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set({ activeTabId: tabId });
   },
 
-  updateTabScroll: (tabId: string, scrollTop: number, scrollResNumber?: number, scrollResOffset?: number) => {
+  updateTabScroll: (
+    tabId: string,
+    scrollTop: number,
+    scrollResNumber?: number,
+    scrollResOffset?: number,
+  ) => {
     set((state) => ({
       tabs: state.tabs.map((t) =>
         t.id === tabId
@@ -816,7 +890,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     // Skip if the value hasn't changed (avoid unnecessary state updates / IPC on scroll)
     if (tab !== undefined && tab.kokomade === kokomade) return;
 
-    pushStatus('thread', 'info', `[kokomade] update: ${tab?.threadId ?? tabId} kokomade=${String(tab?.kokomade ?? -1)}->${String(kokomade)}`);
+    pushStatus(
+      'thread',
+      'info',
+      `[kokomade] update: ${tab?.threadId ?? tabId} kokomade=${String(tab?.kokomade ?? -1)}->${String(kokomade)}`,
+    );
 
     set((state) => {
       const updatedTabs = state.tabs.map((t) => (t.id === tabId ? { ...t, kokomade } : t));
@@ -835,7 +913,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         tabs: updatedTabs,
         threadIndices: updateIdx(state.threadIndices),
         boardTabs: state.boardTabs.map((bt) =>
-          bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+          bt.id === state.activeBoardTabId
+            ? { ...bt, threadIndices: updateIdx(bt.threadIndices) }
+            : bt,
         ),
       };
     });
@@ -877,46 +957,66 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   restoreTabs: async (prefetchedTabs?: readonly SavedTab[], activeThreadTabId?: string) => {
     try {
-      const savedTabs = prefetchedTabs ?? await getApi().invoke('tab:load');
-      pushStatus('thread', 'info', `[restoreTabs] tab.sav から ${String(savedTabs.length)} 件のタブを読み込み`);
+      const savedTabs = prefetchedTabs ?? (await getApi().invoke('tab:load'));
+      pushStatus(
+        'thread',
+        'info',
+        `[restoreTabs] tab.sav から ${String(savedTabs.length)} 件のタブを読み込み`,
+      );
       for (const s of savedTabs) {
-        pushStatus('thread', 'info', `[restoreTabs]   - ${s.title} (board=${s.boardUrl}, thread=${s.threadId})`);
+        pushStatus(
+          'thread',
+          'info',
+          `[restoreTabs]   - ${s.title} (board=${s.boardUrl}, thread=${s.threadId})`,
+        );
       }
 
       // Open all threads in parallel
-      await Promise.all(savedTabs.map(async (saved) => {
-        try {
-          await get().openThread(saved.boardUrl, saved.threadId, saved.title);
-          const { tabs } = get();
-          const opened = tabs.find(
-            (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
-          );
-          if (opened !== undefined) {
-            pushStatus('thread', 'success', `[restoreTabs] 復元成功: ${saved.title} (${String(opened.responses.length)} レス)`);
-          } else {
-            pushStatus('thread', 'error', `[restoreTabs] 復元失敗: openThread 後にタブが見つからない: ${saved.title}`);
-          }
-        } catch (err) {
-          pushStatus('thread', 'error', `[restoreTabs] 復元例外: ${saved.title}: ${err instanceof Error ? err.message : String(err)}`);
-        }
-
-        // Apply scrollTop/scrollResNumber from tab.sav (takes priority over Folder.idx
-        // which may be stale if the tab was never explicitly closed).
-        if ((saved.scrollTop !== undefined && saved.scrollTop > 0) ||
-            (saved.scrollResNumber !== undefined && saved.scrollResNumber > 0)) {
-          const { tabs } = get();
-          const opened = tabs.find(
-            (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
-          );
-          if (opened !== undefined) {
-            get().updateTabScroll(
-              opened.id,
-              saved.scrollTop ?? 0,
-              saved.scrollResNumber,
+      await Promise.all(
+        savedTabs.map(async (saved) => {
+          try {
+            await get().openThread(saved.boardUrl, saved.threadId, saved.title);
+            const { tabs } = get();
+            const opened = tabs.find(
+              (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
+            );
+            if (opened !== undefined) {
+              pushStatus(
+                'thread',
+                'success',
+                `[restoreTabs] 復元成功: ${saved.title} (${String(opened.responses.length)} レス)`,
+              );
+            } else {
+              pushStatus(
+                'thread',
+                'error',
+                `[restoreTabs] 復元失敗: openThread 後にタブが見つからない: ${saved.title}`,
+              );
+            }
+          } catch (err) {
+            pushStatus(
+              'thread',
+              'error',
+              `[restoreTabs] 復元例外: ${saved.title}: ${err instanceof Error ? err.message : String(err)}`,
             );
           }
-        }
-      }));
+
+          // Apply scrollTop/scrollResNumber from tab.sav (takes priority over Folder.idx
+          // which may be stale if the tab was never explicitly closed).
+          if (
+            (saved.scrollTop !== undefined && saved.scrollTop > 0) ||
+            (saved.scrollResNumber !== undefined && saved.scrollResNumber > 0)
+          ) {
+            const { tabs } = get();
+            const opened = tabs.find(
+              (t) => t.boardUrl === saved.boardUrl && t.threadId === saved.threadId,
+            );
+            if (opened !== undefined) {
+              get().updateTabScroll(opened.id, saved.scrollTop ?? 0, saved.scrollResNumber);
+            }
+          }
+        }),
+      );
 
       // Re-sort tabs to match the saved order (parallel open is non-deterministic)
       const tabOrder = new Map(savedTabs.map((s, i) => [`${s.boardUrl}:${s.threadId}`, i]));
@@ -929,7 +1029,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       }));
 
       const finalTabs = get().tabs;
-      pushStatus('thread', 'info', `[restoreTabs] 完了: ${String(finalTabs.length)}/${String(savedTabs.length)} タブ復元`);
+      pushStatus(
+        'thread',
+        'info',
+        `[restoreTabs] 完了: ${String(finalTabs.length)}/${String(savedTabs.length)} タブ復元`,
+      );
 
       // Restore active thread tab from the prefetched session data.
       // Previously this did a fresh session:load IPC call, but that was
@@ -944,25 +1048,53 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           set({ activeTabId: target.id });
           pushStatus('thread', 'info', `[restoreTabs] アクティブスレッドタブ復元: ${target.title}`);
         } else {
-          pushStatus('thread', 'warn', `[restoreTabs] アクティブスレッドタブ "${activeThreadTabId}" が復元後のタブに見つからない`);
+          pushStatus(
+            'thread',
+            'warn',
+            `[restoreTabs] アクティブスレッドタブ "${activeThreadTabId}" が復元後のタブに見つからない`,
+          );
         }
       }
     } catch (err) {
-      pushStatus('thread', 'error', `[restoreTabs] 全体例外: ${err instanceof Error ? err.message : String(err)}`);
+      pushStatus(
+        'thread',
+        'error',
+        `[restoreTabs] 全体例外: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   },
 
   restoreSession: async (prefetchedSession?: SessionState) => {
     try {
-      const session = prefetchedSession ?? await getApi().invoke('session:load');
+      const session = prefetchedSession ?? (await getApi().invoke('session:load'));
       const { menu, externalBoards } = get();
 
       pushStatus('board', 'info', `[restoreSession] session.json 読み込み完了`);
-      pushStatus('board', 'info', `[restoreSession]   selectedBoardUrl=${session.selectedBoardUrl ?? '(null)'}`);
-      pushStatus('board', 'info', `[restoreSession]   boardTabUrls=${session.boardTabUrls !== undefined ? JSON.stringify(session.boardTabUrls) : '(undefined)'}`);
-      pushStatus('board', 'info', `[restoreSession]   activeBoardTabId=${session.activeBoardTabId ?? '(undefined)'}`);
-      pushStatus('board', 'info', `[restoreSession]   menu=${menu !== null ? `${String(menu.categories.length)} categories` : '(null)'}`);
-      pushStatus('board', 'info', `[restoreSession]   externalBoards=${String(externalBoards.length)} 件: [${externalBoards.map((b) => b.url).join(', ')}]`);
+      pushStatus(
+        'board',
+        'info',
+        `[restoreSession]   selectedBoardUrl=${session.selectedBoardUrl ?? '(null)'}`,
+      );
+      pushStatus(
+        'board',
+        'info',
+        `[restoreSession]   boardTabUrls=${session.boardTabUrls !== undefined ? JSON.stringify(session.boardTabUrls) : '(undefined)'}`,
+      );
+      pushStatus(
+        'board',
+        'info',
+        `[restoreSession]   activeBoardTabId=${session.activeBoardTabId ?? '(undefined)'}`,
+      );
+      pushStatus(
+        'board',
+        'info',
+        `[restoreSession]   menu=${menu !== null ? `${String(menu.categories.length)} categories` : '(null)'}`,
+      );
+      pushStatus(
+        'board',
+        'info',
+        `[restoreSession]   externalBoards=${String(externalBoards.length)} 件: [${externalBoards.map((b) => b.url).join(', ')}]`,
+      );
 
       if (menu === null) {
         pushStatus('board', 'warn', '[restoreSession] menu が null のため復元中断');
@@ -974,37 +1106,67 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         for (const cat of menu.categories) {
           const b = cat.boards.find((board) => board.url === url);
           if (b !== undefined) {
-            pushStatus('board', 'info', `[restoreSession] findBoard: "${url}" → メニュー "${cat.name}" で発見`);
+            pushStatus(
+              'board',
+              'info',
+              `[restoreSession] findBoard: "${url}" → メニュー "${cat.name}" で発見`,
+            );
             return b;
           }
         }
         // Also search external boards (JBBS/Shitaraba, Machi BBS, etc.)
         const ext = externalBoards.find((b) => b.url === url);
         if (ext !== undefined) {
-          pushStatus('board', 'info', `[restoreSession] findBoard: "${url}" → externalBoards で発見 (title="${ext.title}")`);
+          pushStatus(
+            'board',
+            'info',
+            `[restoreSession] findBoard: "${url}" → externalBoards で発見 (title="${ext.title}")`,
+          );
           return ext;
         }
-        pushStatus('board', 'error', `[restoreSession] findBoard: "${url}" → メニュー (${String(menu.categories.length)} cats) にも externalBoards (${String(externalBoards.length)} 件) にも見つからない`);
+        pushStatus(
+          'board',
+          'error',
+          `[restoreSession] findBoard: "${url}" → メニュー (${String(menu.categories.length)} cats) にも externalBoards (${String(externalBoards.length)} 件) にも見つからない`,
+        );
         return undefined;
       };
 
       // Restore board tabs (F27) — all boards in parallel
       if (session.boardTabUrls !== undefined && session.boardTabUrls.length > 0) {
         const boardTabUrls = session.boardTabUrls;
-        pushStatus('board', 'info', `[restoreSession] ${String(boardTabUrls.length)} 件の板タブを復元開始`);
+        pushStatus(
+          'board',
+          'info',
+          `[restoreSession] ${String(boardTabUrls.length)} 件の板タブを復元開始`,
+        );
         const boards = boardTabUrls
           .map((url) => findBoard(url))
           .filter((b): b is Board => b !== undefined);
-        pushStatus('board', 'info', `[restoreSession] findBoard で ${String(boards.length)}/${String(boardTabUrls.length)} 件が見つかった`);
+        pushStatus(
+          'board',
+          'info',
+          `[restoreSession] findBoard で ${String(boards.length)}/${String(boardTabUrls.length)} 件が見つかった`,
+        );
 
-        await Promise.all(boards.map(async (board) => {
-          try {
-            await get().selectBoard(board);
-            pushStatus('board', 'success', `[restoreSession] selectBoard 成功: ${board.title} (${board.url})`);
-          } catch (err) {
-            pushStatus('board', 'error', `[restoreSession] selectBoard 失敗: ${board.title} (${board.url}): ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }));
+        await Promise.all(
+          boards.map(async (board) => {
+            try {
+              await get().selectBoard(board);
+              pushStatus(
+                'board',
+                'success',
+                `[restoreSession] selectBoard 成功: ${board.title} (${board.url})`,
+              );
+            } catch (err) {
+              pushStatus(
+                'board',
+                'error',
+                `[restoreSession] selectBoard 失敗: ${board.title} (${board.url}): ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }),
+        );
 
         // Re-sort boardTabs to match the saved order
         const urlOrder = new Map(boardTabUrls.map((url, i) => [url, i]));
@@ -1017,7 +1179,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         }));
 
         const finalBoardTabs = get().boardTabs;
-        pushStatus('board', 'info', `[restoreSession] 板タブ復元完了: ${String(finalBoardTabs.length)} 件 [${finalBoardTabs.map((t) => t.board.title).join(', ')}]`);
+        pushStatus(
+          'board',
+          'info',
+          `[restoreSession] 板タブ復元完了: ${String(finalBoardTabs.length)} 件 [${finalBoardTabs.map((t) => t.board.title).join(', ')}]`,
+        );
 
         // Restore active board tab
         if (session.activeBoardTabId !== undefined) {
@@ -1025,14 +1191,26 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           const target = boardTabs.find((t) => t.id === session.activeBoardTabId);
           if (target !== undefined) {
             get().setActiveBoardTab(target.id);
-            pushStatus('board', 'info', `[restoreSession] アクティブ板タブ復元: ${target.board.title}`);
+            pushStatus(
+              'board',
+              'info',
+              `[restoreSession] アクティブ板タブ復元: ${target.board.title}`,
+            );
           } else {
-            pushStatus('board', 'warn', `[restoreSession] アクティブ板タブ "${session.activeBoardTabId}" が復元後の板タブに見つからない`);
+            pushStatus(
+              'board',
+              'warn',
+              `[restoreSession] アクティブ板タブ "${session.activeBoardTabId}" が復元後の板タブに見つからない`,
+            );
           }
         }
       } else if (session.selectedBoardUrl !== null) {
         // Backward compatibility: restore single board
-        pushStatus('board', 'info', `[restoreSession] 単一板復元モード: ${session.selectedBoardUrl}`);
+        pushStatus(
+          'board',
+          'info',
+          `[restoreSession] 単一板復元モード: ${session.selectedBoardUrl}`,
+        );
         const board = findBoard(session.selectedBoardUrl);
         if (board !== undefined) {
           await get().selectBoard(board);
@@ -1041,7 +1219,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         pushStatus('board', 'info', '[restoreSession] 復元対象の板タブなし');
       }
     } catch (err) {
-      pushStatus('board', 'error', `[restoreSession] 全体例外: ${err instanceof Error ? err.message : String(err)}`);
+      pushStatus(
+        'board',
+        'error',
+        `[restoreSession] 全体例外: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   },
 
@@ -1068,14 +1250,22 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     if (externalBoards.some((b) => b.url === board.url)) return;
     const updated = [...externalBoards, board];
     set({ externalBoards: updated });
-    try { localStorage.setItem('vbbb-external-boards', JSON.stringify(updated)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('vbbb-external-boards', JSON.stringify(updated));
+    } catch {
+      /* ignore */
+    }
   },
 
   removeExternalBoard: (url: string) => {
     const { externalBoards } = get();
     const updated = externalBoards.filter((b) => b.url !== url);
     set({ externalBoards: updated });
-    try { localStorage.setItem('vbbb-external-boards', JSON.stringify(updated)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('vbbb-external-boards', JSON.stringify(updated));
+    } catch {
+      /* ignore */
+    }
   },
 
   refreshSelectedBoard: async () => {
@@ -1087,9 +1277,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
     set((state) => ({
       boardTabs: state.boardTabs.map((t) =>
-        t.id === boardTabId
-          ? { ...t, subjectLoading: true, subjectError: null }
-          : t,
+        t.id === boardTabId ? { ...t, subjectLoading: true, subjectError: null } : t,
       ),
       ...(state.activeBoardTabId === boardTabId
         ? { subjectLoading: true, subjectError: null }
@@ -1109,7 +1297,13 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       set((state) => ({
         boardTabs: state.boardTabs.map((t) =>
           t.id === boardTabId
-            ? { ...t, subjects: result.threads, threadIndices: indices, subjectLoading: false, subjectError: null }
+            ? {
+                ...t,
+                subjects: result.threads,
+                threadIndices: indices,
+                subjectLoading: false,
+                subjectError: null,
+              }
             : t,
         ),
         ...(state.activeBoardTabId === boardTabId
@@ -1124,14 +1318,16 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           : {}),
         statusMessage: `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
       }));
-      pushStatus('board', 'success', `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`);
+      pushStatus(
+        'board',
+        'success',
+        `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       set((state) => ({
         boardTabs: state.boardTabs.map((t) =>
-          t.id === boardTabId
-            ? { ...t, subjectLoading: false, subjectError: message }
-            : t,
+          t.id === boardTabId ? { ...t, subjectLoading: false, subjectError: message } : t,
         ),
         ...(state.activeBoardTabId === boardTabId
           ? { subjectLoading: false, subjectError: message }
@@ -1167,7 +1363,11 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           ),
           statusMessage: `${targetTab.title}: DAT落ち / 過去ログ取得 (${String(result.responses.length)} レス)`,
         }));
-        pushStatus('thread', 'warn', `${targetTab.title}: DAT落ちを確認 (過去ログから ${String(result.responses.length)} レス取得)`);
+        pushStatus(
+          'thread',
+          'warn',
+          `${targetTab.title}: DAT落ちを確認 (過去ログから ${String(result.responses.length)} レス取得)`,
+        );
         return;
       }
 
@@ -1180,29 +1380,41 @@ export const useBBSStore = create<BBSState>((set, get) => ({
           ),
           statusMessage: `${targetTab.title}: DAT落ち (${String(preserved.length)} レス)`,
         }));
-        pushStatus('thread', 'warn', `${targetTab.title}: DAT落ちを確認 (過去ログなし・${String(preserved.length)} レス保持)`);
+        pushStatus(
+          'thread',
+          'warn',
+          `${targetTab.title}: DAT落ちを確認 (過去ログなし・${String(preserved.length)} レス保持)`,
+        );
         return;
       }
 
       set((state) => ({
-        tabs: state.tabs.map((t) =>
-          t.id === tabId ? { ...t, responses: result.responses } : t,
-        ),
+        tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, responses: result.responses } : t)),
         statusMessage: `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
       }));
-      pushStatus('thread', 'success', `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`);
+      pushStatus(
+        'thread',
+        'success',
+        `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
+      );
 
       // Persist lastModified from DAT fetch to Folder.idx and update in-memory threadIndices
       if (result.lastModified !== null) {
         const datFileName = `${targetTab.threadId}.dat`;
-        void getApi().invoke('bbs:update-thread-index', targetTab.boardUrl, targetTab.threadId, { lastModified: result.lastModified });
+        void getApi().invoke('bbs:update-thread-index', targetTab.boardUrl, targetTab.threadId, {
+          lastModified: result.lastModified,
+        });
         set((state) => {
           const updateIdx = (indices: readonly ThreadIndex[]): readonly ThreadIndex[] =>
-            indices.map((i) => i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i);
+            indices.map((i) =>
+              i.fileName === datFileName ? { ...i, lastModified: result.lastModified } : i,
+            );
           return {
             threadIndices: updateIdx(state.threadIndices),
             boardTabs: state.boardTabs.map((bt) =>
-              bt.id === state.activeBoardTabId ? { ...bt, threadIndices: updateIdx(bt.threadIndices) } : bt,
+              bt.id === state.activeBoardTabId
+                ? { ...bt, threadIndices: updateIdx(bt.threadIndices) }
+                : bt,
             ),
           };
         });
@@ -1242,7 +1454,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) =>
         t.id === tabId
-          ? { ...t, postEditorOpen: !t.postEditorOpen, postEditorInitialMessage: '', progPostOpen: false }
+          ? {
+              ...t,
+              postEditorOpen: !t.postEditorOpen,
+              postEditorInitialMessage: '',
+              progPostOpen: false,
+            }
           : t,
       ),
     }));
@@ -1260,7 +1477,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) =>
         t.id === tabId
-          ? { ...t, postEditorOpen: true, postEditorInitialMessage: `>>${String(resNumber)}\n`, progPostOpen: false }
+          ? {
+              ...t,
+              postEditorOpen: true,
+              postEditorInitialMessage: `>>${String(resNumber)}\n`,
+              progPostOpen: false,
+            }
           : t,
       ),
     }));
@@ -1268,9 +1490,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   toggleTabAnalysis: (tabId: string) => {
     set((state) => ({
-      tabs: state.tabs.map((t) =>
-        t.id === tabId ? { ...t, analysisOpen: !t.analysisOpen } : t,
-      ),
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, analysisOpen: !t.analysisOpen } : t)),
     }));
   },
 
@@ -1278,7 +1498,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) =>
         t.id === tabId
-          ? { ...t, progPostOpen: !t.progPostOpen, postEditorOpen: false, postEditorInitialMessage: '' }
+          ? {
+              ...t,
+              progPostOpen: !t.progPostOpen,
+              postEditorOpen: false,
+              postEditorInitialMessage: '',
+            }
           : t,
       ),
     }));
@@ -1286,21 +1511,19 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   closeTabProgPost: (tabId: string) => {
     set((state) => ({
-      tabs: state.tabs.map((t) =>
-        t.id === tabId ? { ...t, progPostOpen: false } : t,
-      ),
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, progPostOpen: false } : t)),
     }));
   },
 
   updateBoardTabFilter: (tabId: string, filter: string) => {
     set((state) => ({
-      boardTabs: state.boardTabs.map((t) => t.id === tabId ? { ...t, filter } : t),
+      boardTabs: state.boardTabs.map((t) => (t.id === tabId ? { ...t, filter } : t)),
     }));
   },
 
   updateBoardTabSort: (tabId: string, sortKey: BoardSortKey, sortDir: BoardSortDir) => {
     set((state) => ({
-      boardTabs: state.boardTabs.map((t) => t.id === tabId ? { ...t, sortKey, sortDir } : t),
+      boardTabs: state.boardTabs.map((t) => (t.id === tabId ? { ...t, sortKey, sortDir } : t)),
     }));
     // Persist sort settings keyed by boardUrl (tabId === boardUrl for board tabs)
     saveBoardSortSetting(tabId, sortKey, sortDir);
@@ -1343,9 +1566,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   switchToAdjacentTab: (direction: 'prev' | 'next') => {
     const { tabs, activeTabId } = get();
     if (tabs.length === 0) return;
-    const currentIndex = activeTabId !== null
-      ? tabs.findIndex((t) => t.id === activeTabId)
-      : -1;
+    const currentIndex = activeTabId !== null ? tabs.findIndex((t) => t.id === activeTabId) : -1;
     if (currentIndex < 0) return;
     const offset = direction === 'next' ? 1 : -1;
     const targetIndex = currentIndex + offset;

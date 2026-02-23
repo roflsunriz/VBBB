@@ -1,8 +1,10 @@
 {
-  "compilerOptions": {},
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "./tsconfig.web.json" }
-  ],
+  "compilerOptions": {
+    "paths": {
+      "@shared/*": ["./src/types/*"],
+      "@renderer/*": ["./src/renderer/*"]
+    }
+  },
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }],
   "files": []
 }

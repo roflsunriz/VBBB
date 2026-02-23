@@ -31,14 +31,22 @@ export function parseTabSav(content: string): SavedTab[] {
     if (boardUrl.length === 0 || threadId.length === 0) continue;
 
     const rawScroll = fields[3];
-    const scrollTop = rawScroll !== undefined && rawScroll.length > 0 ? Number(rawScroll) : undefined;
+    const scrollTop =
+      rawScroll !== undefined && rawScroll.length > 0 ? Number(rawScroll) : undefined;
     // scrollTop 0 is semantically identical to "no saved position" (start from top),
     // so omit the property entirely to ensure proper round-tripping.
-    const resolvedScroll = scrollTop !== undefined && Number.isFinite(scrollTop) && scrollTop > 0 ? scrollTop : undefined;
+    const resolvedScroll =
+      scrollTop !== undefined && Number.isFinite(scrollTop) && scrollTop > 0
+        ? scrollTop
+        : undefined;
 
     const rawResNum = fields[4];
-    const parsedResNum = rawResNum !== undefined && rawResNum.length > 0 ? Number(rawResNum) : undefined;
-    const resolvedResNum = parsedResNum !== undefined && Number.isFinite(parsedResNum) && parsedResNum > 0 ? parsedResNum : undefined;
+    const parsedResNum =
+      rawResNum !== undefined && rawResNum.length > 0 ? Number(rawResNum) : undefined;
+    const resolvedResNum =
+      parsedResNum !== undefined && Number.isFinite(parsedResNum) && parsedResNum > 0
+        ? parsedResNum
+        : undefined;
 
     tabs.push({
       boardUrl,
@@ -57,7 +65,10 @@ export function parseTabSav(content: string): SavedTab[] {
  */
 export function serializeTabSav(tabs: readonly SavedTab[]): string {
   return tabs
-    .map((t) => `${t.boardUrl}\t${t.threadId}\t${t.title}\t${String(t.scrollTop ?? 0)}\t${String(t.scrollResNumber ?? 0)}`)
+    .map(
+      (t) =>
+        `${t.boardUrl}\t${t.threadId}\t${t.title}\t${String(t.scrollTop ?? 0)}\t${String(t.scrollResNumber ?? 0)}`,
+    )
     .join('\n');
 }
 
@@ -118,13 +129,16 @@ export function loadSessionState(dataDir: string): SessionState {
   if (content === null) return { selectedBoardUrl: null };
   try {
     const parsed = JSON.parse(content.toString('utf-8')) as Record<string, unknown>;
-    const boardUrl = typeof parsed['selectedBoardUrl'] === 'string' ? parsed['selectedBoardUrl'] : null;
-    const activeThreadTabId = typeof parsed['activeThreadTabId'] === 'string' ? parsed['activeThreadTabId'] : undefined;
+    const boardUrl =
+      typeof parsed['selectedBoardUrl'] === 'string' ? parsed['selectedBoardUrl'] : null;
+    const activeThreadTabId =
+      typeof parsed['activeThreadTabId'] === 'string' ? parsed['activeThreadTabId'] : undefined;
     const rawBoardTabUrls = parsed['boardTabUrls'];
     const boardTabUrls = Array.isArray(rawBoardTabUrls)
       ? (rawBoardTabUrls as unknown[]).filter((u): u is string => typeof u === 'string')
       : undefined;
-    const activeBoardTabId = typeof parsed['activeBoardTabId'] === 'string' ? parsed['activeBoardTabId'] : undefined;
+    const activeBoardTabId =
+      typeof parsed['activeBoardTabId'] === 'string' ? parsed['activeBoardTabId'] : undefined;
     return { selectedBoardUrl: boardUrl, activeThreadTabId, boardTabUrls, activeBoardTabId };
   } catch {
     return { selectedBoardUrl: null };

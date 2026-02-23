@@ -83,12 +83,11 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
 
     // Diagnostic: log outgoing request details
     const headerNames = Object.keys(headers).join(', ');
-    const bodyInfo = config.body !== undefined
-      ? `${String(Buffer.byteLength(config.body, 'utf-8'))} bytes`
-      : 'none';
-    logger.info(
-      `[DIAG] ${config.method} ${config.url} headers=[${headerNames}] body=${bodyInfo}`,
-    );
+    const bodyInfo =
+      config.body !== undefined
+        ? `${String(Buffer.byteLength(config.body, 'utf-8'))} bytes`
+        : 'none';
+    logger.info(`[DIAG] ${config.method} ${config.url} headers=[${headerNames}] body=${bodyInfo}`);
 
     const requestOptions: Record<string, unknown> = {
       method: config.method,
@@ -101,81 +100,75 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
       requestOptions['agent'] = config.agent;
     }
 
-    const req = requestFn(
-      config.url,
-      requestOptions,
-      (res) => {
-        const chunks: Buffer[] = [];
-        const readTimeout = config.readTimeout ?? DEFAULT_READ_TIMEOUT;
-        const timer = setTimeout(() => {
-          req.destroy(new Error(`Read timeout after ${String(readTimeout)}ms`));
-        }, readTimeout);
+    const req = requestFn(config.url, requestOptions, (res) => {
+      const chunks: Buffer[] = [];
+      const readTimeout = config.readTimeout ?? DEFAULT_READ_TIMEOUT;
+      const timer = setTimeout(() => {
+        req.destroy(new Error(`Read timeout after ${String(readTimeout)}ms`));
+      }, readTimeout);
 
-        res.on('data', (chunk: Buffer) => {
-          chunks.push(chunk);
-        });
+      res.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
 
-        res.on('end', () => {
-          clearTimeout(timer);
-          let body = Buffer.concat(chunks);
+      res.on('end', () => {
+        clearTimeout(timer);
+        let body = Buffer.concat(chunks);
 
-          // Decompress gzip if Content-Encoding indicates it
-          const contentEncoding = res.headers['content-encoding'];
-          if (contentEncoding === 'gzip' && config.range === undefined) {
-            try {
-              body = gunzipSync(body);
-            } catch {
-              // If decompression fails, use raw body
+        // Decompress gzip if Content-Encoding indicates it
+        const contentEncoding = res.headers['content-encoding'];
+        if (contentEncoding === 'gzip' && config.range === undefined) {
+          try {
+            body = gunzipSync(body);
+          } catch {
+            // If decompression fails, use raw body
+          }
+        }
+
+        const responseHeaders = headersToRecord(res.headers);
+
+        // Diagnostic: log response summary
+        logger.info(
+          `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
+        );
+
+        // Diagnostic: log raw header names when Set-Cookie is present or
+        // for POST requests, to detect headers lost in processing
+        const hasSetCookie = responseHeaders['set-cookie'] !== undefined;
+        if (config.method === 'POST' || hasSetCookie) {
+          const rawNames: string[] = [];
+          for (let i = 0; i < res.rawHeaders.length; i += 2) {
+            const name = res.rawHeaders[i];
+            if (name !== undefined) {
+              rawNames.push(name);
             }
           }
+          logger.info(`[DIAG] ${config.method} rawHeaders names: ${rawNames.join(', ')}`);
+        }
 
-          const responseHeaders = headersToRecord(res.headers);
+        // Automatically parse Set-Cookie headers from ALL responses
+        // (GET, POST, etc.) to match real browser behaviour.
+        // Browsers store cookies from every HTTP response; previously
+        // VBBB only parsed Set-Cookie from POST responses, missing
+        // cookies set during GET requests (subject.txt, dat, etc.).
+        if (hasSetCookie) {
+          logger.info(`[DIAG] Set-Cookie found in ${config.method} ${config.url} — parsing`);
+          parseSetCookieHeaders(responseHeaders, config.url);
+        }
 
-          // Diagnostic: log response summary
-          logger.info(
-            `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
-          );
-
-          // Diagnostic: log raw header names when Set-Cookie is present or
-          // for POST requests, to detect headers lost in processing
-          const hasSetCookie = responseHeaders['set-cookie'] !== undefined;
-          if (config.method === 'POST' || hasSetCookie) {
-            const rawNames: string[] = [];
-            for (let i = 0; i < res.rawHeaders.length; i += 2) {
-              const name = res.rawHeaders[i];
-              if (name !== undefined) {
-                rawNames.push(name);
-              }
-            }
-            logger.info(
-              `[DIAG] ${config.method} rawHeaders names: ${rawNames.join(', ')}`,
-            );
-          }
-
-          // Automatically parse Set-Cookie headers from ALL responses
-          // (GET, POST, etc.) to match real browser behaviour.
-          // Browsers store cookies from every HTTP response; previously
-          // VBBB only parsed Set-Cookie from POST responses, missing
-          // cookies set during GET requests (subject.txt, dat, etc.).
-          if (hasSetCookie) {
-            logger.info(`[DIAG] Set-Cookie found in ${config.method} ${config.url} — parsing`);
-            parseSetCookieHeaders(responseHeaders, config.url);
-          }
-
-          resolve({
-            status: res.statusCode ?? 0,
-            headers: responseHeaders,
-            body,
-            lastModified: responseHeaders['last-modified'],
-          });
+        resolve({
+          status: res.statusCode ?? 0,
+          headers: responseHeaders,
+          body,
+          lastModified: responseHeaders['last-modified'],
         });
+      });
 
-        res.on('error', (err: Error) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-      },
-    );
+      res.on('error', (err: Error) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
 
     req.on('timeout', () => {
       req.destroy(new Error('Connection timeout'));
@@ -204,12 +197,17 @@ export async function httpFetch(
     try {
       const response = await doRequest(config);
 
-      if (retryConfig.retryableStatuses.includes(response.status) && attempt < retryConfig.maxRetries) {
+      if (
+        retryConfig.retryableStatuses.includes(response.status) &&
+        attempt < retryConfig.maxRetries
+      ) {
         const delay = Math.min(
           retryConfig.initialDelayMs * Math.pow(2, attempt),
           retryConfig.maxDelayMs,
         );
-        logger.warn(`Retryable status ${String(response.status)} for ${config.url}, retrying in ${String(delay)}ms`);
+        logger.warn(
+          `Retryable status ${String(response.status)} for ${config.url}, retrying in ${String(delay)}ms`,
+        );
         await sleep(delay);
         continue;
       }
@@ -222,7 +220,9 @@ export async function httpFetch(
           retryConfig.initialDelayMs * Math.pow(2, attempt),
           retryConfig.maxDelayMs,
         );
-        logger.warn(`Request error for ${config.url}: ${lastError.message}, retrying in ${String(delay)}ms`);
+        logger.warn(
+          `Request error for ${config.url}: ${lastError.message}, retrying in ${String(delay)}ms`,
+        );
         await sleep(delay);
       }
     }

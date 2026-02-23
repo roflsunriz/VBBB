@@ -19,7 +19,11 @@ interface ImageThumbnailProps {
 const THUMBNAIL_MAX_WIDTH = 200;
 const THUMBNAIL_MAX_HEIGHT = 200;
 
-export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnailProps): React.JSX.Element {
+export function ImageThumbnail({
+  url,
+  displayUrl,
+  allImageUrls,
+}: ImageThumbnailProps): React.JSX.Element {
   const [modalOpen, setModalOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
@@ -57,7 +61,14 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
 
   return (
     <>
-      <span ref={ref} className="my-1 inline-block" style={{ minWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`, minHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px` }}>
+      <span
+        ref={ref}
+        className="my-1 inline-block"
+        style={{
+          minWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`,
+          minHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px`,
+        }}
+      >
         {isVisible ? (
           <button
             type="button"
@@ -73,16 +84,30 @@ export function ImageThumbnail({ url, displayUrl, allImageUrls }: ImageThumbnail
               loading="lazy"
               onError={handleError}
               className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"
-              style={{ maxWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`, maxHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px` }}
+              style={{
+                maxWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`,
+                maxHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px`,
+              }}
               referrerPolicy="no-referrer"
             />
           </button>
         ) : (
-          <MediaPlaceholder width={THUMBNAIL_MAX_WIDTH} height={THUMBNAIL_MAX_HEIGHT} mediaType="image" />
+          <MediaPlaceholder
+            width={THUMBNAIL_MAX_WIDTH}
+            height={THUMBNAIL_MAX_HEIGHT}
+            mediaType="image"
+          />
         )}
       </span>
 
-      {modalOpen && <ImageModal url={displayUrl} pageUrl={url} allImageUrls={allImageUrls} onClose={handleCloseModal} />}
+      {modalOpen && (
+        <ImageModal
+          url={displayUrl}
+          pageUrl={url}
+          allImageUrls={allImageUrls}
+          onClose={handleCloseModal}
+        />
+      )}
     </>
   );
 }

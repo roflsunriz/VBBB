@@ -2,7 +2,13 @@
  * Board plugin interface and factory.
  * Provides strategy pattern for board-type-specific operations.
  */
-import type { Board, DatFetchResult, PostParams, PostResult, SubjectFetchResult } from '@shared/domain';
+import type {
+  Board,
+  DatFetchResult,
+  PostParams,
+  PostResult,
+  SubjectFetchResult,
+} from '@shared/domain';
 import { BoardType } from '@shared/domain';
 
 /** Interface for board-type-specific operations */

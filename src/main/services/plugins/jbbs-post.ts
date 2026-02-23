@@ -43,9 +43,7 @@ function buildJBBSPostBody(params: PostParams, board: Board): string {
     ['submit', '\u66F8\u304D\u8FBC\u3080'], // 書き込む
   ];
 
-  return fields
-    .map(([key, value]) => `${key}=${httpEncode(value, encoding)}`)
-    .join('&');
+  return fields.map(([key, value]) => `${key}=${httpEncode(value, encoding)}`).join('&');
 }
 
 /** Max chars of response HTML to log for diagnostics. */
@@ -70,10 +68,10 @@ function detectJBBSResultType(html: string): PostResultType {
   if (
     html.includes('\u66F8\u304D\u3053\u307F\u304C\u7D42\u308F\u308A\u307E\u3057\u305F') || // 書きこみが終わりました
     html.includes('\u66F8\u304D\u8FBC\u307F\u304C\u7D42\u308F\u308A\u307E\u3057\u305F') || // 書き込みが終わりました
-    html.includes('\u66F8\u304D\u3053\u307F\u304C\u7D42\u308A\u307E\u3057\u305F') ||       // 書きこみが終りました (without わ)
-    html.includes('\u66F8\u304D\u8FBC\u307F\u304C\u7D42\u308A\u307E\u3057\u305F') ||       // 書き込みが終りました (without わ)
-    html.includes('\u7D42\u308F\u308A\u307E\u3057\u305F') ||                                // 終わりました (broader)
-    html.includes('\u7D42\u308A\u307E\u3057\u305F')                                         // 終りました (broader, without わ)
+    html.includes('\u66F8\u304D\u3053\u307F\u304C\u7D42\u308A\u307E\u3057\u305F') || // 書きこみが終りました (without わ)
+    html.includes('\u66F8\u304D\u8FBC\u307F\u304C\u7D42\u308A\u307E\u3057\u305F') || // 書き込みが終りました (without わ)
+    html.includes('\u7D42\u308F\u308A\u307E\u3057\u305F') || // 終わりました (broader)
+    html.includes('\u7D42\u308A\u307E\u3057\u305F') // 終りました (broader, without わ)
   ) {
     return PostResultType.OK;
   }
@@ -99,10 +97,7 @@ function detectJBBSResultType(html: string): PostResultType {
 /**
  * Post a response to a JBBS thread.
  */
-export async function postJBBSResponse(
-  params: PostParams,
-  board: Board,
-): Promise<PostResult> {
+export async function postJBBSResponse(params: PostParams, board: Board): Promise<PostResult> {
   const postUrl = getPostUrl(board, params.threadId);
   const referer = getReadReferer(board, params.threadId);
   const body = buildJBBSPostBody(params, board);
@@ -110,7 +105,12 @@ export async function postJBBSResponse(
 
   logger.info(`[DIAG] JBBS posting to ${postUrl}`);
   logger.info(`[DIAG] JBBS Referer: ${referer}`);
-  logger.info(`[DIAG] JBBS body param keys: ${body.split('&').map((p) => p.split('=')[0] ?? '').join(', ')}`);
+  logger.info(
+    `[DIAG] JBBS body param keys: ${body
+      .split('&')
+      .map((p) => p.split('=')[0] ?? '')
+      .join(', ')}`,
+  );
   logger.info(`[DIAG] JBBS body size: ${String(Buffer.byteLength(body, 'utf-8'))} bytes`);
 
   try {
@@ -122,7 +122,11 @@ export async function postJBBSResponse(
       headers['Cookie'] = cookieHeader;
     }
 
-    logger.info(`[DIAG] JBBS request headers: ${Object.entries(headers).map(([k, v]) => k === 'Cookie' ? `${k}=(present)` : `${k}: ${v}`).join(', ')}`);
+    logger.info(
+      `[DIAG] JBBS request headers: ${Object.entries(headers)
+        .map(([k, v]) => (k === 'Cookie' ? `${k}=(present)` : `${k}: ${v}`))
+        .join(', ')}`,
+    );
 
     const response = await httpFetch({
       url: postUrl,
@@ -136,16 +140,20 @@ export async function postJBBSResponse(
     // JBBS responses are EUC-JP encoded
     const html = decodeBuffer(response.body, 'EUC-JP');
 
-    logger.info(`[DIAG] JBBS response HTTP ${String(response.status)}, body ${String(response.body.length)} bytes`);
-    const htmlPreview = html.length > DIAG_HTML_LIMIT
-      ? html.substring(0, DIAG_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
-      : html;
+    logger.info(
+      `[DIAG] JBBS response HTTP ${String(response.status)}, body ${String(response.body.length)} bytes`,
+    );
+    const htmlPreview =
+      html.length > DIAG_HTML_LIMIT
+        ? html.substring(0, DIAG_HTML_LIMIT) + `... (truncated, total ${String(html.length)} chars)`
+        : html;
     logger.info(`[DIAG] JBBS response HTML:\n${htmlPreview}`);
 
     // 302 with empty body is a success redirect
-    const resultType = response.status === 302 && html.trim().length === 0
-      ? PostResultType.OK
-      : detectJBBSResultType(html);
+    const resultType =
+      response.status === 302 && html.trim().length === 0
+        ? PostResultType.OK
+        : detectJBBSResultType(html);
 
     logger.info(`[DIAG] JBBS detected resultType: ${resultType}`);
 

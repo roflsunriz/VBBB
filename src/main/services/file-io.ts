@@ -1,7 +1,14 @@
 /**
  * Atomic file I/O with locking and backup support.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createLogger } from '../logger';
 
@@ -31,7 +38,9 @@ async function acquireLock(filePath: string): Promise<void> {
     }
     await sleep(LOCK_RETRY_DELAY_MS);
   }
-  throw new Error(`Failed to acquire lock for ${filePath} after ${String(MAX_LOCK_RETRIES)} retries`);
+  throw new Error(
+    `Failed to acquire lock for ${filePath} after ${String(MAX_LOCK_RETRIES)} retries`,
+  );
 }
 
 function releaseLock(filePath: string): void {
@@ -65,7 +74,9 @@ export async function atomicWriteFile(filePath: string, content: Buffer | string
         }
         renameSync(filePath, bakPath);
       } catch (err) {
-        logger.warn(`Failed to create backup for ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+        logger.warn(
+          `Failed to create backup for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 

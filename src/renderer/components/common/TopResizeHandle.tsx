@@ -12,14 +12,21 @@ interface TopResizeHandleProps {
   readonly onResizeEnd?: () => void;
 }
 
-export function TopResizeHandle({ onResize, onResizeEnd }: TopResizeHandleProps): React.JSX.Element {
+export function TopResizeHandle({
+  onResize,
+  onResizeEnd,
+}: TopResizeHandleProps): React.JSX.Element {
   const dragging = useRef(false);
   const lastY = useRef(0);
   const onResizeRef = useRef(onResize);
   const onResizeEndRef = useRef(onResizeEnd);
 
-  useEffect(() => { onResizeRef.current = onResize; }, [onResize]);
-  useEffect(() => { onResizeEndRef.current = onResizeEnd; }, [onResizeEnd]);
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
+  useEffect(() => {
+    onResizeEndRef.current = onResizeEnd;
+  }, [onResizeEnd]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragging.current) return;

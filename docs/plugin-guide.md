@@ -9,11 +9,11 @@ VBBB は `BoardPlugin` インターフェースにより、異なるBBSシステ
 
 プラグインは以下の3つの操作を実装します:
 
-| 操作 | メソッド | 説明 |
-|------|----------|------|
-| スレ一覧取得 | `fetchSubject(board, dataDir)` | subject.txt の取得とパース |
-| DAT取得 | `fetchDat(board, threadId, dataDir)` | スレッド本文の取得 |
-| 投稿 | `postResponse(params, board)` | レスの書き込み |
+| 操作         | メソッド                             | 説明                       |
+| ------------ | ------------------------------------ | -------------------------- |
+| スレ一覧取得 | `fetchSubject(board, dataDir)`       | subject.txt の取得とパース |
+| DAT取得      | `fetchDat(board, threadId, dataDir)` | スレッド本文の取得         |
+| 投稿         | `postResponse(params, board)`        | レスの書き込み             |
 
 ---
 
@@ -28,7 +28,7 @@ export const BoardType = {
   Type2ch: '2ch',
   Shitaraba: 'shitaraba',
   JBBS: 'jbbs',
-  MachiBBS: 'machi',  // 追加
+  MachiBBS: 'machi', // 追加
 } as const;
 ```
 
@@ -51,7 +51,13 @@ src/main/services/plugins/
 
 ```typescript
 import type { BoardPlugin } from './board-plugin';
-import type { Board, DatFetchResult, PostParams, PostResult, SubjectFetchResult } from '@shared/domain';
+import type {
+  Board,
+  DatFetchResult,
+  PostParams,
+  PostResult,
+  SubjectFetchResult,
+} from '@shared/domain';
 
 export function createMachiPlugin(): BoardPlugin {
   return {

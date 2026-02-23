@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { parseReplaceIni, applyDatReplace, clearReplaceCache } from '../../src/main/services/dat-replace';
+import {
+  parseReplaceIni,
+  applyDatReplace,
+  clearReplaceCache,
+} from '../../src/main/services/dat-replace';
 
 beforeEach(() => {
   clearReplaceCache();

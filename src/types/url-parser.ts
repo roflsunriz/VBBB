@@ -74,10 +74,12 @@ function parseFromReadCgi(url: URL): ParsedThreadPathParts | null {
   }
 
   // Shitaraba / JBBS: /bbs/read.cgi/<dir>/<boardId>/<threadId>/
-  if ((hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
-      pathSegments[0] === 'bbs' &&
-      pathSegments[1] === 'read.cgi' &&
-      pathSegments.length >= 5) {
+  if (
+    (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
+    pathSegments[0] === 'bbs' &&
+    pathSegments[1] === 'read.cgi' &&
+    pathSegments.length >= 5
+  ) {
     const dir = pathSegments[2];
     const bbsId = pathSegments[3];
     const threadId = pathSegments[4];
@@ -90,10 +92,12 @@ function parseFromReadCgi(url: URL): ParsedThreadPathParts | null {
   }
 
   // Machi BBS: /bbs/read.cgi/<boardId>/<threadId>/
-  if (hostname.includes('machi.to') &&
-      pathSegments[0] === 'bbs' &&
-      pathSegments[1] === 'read.cgi' &&
-      pathSegments.length >= 4) {
+  if (
+    hostname.includes('machi.to') &&
+    pathSegments[0] === 'bbs' &&
+    pathSegments[1] === 'read.cgi' &&
+    pathSegments.length >= 4
+  ) {
     const bbsId = pathSegments[2];
     const threadId = pathSegments[3];
     if (bbsId !== undefined && threadId !== undefined) {
@@ -191,7 +195,10 @@ function buildBoard(url: URL, boardPathSegments: readonly string[]): Board | nul
   const bbsId = boardPathSegments[boardPathSegments.length - 1];
   if (bbsId === undefined || bbsId.length === 0) return null;
 
-  if ((boardType === BoardType.Shitaraba || boardType === BoardType.JBBS) && boardPathSegments.length >= 2) {
+  if (
+    (boardType === BoardType.Shitaraba || boardType === BoardType.JBBS) &&
+    boardPathSegments.length >= 2
+  ) {
     const jbbsDir = boardPathSegments[boardPathSegments.length - 2];
     if (jbbsDir === undefined || jbbsDir.length === 0) return null;
 

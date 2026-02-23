@@ -8,7 +8,9 @@ import { parseDslScript } from '../../src/renderer/utils/dsl-parser';
 function assertOk(src: string) {
   const result = parseDslScript(src);
   if (!result.ok) {
-    throw new Error(`Expected ok but got errors:\n${result.errors.map((e) => `  line ${String(e.line)}: ${e.message}`).join('\n')}`);
+    throw new Error(
+      `Expected ok but got errors:\n${result.errors.map((e) => `  line ${String(e.line)}: ${e.message}`).join('\n')}`,
+    );
   }
   return result.script;
 }

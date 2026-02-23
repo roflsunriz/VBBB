@@ -4,7 +4,15 @@
  * Features: level filter, auto-scroll, clear, copy-all.
  */
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { mdiClose, mdiContentCopy, mdiContentSave, mdiDeleteOutline, mdiRefresh, mdiFilterOutline, mdiMagnify } from '@mdi/js';
+import {
+  mdiClose,
+  mdiContentCopy,
+  mdiContentSave,
+  mdiDeleteOutline,
+  mdiRefresh,
+  mdiFilterOutline,
+  mdiMagnify,
+} from '@mdi/js';
 import type { DiagLogEntry, DiagLogLevel, DiagSearchField } from '@shared/diagnostic';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -59,8 +67,12 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
   // Poll for new logs while the modal is open
   useEffect(() => {
     void fetchLogs();
-    const interval = setInterval(() => { void fetchLogs(); }, 1000);
-    return () => { clearInterval(interval); };
+    const interval = setInterval(() => {
+      void fetchLogs();
+    }, 1000);
+    return () => {
+      clearInterval(interval);
+    };
   }, [fetchLogs]);
 
   // Auto-scroll to bottom when logs change
@@ -80,7 +92,8 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
   }, []);
 
   const filteredLogs = useMemo(() => {
-    let result: readonly DiagLogEntry[] = filter === 'all' ? logs : logs.filter((l) => l.level === filter);
+    let result: readonly DiagLogEntry[] =
+      filter === 'all' ? logs : logs.filter((l) => l.level === filter);
     const query = searchText.trim().toLowerCase();
     if (query !== '') {
       result = result.filter((entry) => {
@@ -109,7 +122,10 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
 
   const formatLogsToText = useCallback((): string => {
     return filteredLogs
-      .map((l) => `[${formatTimestamp(l.timestamp)}] [${l.tag}] ${LEVEL_LABELS[l.level]}: ${l.message}`)
+      .map(
+        (l) =>
+          `[${formatTimestamp(l.timestamp)}] [${l.tag}] ${LEVEL_LABELS[l.level]}: ${l.message}`,
+      )
       .join('\n');
   }, [filteredLogs]);
 
@@ -118,7 +134,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     try {
       await navigator.clipboard.writeText(text);
       setCopyFeedback(true);
-      setTimeout(() => { setCopyFeedback(false); }, 1500);
+      setTimeout(() => {
+        setCopyFeedback(false);
+      }, 1500);
     } catch {
       // Fallback: ignore clipboard errors
     }
@@ -130,11 +148,15 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
       const result = await window.electronApi.invoke('diag:save-logs', text);
       if (result.saved) {
         setSaveFeedback('保存しました');
-        setTimeout(() => { setSaveFeedback(null); }, 2000);
+        setTimeout(() => {
+          setSaveFeedback(null);
+        }, 2000);
       }
     } catch {
       setSaveFeedback('保存に失敗しました');
-      setTimeout(() => { setSaveFeedback(null); }, 2000);
+      setTimeout(() => {
+        setSaveFeedback(null);
+      }, 2000);
     }
   }, [formatLogsToText]);
 
@@ -149,9 +171,7 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
     <div className="flex h-full flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 border-b border-[var(--color-border-primary)] px-3 py-2">
-        <span className="text-sm font-bold text-[var(--color-text-primary)]">
-          診断コンソール
-        </span>
+        <span className="text-sm font-bold text-[var(--color-text-primary)]">診断コンソール</span>
 
         <div className="mx-2 h-4 w-px bg-[var(--color-border-primary)]" />
 
@@ -160,7 +180,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
           <MdiIcon path={mdiFilterOutline} size={12} className="text-[var(--color-text-muted)]" />
           <select
             value={filter}
-            onChange={(e) => { setFilter(e.target.value as DiagLogLevel | 'all'); }}
+            onChange={(e) => {
+              setFilter(e.target.value as DiagLogLevel | 'all');
+            }}
             className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
           >
             <option value="all">全て</option>
@@ -177,7 +199,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
           <MdiIcon path={mdiMagnify} size={12} className="text-[var(--color-text-muted)]" />
           <select
             value={searchField}
-            onChange={(e) => { setSearchField(e.target.value as DiagSearchField); }}
+            onChange={(e) => {
+              setSearchField(e.target.value as DiagSearchField);
+            }}
             className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
             aria-label="検索対象フィールド"
           >
@@ -190,7 +214,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
             <input
               type="text"
               value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); }}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+              }}
               placeholder="検索..."
               className="w-36 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 pr-5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
               aria-label="ログ検索"
@@ -198,7 +224,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
             {searchText !== '' && (
               <button
                 type="button"
-                onClick={() => { setSearchText(''); }}
+                onClick={() => {
+                  setSearchText('');
+                }}
                 className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                 title="検索をクリア"
               >
@@ -217,7 +245,9 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
         {/* Actions */}
         <button
           type="button"
-          onClick={() => { void fetchLogs(); }}
+          onClick={() => {
+            void fetchLogs();
+          }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="更新"
         >
@@ -225,23 +255,37 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
         </button>
         <button
           type="button"
-          onClick={() => { void handleCopyAll(); }}
+          onClick={() => {
+            void handleCopyAll();
+          }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title={copyFeedback ? 'コピー済み' : 'ログをコピー'}
         >
-          <MdiIcon path={mdiContentCopy} size={14} className={copyFeedback ? 'text-[var(--color-success)]' : ''} />
+          <MdiIcon
+            path={mdiContentCopy}
+            size={14}
+            className={copyFeedback ? 'text-[var(--color-success)]' : ''}
+          />
         </button>
         <button
           type="button"
-          onClick={() => { void handleSaveToFile(); }}
+          onClick={() => {
+            void handleSaveToFile();
+          }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title={saveFeedback ?? 'ログをファイルに保存'}
         >
-          <MdiIcon path={mdiContentSave} size={14} className={saveFeedback === '保存しました' ? 'text-[var(--color-success)]' : ''} />
+          <MdiIcon
+            path={mdiContentSave}
+            size={14}
+            className={saveFeedback === '保存しました' ? 'text-[var(--color-success)]' : ''}
+          />
         </button>
         <button
           type="button"
-          onClick={() => { void handleClear(); }}
+          onClick={() => {
+            void handleClear();
+          }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-error)]"
           title="クリア"
         >
@@ -275,16 +319,11 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
             >
               <span className="text-[var(--color-text-muted)]">
                 {formatTimestamp(entry.timestamp)}
-              </span>
-              {' '}
-              <span className="font-semibold">
-                [{entry.tag}]
-              </span>
-              {' '}
+              </span>{' '}
+              <span className="font-semibold">[{entry.tag}]</span>{' '}
               <span className={entry.level === 'error' ? 'font-bold' : ''}>
                 {LEVEL_LABELS[entry.level]}:
-              </span>
-              {' '}
+              </span>{' '}
               {entry.message}
             </div>
           ))
@@ -297,14 +336,14 @@ export function ConsoleModal({ onClose }: ConsoleModalProps): React.JSX.Element 
           <input
             type="checkbox"
             checked={autoScroll}
-            onChange={(e) => { setAutoScroll(e.target.checked); }}
+            onChange={(e) => {
+              setAutoScroll(e.target.checked);
+            }}
             className="accent-[var(--color-accent)]"
           />
           自動スクロール
         </label>
-        <span className="text-xs text-[var(--color-text-muted)]">
-          1秒ごとに自動更新
-        </span>
+        <span className="text-xs text-[var(--color-text-muted)]">1秒ごとに自動更新</span>
       </div>
     </div>
   );

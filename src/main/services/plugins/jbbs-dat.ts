@@ -167,7 +167,9 @@ export async function fetchJBBSDat(
         }
       }
     } catch (err) {
-      logger.warn(`JBBS differential fetch failed, trying full fetch: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        `JBBS differential fetch failed, trying full fetch: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -201,13 +203,11 @@ async function fetchJBBSDatFull(
     const response = await httpFetch({ url, method: 'GET' });
 
     // Detect DAT落ち: non-200 response, OR Shitaraba "ERROR: STORAGE IN" header on 200
-    const isDatFallen = response.status !== 200 ||
-      isShitarabaStorageResponse(response.headers);
+    const isDatFallen = response.status !== 200 || isShitarabaStorageResponse(response.headers);
 
     if (isDatFallen) {
-      const reason = response.status !== 200
-        ? `HTTP ${String(response.status)}`
-        : 'STORAGE IN header';
+      const reason =
+        response.status !== 200 ? `HTTP ${String(response.status)}` : 'STORAGE IN header';
       logger.info(`JBBS DAT fallen (${reason}): ${url}`);
 
       // Try read_archive.cgi

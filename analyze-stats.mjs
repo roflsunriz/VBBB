@@ -3,25 +3,29 @@ const html = readFileSync('stats.html', 'utf-8');
 
 const idx = html.indexOf('const data = {');
 const chunk = html.substring(idx + 'const data = '.length);
-let depth = 0, i = 0;
+let depth = 0,
+  i = 0;
 for (; i < chunk.length; i++) {
   if (chunk[i] === '{') depth++;
-  else if (chunk[i] === '}') { depth--; if (depth === 0) break; }
+  else if (chunk[i] === '}') {
+    depth--;
+    if (depth === 0) break;
+  }
 }
 const data = JSON.parse(chunk.substring(0, i + 1));
 
 // Find the index (main) bundle
-const mainBundle = data.tree.children.find(c => c.name?.includes('index-'));
+const mainBundle = data.tree.children.find((c) => c.name?.includes('index-'));
 console.log('Main bundle:', mainBundle?.name);
 
 // Walk the index bundle and collect all module names
 function collectNames(node, results, maxDepth, curDepth) {
   if (curDepth > maxDepth) return;
   const n = node.name || '';
-  if (n && !n.includes('root') && !n.endsWith('.js') || n.includes('node_modules')) {
+  if ((n && !n.includes('root') && !n.endsWith('.js')) || n.includes('node_modules')) {
     results.push({ name: n, depth: curDepth });
   }
-  for (const child of (node.children || [])) {
+  for (const child of node.children || []) {
     collectNames(child, results, maxDepth, curDepth + 1);
   }
 }
@@ -41,8 +45,8 @@ for (const pkg of [...pkgSet].sort()) {
   console.log(' -', pkg);
 }
 
-// Show top-level src modules 
-const srcModules = names.filter(n => n.name.includes('/src/'));
+// Show top-level src modules
+const srcModules = names.filter((n) => n.name.includes('/src/'));
 console.log('\n=== Src module groups in index bundle ===');
 const srcSet = new Set();
 for (const { name } of srcModules) {

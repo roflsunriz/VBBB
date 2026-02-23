@@ -21,7 +21,7 @@ describe('decodeHtmlEntities', () => {
   });
 
   it('decodes &apos;', () => {
-    expect(decodeHtmlEntities("it&apos;s")).toBe("it's");
+    expect(decodeHtmlEntities('it&apos;s')).toBe("it's");
   });
 
   it('decodes &nbsp;', () => {

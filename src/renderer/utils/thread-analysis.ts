@@ -88,7 +88,10 @@ export function extractWatchoi(res: Res): WatchoiInfo | null {
 
 /** Extract コテハン (non-default name) from a response */
 export function extractKotehan(res: Res): string | null {
-  const plainName = res.name.replace(/<[^>]+>/g, '').replace(/\([^)]*\)/g, '').trim();
+  const plainName = res.name
+    .replace(/<[^>]+>/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .trim();
   if (plainName.length === 0) return null;
   if (DEFAULT_NAMES.has(plainName)) return null;
   return plainName;
@@ -373,7 +376,8 @@ export interface ThreadAnalysisResult {
 const URL_PATTERN = /https?:\/\/[^\s"'<>\]]+/gi;
 const IMAGE_EXT = /\.(jpe?g|gif|png|webp|bmp|avif|svg)(\?[^\s]*)?$/i;
 const VIDEO_PATTERN = /\.(mp4|webm|mov|avi)(\?[^\s]*)?$/i;
-const VIDEO_SITE = /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|nicovideo\.jp|streamable\.com|vimeo\.com)/i;
+const VIDEO_SITE =
+  /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|nicovideo\.jp|streamable\.com|vimeo\.com)/i;
 const ANCHOR_COUNT_PATTERN = />>(\d+)/g;
 
 export function analyzeThread(responses: readonly Res[]): ThreadAnalysisResult {

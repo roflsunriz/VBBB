@@ -58,7 +58,10 @@ test=0`;
 describe('serializeSambaIni', () => {
   it('serializes settings and sends', () => {
     const data = {
-      settings: new Map([['test', 30], ['@board', 60]]),
+      settings: new Map([
+        ['test', 30],
+        ['@board', 60],
+      ]),
       sends: new Map([['test', '2024-01-01T00:00:00.000Z']]),
     };
 

@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseTabSav, serializeTabSav, replaceTabUrls,
-  loadSessionState, saveSessionState,
-  saveTabsSync, saveSessionStateSync, loadSavedTabs,
+  parseTabSav,
+  serializeTabSav,
+  replaceTabUrls,
+  loadSessionState,
+  saveSessionState,
+  saveTabsSync,
+  saveSessionStateSync,
+  loadSavedTabs,
 } from '../../src/main/services/tab-persistence';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +15,8 @@ import { tmpdir } from 'node:os';
 
 describe('parseTabSav', () => {
   it('parses valid tab lines', () => {
-    const content = 'https://news.5ch.net/newsplus/\t1234567890\tTest Thread\nhttps://example.com/board/\t9876543210\tAnother';
+    const content =
+      'https://news.5ch.net/newsplus/\t1234567890\tTest Thread\nhttps://example.com/board/\t9876543210\tAnother';
     const tabs = parseTabSav(content);
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.boardUrl).toBe('https://news.5ch.net/newsplus/');
@@ -47,17 +53,13 @@ describe('serializeTabSav', () => {
   });
 
   it('serializes tabs with scrollTop', () => {
-    const tabs = [
-      { boardUrl: 'https://a.com/', threadId: '111', title: 'First', scrollTop: 500 },
-    ];
+    const tabs = [{ boardUrl: 'https://a.com/', threadId: '111', title: 'First', scrollTop: 500 }];
     const result = serializeTabSav(tabs);
     expect(result).toBe('https://a.com/\t111\tFirst\t500\t0');
   });
 
   it('round-trips correctly', () => {
-    const original = [
-      { boardUrl: 'https://example.com/board/', threadId: '999', title: 'Test' },
-    ];
+    const original = [{ boardUrl: 'https://example.com/board/', threadId: '999', title: 'Test' }];
     const serialized = serializeTabSav(original);
     const parsed = parseTabSav(serialized);
     expect(parsed).toStrictEqual(original);
@@ -123,10 +125,7 @@ describe('saveSessionState', () => {
     const state = {
       selectedBoardUrl: 'https://news.5ch.net/newsplus/',
       activeThreadTabId: 'https://news.5ch.net/newsplus/:1234567890',
-      boardTabUrls: [
-        'https://news.5ch.net/newsplus/',
-        'https://eagle.5ch.net/livejupiter/',
-      ],
+      boardTabUrls: ['https://news.5ch.net/newsplus/', 'https://eagle.5ch.net/livejupiter/'],
       activeBoardTabId: 'https://eagle.5ch.net/livejupiter/',
     };
     await saveSessionState(dir, state);
@@ -188,10 +187,7 @@ describe('saveSessionStateSync', () => {
     const state = {
       selectedBoardUrl: 'https://news.5ch.net/newsplus/',
       activeThreadTabId: 'https://news.5ch.net/newsplus/:1234567890',
-      boardTabUrls: [
-        'https://news.5ch.net/newsplus/',
-        'https://eagle.5ch.net/livejupiter/',
-      ],
+      boardTabUrls: ['https://news.5ch.net/newsplus/', 'https://eagle.5ch.net/livejupiter/'],
       activeBoardTabId: 'https://eagle.5ch.net/livejupiter/',
     };
     saveSessionStateSync(dir, state);

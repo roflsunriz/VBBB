@@ -6,11 +6,32 @@
 import { useCallback, useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { mdiClose, mdiPencil, mdiShieldOff, mdiFormatColorHighlight, mdiClockOutline, mdiChartBar, mdiRobot, mdiRefresh, mdiLoading, mdiImage, mdiViewSequential, mdiViewParallel, mdiChevronLeft, mdiChevronRight, mdiArrowRightBold } from '@mdi/js';
+import {
+  mdiClose,
+  mdiPencil,
+  mdiShieldOff,
+  mdiFormatColorHighlight,
+  mdiClockOutline,
+  mdiChartBar,
+  mdiRobot,
+  mdiRefresh,
+  mdiLoading,
+  mdiImage,
+  mdiViewSequential,
+  mdiViewParallel,
+  mdiChevronLeft,
+  mdiChevronRight,
+  mdiArrowRightBold,
+} from '@mdi/js';
 import type { Res, SubjectRecord } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
-import { type NgRule, type NgFilterResult, AbonType, NgFilterResult as NgFilterResultEnum } from '@shared/ng';
+import {
+  type NgRule,
+  type NgFilterResult,
+  AbonType,
+  NgFilterResult as NgFilterResultEnum,
+} from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
 import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
@@ -34,11 +55,19 @@ const ProgrammaticPost = lazy(() =>
 const ThreadAnalysis = lazy(() =>
   import('./ThreadAnalysis').then((m) => ({ default: m.ThreadAnalysis })),
 );
-const NgEditor = lazy(() =>
-  import('../ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
-);
-import { extractId, extractWatchoi, extractKotehan, buildCountMap, estimateFromWatchoi } from '../../utils/thread-analysis';
-import { findNextThread, NEXT_THREAD_RESPONSE_THRESHOLD, NEXT_THREAD_BUTTON_THRESHOLD } from '../../utils/next-thread-detect';
+const NgEditor = lazy(() => import('../ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })));
+import {
+  extractId,
+  extractWatchoi,
+  extractKotehan,
+  buildCountMap,
+  estimateFromWatchoi,
+} from '../../utils/thread-analysis';
+import {
+  findNextThread,
+  NEXT_THREAD_RESPONSE_THRESHOLD,
+  NEXT_THREAD_BUTTON_THRESHOLD,
+} from '../../utils/next-thread-detect';
 import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
@@ -84,18 +113,31 @@ function formatRelativeTime(date: Date): string {
  * Render datetime text, converting Be IDs into clickable profile links.
  * Optionally shows relative time.
  */
-function renderDateTimeWithBe(dateTime: string, resNumber: number, showRelative: boolean): React.ReactNode {
+function renderDateTimeWithBe(
+  dateTime: string,
+  resNumber: number,
+  showRelative: boolean,
+): React.ReactNode {
   const match = BE_PATTERN.exec(dateTime);
-  const relativeNode = showRelative ? (() => {
-    const parsed = parseResDateTime(dateTime);
-    if (parsed === null) return null;
-    return (
-      <span className="ml-1 text-[var(--color-text-muted)] opacity-70">({formatRelativeTime(parsed)})</span>
-    );
-  })() : null;
+  const relativeNode = showRelative
+    ? (() => {
+        const parsed = parseResDateTime(dateTime);
+        if (parsed === null) return null;
+        return (
+          <span className="ml-1 text-[var(--color-text-muted)] opacity-70">
+            ({formatRelativeTime(parsed)})
+          </span>
+        );
+      })()
+    : null;
 
   if (match?.[1] === undefined || match[2] === undefined) {
-    return <>{dateTime}{relativeNode}</>;
+    return (
+      <>
+        {dateTime}
+        {relativeNode}
+      </>
+    );
   }
 
   const beId = match[1];
@@ -131,7 +173,12 @@ interface PopupState {
 /**
  * Apply NG rules to a single response (renderer-side matching).
  */
-function applyNgFilter(rules: readonly NgRule[], res: Res, boardId: string, threadId: string): NgFilterResult {
+function applyNgFilter(
+  rules: readonly NgRule[],
+  res: Res,
+  boardId: string,
+  threadId: string,
+): NgFilterResult {
   const fullText = `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
   for (const rule of rules) {
     if (!rule.enabled) continue;
@@ -165,13 +212,27 @@ function applyNgFilter(rules: readonly NgRule[], res: Res, boardId: string, thre
 type HighlightType = 'none' | 'own' | 'reply';
 
 /** F31: Count badge component */
-function CountBadge({ count, onClick }: { readonly count: number; readonly onClick: () => void }): React.JSX.Element | null {
+function CountBadge({
+  count,
+  onClick,
+}: {
+  readonly count: number;
+  readonly onClick: () => void;
+}): React.JSX.Element | null {
   if (count <= 1) return null;
-  const color = count >= 10 ? 'text-[var(--color-error)]' : count >= 5 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-muted)]';
+  const color =
+    count >= 10
+      ? 'text-[var(--color-error)]'
+      : count >= 5
+        ? 'text-[var(--color-warning)]'
+        : 'text-[var(--color-text-muted)]';
   return (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       className={`ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] font-bold ${color} hover:opacity-80`}
       title={`${String(count)}回書き込み — クリックで一覧`}
     >
@@ -181,7 +242,12 @@ function CountBadge({ count, onClick }: { readonly count: number; readonly onCli
 }
 
 /** F29: ワッチョイ estimation popup */
-function WatchoiPopup({ info, x, y, onClose }: {
+function WatchoiPopup({
+  info,
+  x,
+  y,
+  onClose,
+}: {
   readonly info: WatchoiInfo;
   readonly x: number;
   readonly y: number;
@@ -212,7 +278,9 @@ function WatchoiPopup({ info, x, y, onClose }: {
       <div
         className="fixed inset-0 z-40"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClose();
+        }}
         role="button"
         tabIndex={-1}
         aria-label="閉じる"
@@ -225,18 +293,37 @@ function WatchoiPopup({ info, x, y, onClose }: {
         <h4 className="mb-2 text-xs font-bold text-[var(--color-text-primary)]">ワッチョイ分析</h4>
         <table className="w-full text-xs text-[var(--color-text-secondary)]">
           <tbody>
-            <tr><td className="whitespace-nowrap pr-2 font-semibold">ラベル</td><td>{info.label.normalize('NFKC')}</td></tr>
-            <tr><td className="whitespace-nowrap pr-2 font-semibold">回線種別</td><td>{estimation.connectionType}</td></tr>
+            <tr>
+              <td className="whitespace-nowrap pr-2 font-semibold">ラベル</td>
+              <td>{info.label.normalize('NFKC')}</td>
+            </tr>
+            <tr>
+              <td className="whitespace-nowrap pr-2 font-semibold">回線種別</td>
+              <td>{estimation.connectionType}</td>
+            </tr>
             {estimation.suffixHint !== null && (
-              <tr><td className="whitespace-nowrap pr-2 font-semibold">接続方法</td><td>{estimation.suffixHint}</td></tr>
+              <tr>
+                <td className="whitespace-nowrap pr-2 font-semibold">接続方法</td>
+                <td>{estimation.suffixHint}</td>
+              </tr>
             )}
             <tr>
               <td className="whitespace-nowrap pr-2 font-semibold">IPハッシュ</td>
-              <td className="font-mono">{info.ipHash.toUpperCase()}<span className="ml-1 font-sans text-[var(--color-text-muted)]">(同一IP = 同一値)</span></td>
+              <td className="font-mono">
+                {info.ipHash.toUpperCase()}
+                <span className="ml-1 font-sans text-[var(--color-text-muted)]">
+                  (同一IP = 同一値)
+                </span>
+              </td>
             </tr>
             <tr>
               <td className="whitespace-nowrap pr-2 font-semibold">UAハッシュ</td>
-              <td className="font-mono">{info.uaHash.toUpperCase()}<span className="ml-1 font-sans text-[var(--color-text-muted)]">(同一ブラウザ = 同一値)</span></td>
+              <td className="font-mono">
+                {info.uaHash.toUpperCase()}
+                <span className="ml-1 font-sans text-[var(--color-text-muted)]">
+                  (同一ブラウザ = 同一値)
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -249,7 +336,12 @@ function WatchoiPopup({ info, x, y, onClose }: {
 }
 
 /** F28: IP info popup */
-function IpPopup({ ip, x, y, onClose }: {
+function IpPopup({
+  ip,
+  x,
+  y,
+  onClose,
+}: {
   readonly ip: string;
   readonly x: number;
   readonly y: number;
@@ -265,12 +357,20 @@ function IpPopup({ ip, x, y, onClose }: {
     void (async () => {
       try {
         const result = await window.electronApi.invoke('ip:lookup', ip);
-        if (!cancelled) { setInfo(result); setLoading(false); }
+        if (!cancelled) {
+          setInfo(result);
+          setLoading(false);
+        }
       } catch (err) {
-        if (!cancelled) { setError(err instanceof Error ? err.message : String(err)); setLoading(false); }
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [ip]);
 
   // Clamp popup within viewport
@@ -295,7 +395,9 @@ function IpPopup({ ip, x, y, onClose }: {
       <div
         className="fixed inset-0 z-40"
         onClick={onClose}
-        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClose();
+        }}
         role="button"
         tabIndex={-1}
         aria-label="閉じる"
@@ -311,12 +413,30 @@ function IpPopup({ ip, x, y, onClose }: {
         {info !== null && (
           <table className="w-full text-xs text-[var(--color-text-secondary)]">
             <tbody>
-              <tr><td className="pr-2 font-semibold">国</td><td>{info.country}</td></tr>
-              <tr><td className="pr-2 font-semibold">地域</td><td>{info.region}</td></tr>
-              <tr><td className="pr-2 font-semibold">都市</td><td>{info.city}</td></tr>
-              <tr><td className="pr-2 font-semibold">ISP</td><td>{info.isp}</td></tr>
-              <tr><td className="pr-2 font-semibold">組織</td><td>{info.org}</td></tr>
-              <tr><td className="pr-2 font-semibold">AS</td><td>{info.as}</td></tr>
+              <tr>
+                <td className="pr-2 font-semibold">国</td>
+                <td>{info.country}</td>
+              </tr>
+              <tr>
+                <td className="pr-2 font-semibold">地域</td>
+                <td>{info.region}</td>
+              </tr>
+              <tr>
+                <td className="pr-2 font-semibold">都市</td>
+                <td>{info.city}</td>
+              </tr>
+              <tr>
+                <td className="pr-2 font-semibold">ISP</td>
+                <td>{info.isp}</td>
+              </tr>
+              <tr>
+                <td className="pr-2 font-semibold">組織</td>
+                <td>{info.org}</td>
+              </tr>
+              <tr>
+                <td className="pr-2 font-semibold">AS</td>
+                <td>{info.as}</td>
+              </tr>
             </tbody>
           </table>
         )}
@@ -381,7 +501,10 @@ function ResItem({
   // Normal abon: show placeholder
   if (ngResult === NgFilterResultEnum.NormalAbon) {
     return (
-      <div className="border-b border-[var(--color-border-secondary)] px-4 py-2 opacity-40" id={`res-${String(res.number)}`}>
+      <div
+        className="border-b border-[var(--color-border-secondary)] px-4 py-2 opacity-40"
+        id={`res-${String(res.number)}`}
+      >
         <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
           <span className="font-bold text-[var(--color-res-abon)]">{res.number}</span>
           <span className="text-[var(--color-res-abon)]">あぼーん</span>
@@ -392,7 +515,11 @@ function ResItem({
   }
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [watchoiPopup, setWatchoiPopup] = useState<{ info: WatchoiInfo; x: number; y: number } | null>(null);
+  const [watchoiPopup, setWatchoiPopup] = useState<{
+    info: WatchoiInfo;
+    x: number;
+    y: number;
+  } | null>(null);
   const [ipPopup, setIpPopup] = useState<{ ip: string; x: number; y: number } | null>(null);
 
   const [selectedText, setSelectedText] = useState('');
@@ -406,11 +533,14 @@ function ResItem({
   const resIps = useMemo(() => extractIps(res), [res]);
 
   // F29: handle ワッチョイ click
-  const handleWatchoiClick = useCallback((e: React.MouseEvent) => {
-    if (resWatchoi === null) return;
-    e.stopPropagation();
-    setWatchoiPopup({ info: resWatchoi, x: e.clientX, y: e.clientY });
-  }, [resWatchoi]);
+  const handleWatchoiClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (resWatchoi === null) return;
+      e.stopPropagation();
+      setWatchoiPopup({ info: resWatchoi, x: e.clientX, y: e.clientY });
+    },
+    [resWatchoi],
+  );
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -442,9 +572,13 @@ function ResItem({
   // Close context menu on click outside
   useEffect(() => {
     if (contextMenu === null) return;
-    const handler = (): void => { setContextMenu(null); };
+    const handler = (): void => {
+      setContextMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [contextMenu]);
 
   const bodyHtml = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
@@ -467,7 +601,10 @@ function ResItem({
       const numsAttr = target.dataset['anchorNums'];
       if (numsAttr === undefined || numsAttr === '') return;
 
-      const nums = numsAttr.split(',').map(Number).filter((n) => n > 0);
+      const nums = numsAttr
+        .split(',')
+        .map(Number)
+        .filter((n) => n > 0);
       if (nums.length > 0) {
         onAnchorHover(nums, e.clientX, e.clientY);
       }
@@ -475,32 +612,35 @@ function ResItem({
     [onAnchorHover],
   );
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target;
-    if (!(target instanceof HTMLAnchorElement)) return;
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target;
+      if (!(target instanceof HTMLAnchorElement)) return;
 
-    // Handle external URL links
-    if (target.classList.contains('external-url')) {
-      e.preventDefault();
-      const url = target.dataset['url'];
-      if (url !== undefined && url.length > 0) {
-        void window.electronApi.invoke('shell:open-external', url);
+      // Handle external URL links
+      if (target.classList.contains('external-url')) {
+        e.preventDefault();
+        const url = target.dataset['url'];
+        if (url !== undefined && url.length > 0) {
+          void window.electronApi.invoke('shell:open-external', url);
+        }
+        return;
       }
-      return;
-    }
 
-    // Handle anchor links (>>N) — use virtualizer-based scroll
-    if (!target.classList.contains('anchor-link')) return;
+      // Handle anchor links (>>N) — use virtualizer-based scroll
+      if (!target.classList.contains('anchor-link')) return;
 
-    e.preventDefault();
-    const href = target.getAttribute('href');
-    if (href === null) return;
+      e.preventDefault();
+      const href = target.getAttribute('href');
+      if (href === null) return;
 
-    const anchorMatch = /^#res-(\d+)$/.exec(href);
-    if (anchorMatch?.[1] !== undefined) {
-      onScrollToResNumber(Number(anchorMatch[1]));
-    }
-  }, [onScrollToResNumber]);
+      const anchorMatch = /^#res-(\d+)$/.exec(href);
+      if (anchorMatch?.[1] !== undefined) {
+        onScrollToResNumber(Number(anchorMatch[1]));
+      }
+    },
+    [onScrollToResNumber],
+  );
 
   const highlightClass =
     highlightType === 'own'
@@ -512,15 +652,24 @@ function ResItem({
   const replyCount = replyNumbers.length;
 
   return (
-    <div className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${highlightClass}`} id={`res-${String(res.number)}`} onContextMenu={handleContextMenu}>
+    <div
+      className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${highlightClass}`}
+      id={`res-${String(res.number)}`}
+      onContextMenu={handleContextMenu}
+    >
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
         {replyCount > 0 && (
           <button
             type="button"
             className="cursor-pointer rounded border-none bg-transparent p-0 text-[10px] font-semibold text-[var(--color-link)] hover:underline"
-            onMouseEnter={(e) => { onAnchorHover(replyNumbers, e.clientX, e.clientY); }}
+            onMouseEnter={(e) => {
+              onAnchorHover(replyNumbers, e.clientX, e.clientY);
+            }}
             onMouseLeave={onAnchorLeave}
-            onClick={(e) => { e.stopPropagation(); onAnchorHover(replyNumbers, e.clientX, e.clientY); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAnchorHover(replyNumbers, e.clientX, e.clientY);
+            }}
             title={`${String(replyCount)}件の返信`}
           >
             +{replyCount}
@@ -535,9 +684,17 @@ function ResItem({
           {res.number}
         </button>
         <span className="inline-flex items-baseline gap-0.5">
-          <span className="text-[var(--color-res-name)]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }} />
+          <span
+            className="text-[var(--color-res-name)]"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
+          />
           {resKotehan !== null && (
-            <CountBadge count={kotehanCount} onClick={() => { onFilterByKotehan(resKotehan); }} />
+            <CountBadge
+              count={kotehanCount}
+              onClick={() => {
+                onFilterByKotehan(resKotehan);
+              }}
+            />
           )}
           {resWatchoi !== null && (
             <>
@@ -549,34 +706,44 @@ function ResItem({
               >
                 {resWatchoi.prefix.normalize('NFKC')}
               </button>
-              <CountBadge count={watchoiCount} onClick={() => { onFilterByWatchoi(resWatchoi.label); }} />
+              <CountBadge
+                count={watchoiCount}
+                onClick={() => {
+                  onFilterByWatchoi(resWatchoi.label);
+                }}
+              />
             </>
           )}
         </span>
-        {res.mail.length > 0 && (
-          <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
-        )}
+        {res.mail.length > 0 && <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>}
         <span className="inline-flex items-baseline gap-0.5 text-[var(--color-res-datetime)]">
           {renderDateTimeWithBe(res.dateTime, res.number, showRelativeTime)}
-          {resId !== null && res.id !== undefined && (
-            <span>ID:{resId}</span>
-          )}
+          {resId !== null && res.id !== undefined && <span>ID:{resId}</span>}
           {resId !== null && (
-            <CountBadge count={idCount} onClick={() => { onFilterById(resId); }} />
+            <CountBadge
+              count={idCount}
+              onClick={() => {
+                onFilterById(resId);
+              }}
+            />
           )}
         </span>
         {/* F28: Clickable IP addresses */}
-        {resIps.length > 0 && resIps.map((ip) => (
-          <button
-            key={ip}
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setIpPopup({ ip, x: e.clientX, y: e.clientY }); }}
-            className="rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-warning)] hover:underline"
-            title={`IP情報: ${ip}`}
-          >
-            {ip}
-          </button>
-        ))}
+        {resIps.length > 0 &&
+          resIps.map((ip) => (
+            <button
+              key={ip}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIpPopup({ ip, x: e.clientX, y: e.clientY });
+              }}
+              className="rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-warning)] hover:underline"
+              title={`IP情報: ${ip}`}
+            >
+              {ip}
+            </button>
+          ))}
       </div>
       <div
         className={`res-body ${isAaFinal ? 'aa-font' : 'text-sm leading-relaxed'} text-[var(--color-res-body)]`}
@@ -589,7 +756,12 @@ function ResItem({
       {inlineMediaEnabled && images.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {images.map((img) => (
-            <ImageThumbnail key={img.url} url={img.url} displayUrl={img.displayUrl} allImageUrls={allThreadImageUrls} />
+            <ImageThumbnail
+              key={img.url}
+              url={img.url}
+              displayUrl={img.displayUrl}
+              allImageUrls={allThreadImageUrls}
+            />
           ))}
         </div>
       )}
@@ -602,102 +774,121 @@ function ResItem({
       )}
 
       {/* Context menu — rendered via portal to escape transform containing block */}
-      {contextMenu !== null && createPortal(
-        <ContextMenuContainer
-          x={contextMenu.x}
-          y={contextMenu.y}
-          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          onClick={handleCloseContextMenu}
-          role="menu"
-        >
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleKokomade}
-            role="menuitem"
+      {contextMenu !== null &&
+        createPortal(
+          <ContextMenuContainer
+            x={contextMenu.x}
+            y={contextMenu.y}
+            className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+            onClick={handleCloseContextMenu}
+            role="menu"
           >
-            ここまで読んだ
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleQuoteClick}
-            role="menuitem"
-          >
-            レスを引用 (&gt;&gt;{res.number})
-          </button>
-          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
-          {/* F18: Copy options */}
-          {(() => {
-            const plainName = res.name.replace(/<[^>]+>/g, '');
-            const plainBody = res.body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-            const permalink = buildResPermalink(boardUrl, threadId, res.number);
-            const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
-            return [
-              { label: '名前をコピー', value: header },
-              { label: '本文をコピー', value: plainBody },
-              { label: 'URLをコピー', value: permalink },
-              { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
-              { label: '本文+URL', value: `${plainBody}\n${permalink}` },
-            ] as const;
-          })().map((opt) => (
             <button
-              key={opt.label}
               type="button"
               className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-              onClick={() => { void navigator.clipboard.writeText(opt.value.trim()); setContextMenu(null); }}
+              onClick={handleKokomade}
               role="menuitem"
             >
-              {opt.label}
+              ここまで読んだ
             </button>
-          ))}
-          {selectedText.length > 0 && (
-            <>
-              <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onClick={handleQuoteClick}
+              role="menuitem"
+            >
+              レスを引用 (&gt;&gt;{res.number})
+            </button>
+            <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+            {/* F18: Copy options */}
+            {(() => {
+              const plainName = res.name.replace(/<[^>]+>/g, '');
+              const plainBody = res.body
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&gt;/g, '>')
+                .replace(/&lt;/g, '<')
+                .replace(/&amp;/g, '&');
+              const permalink = buildResPermalink(boardUrl, threadId, res.number);
+              const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
+              return [
+                { label: '名前をコピー', value: header },
+                { label: '本文をコピー', value: plainBody },
+                { label: 'URLをコピー', value: permalink },
+                { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
+                { label: '本文+URL', value: `${plainBody}\n${permalink}` },
+              ] as const;
+            })().map((opt) => (
               <button
+                key={opt.label}
                 type="button"
                 className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                onClick={handleAddNg}
+                onClick={() => {
+                  void navigator.clipboard.writeText(opt.value.trim());
+                  setContextMenu(null);
+                }}
                 role="menuitem"
               >
-                &quot;{selectedText.length > 20 ? `${selectedText.slice(0, 20)}…` : selectedText}&quot; をNGワードに追加
+                {opt.label}
               </button>
-            </>
-          )}
-          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={() => { onToggleAaFont(res.number, !isAaFinal); setContextMenu(null); }}
-            role="menuitem"
-          >
-            {isAaFinal ? '通常フォントに戻す' : 'AAフォントで表示'}
-          </button>
-        </ContextMenuContainer>,
-        document.body,
-      )}
+            ))}
+            {selectedText.length > 0 && (
+              <>
+                <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+                <button
+                  type="button"
+                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  onClick={handleAddNg}
+                  role="menuitem"
+                >
+                  &quot;{selectedText.length > 20 ? `${selectedText.slice(0, 20)}…` : selectedText}
+                  &quot; をNGワードに追加
+                </button>
+              </>
+            )}
+            <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onClick={() => {
+                onToggleAaFont(res.number, !isAaFinal);
+                setContextMenu(null);
+              }}
+              role="menuitem"
+            >
+              {isAaFinal ? '通常フォントに戻す' : 'AAフォントで表示'}
+            </button>
+          </ContextMenuContainer>,
+          document.body,
+        )}
 
       {/* F29: ワッチョイ popup — rendered via portal to escape transform containing block */}
-      {watchoiPopup !== null && createPortal(
-        <WatchoiPopup
-          info={watchoiPopup.info}
-          x={watchoiPopup.x}
-          y={watchoiPopup.y}
-          onClose={() => { setWatchoiPopup(null); }}
-        />,
-        document.body,
-      )}
+      {watchoiPopup !== null &&
+        createPortal(
+          <WatchoiPopup
+            info={watchoiPopup.info}
+            x={watchoiPopup.x}
+            y={watchoiPopup.y}
+            onClose={() => {
+              setWatchoiPopup(null);
+            }}
+          />,
+          document.body,
+        )}
 
       {/* F28: IP info popup — rendered via portal to escape transform containing block */}
-      {ipPopup !== null && createPortal(
-        <IpPopup
-          ip={ipPopup.ip}
-          x={ipPopup.x}
-          y={ipPopup.y}
-          onClose={() => { setIpPopup(null); }}
-        />,
-        document.body,
-      )}
+      {ipPopup !== null &&
+        createPortal(
+          <IpPopup
+            ip={ipPopup.ip}
+            x={ipPopup.x}
+            y={ipPopup.y}
+            onClose={() => {
+              setIpPopup(null);
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -826,7 +1017,12 @@ export function ThreadView(): React.JSX.Element {
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
-  const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string; isFavorite: boolean } | null>(null);
+  const [tabCtxMenu, setTabCtxMenu] = useState<{
+    x: number;
+    y: number;
+    tabId: string;
+    isFavorite: boolean;
+  } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
 
@@ -850,18 +1046,30 @@ export function ThreadView(): React.JSX.Element {
   // Close tab context menu on click
   useEffect(() => {
     if (tabCtxMenu === null) return;
-    const handler = (): void => { setTabCtxMenu(null); };
+    const handler = (): void => {
+      setTabCtxMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [tabCtxMenu]);
 
-  const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const tab = tabs.find((t) => t.id === tabId);
-    const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
-    setTabCtxMenu({ x: e.clientX, y: e.clientY, tabId, isFavorite: favoriteUrlToId.has(threadUrl) });
-  }, [tabs, favoriteUrlToId]);
+  const handleTabContextMenu = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const tab = tabs.find((t) => t.id === tabId);
+      const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
+      setTabCtxMenu({
+        x: e.clientX,
+        y: e.clientY,
+        tabId,
+        isFavorite: favoriteUrlToId.has(threadUrl),
+      });
+    },
+    [tabs, favoriteUrlToId],
+  );
 
   // Alt+[ / Alt+] keyboard shortcut for prev/next thread tab navigation
   useEffect(() => {
@@ -876,7 +1084,9 @@ export function ThreadView(): React.JSX.Element {
       }
     };
     document.addEventListener('keydown', handler);
-    return () => { document.removeEventListener('keydown', handler); };
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
   }, [switchToAdjacentTab]);
 
   const handleTabCtxToggleFavorite = useCallback(() => {
@@ -944,12 +1154,20 @@ export function ThreadView(): React.JSX.Element {
 
   const RELATIVE_TIME_KEY = 'vbbb-relative-time';
   const [showRelativeTime, setShowRelativeTime] = useState(() => {
-    try { return localStorage.getItem(RELATIVE_TIME_KEY) === 'true'; } catch { return false; }
+    try {
+      return localStorage.getItem(RELATIVE_TIME_KEY) === 'true';
+    } catch {
+      return false;
+    }
   });
   const handleToggleRelativeTime = useCallback(() => {
     setShowRelativeTime((prev) => {
       const next = !prev;
-      try { localStorage.setItem(RELATIVE_TIME_KEY, String(next)); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(RELATIVE_TIME_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
       return next;
     });
   }, []);
@@ -961,18 +1179,29 @@ export function ThreadView(): React.JSX.Element {
 
   // Inline media (image/video) toggle — persisted in localStorage
   const [inlineMediaEnabled, setInlineMediaEnabled] = useState(() => {
-    try { return localStorage.getItem('vbbb-inline-media') !== 'false'; } catch { return true; }
+    try {
+      return localStorage.getItem('vbbb-inline-media') !== 'false';
+    } catch {
+      return true;
+    }
   });
   const handleToggleInlineMedia = useCallback(() => {
     setInlineMediaEnabled((prev) => {
       const next = !prev;
-      try { localStorage.setItem('vbbb-inline-media', String(next)); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('vbbb-inline-media', String(next));
+      } catch {
+        /* ignore */
+      }
       return next;
     });
   }, []);
 
   // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
-  const [filterKey, setFilterKey] = useState<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
+  const [filterKey, setFilterKey] = useState<{
+    type: 'id' | 'watchoi' | 'kotehan';
+    value: string;
+  } | null>(null);
 
   // Preserve scroll position across filter apply/clear cycles.
   // Saved when transitioning from no-filter → filter; restored when transitioning back to no-filter.
@@ -981,7 +1210,9 @@ export function ThreadView(): React.JSX.Element {
   // preFilterScrollTopRef is kept as pixel-based fallback.
   const preFilterScrollTopRef = useRef<number>(0);
   const preFilterResNumberRef = useRef<number>(0);
-  const prevFilterKeyRef = useRef<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(null);
+  const prevFilterKeyRef = useRef<{ type: 'id' | 'watchoi' | 'kotehan'; value: string } | null>(
+    null,
+  );
 
   // Restore scroll when filter is cleared (non-null → null transition).
   // Uses index-based scrollToIndex when available (same approach as tab restoration),
@@ -1023,25 +1254,42 @@ export function ThreadView(): React.JSX.Element {
     }
   }, []);
 
-  const handleFilterById = useCallback((id: string) => {
-    if (filterKey === null) {
-      savePreFilterScroll();
-    }
-    setFilterKey((prev) => (prev?.type === 'id' && prev.value === id) ? null : { type: 'id', value: id });
-  }, [filterKey, savePreFilterScroll]);
-  const handleFilterByWatchoi = useCallback((label: string) => {
-    if (filterKey === null) {
-      savePreFilterScroll();
-    }
-    setFilterKey((prev) => (prev?.type === 'watchoi' && prev.value === label) ? null : { type: 'watchoi', value: label });
-  }, [filterKey, savePreFilterScroll]);
-  const handleFilterByKotehan = useCallback((name: string) => {
-    if (filterKey === null) {
-      savePreFilterScroll();
-    }
-    setFilterKey((prev) => (prev?.type === 'kotehan' && prev.value === name) ? null : { type: 'kotehan', value: name });
-  }, [filterKey, savePreFilterScroll]);
-  const handleClearFilter = useCallback(() => { setFilterKey(null); }, []);
+  const handleFilterById = useCallback(
+    (id: string) => {
+      if (filterKey === null) {
+        savePreFilterScroll();
+      }
+      setFilterKey((prev) =>
+        prev?.type === 'id' && prev.value === id ? null : { type: 'id', value: id },
+      );
+    },
+    [filterKey, savePreFilterScroll],
+  );
+  const handleFilterByWatchoi = useCallback(
+    (label: string) => {
+      if (filterKey === null) {
+        savePreFilterScroll();
+      }
+      setFilterKey((prev) =>
+        prev?.type === 'watchoi' && prev.value === label ? null : { type: 'watchoi', value: label },
+      );
+    },
+    [filterKey, savePreFilterScroll],
+  );
+  const handleFilterByKotehan = useCallback(
+    (name: string) => {
+      if (filterKey === null) {
+        savePreFilterScroll();
+      }
+      setFilterKey((prev) =>
+        prev?.type === 'kotehan' && prev.value === name ? null : { type: 'kotehan', value: name },
+      );
+    },
+    [filterKey, savePreFilterScroll],
+  );
+  const handleClearFilter = useCallback(() => {
+    setFilterKey(null);
+  }, []);
 
   // AA font override state: manual per-post toggle (true = force AA, false = force normal)
   const [aaOverrides, setAaOverrides] = useState(() => new Map<number, boolean>());
@@ -1059,7 +1307,9 @@ export function ThreadView(): React.JSX.Element {
   // 次スレ自動移動 (Next-thread detection)
   // ---------------------------------------------------------------------------
   // undefined = not yet detected, null = detected but not found, SubjectRecord = found
-  const [nextThreadCandidate, setNextThreadCandidate] = useState<SubjectRecord | null | undefined>(undefined);
+  const [nextThreadCandidate, setNextThreadCandidate] = useState<SubjectRecord | null | undefined>(
+    undefined,
+  );
 
   // Reset detection state when the active tab changes
   useEffect(() => {
@@ -1075,11 +1325,7 @@ export function ThreadView(): React.JSX.Element {
     const boardTab = boardTabs.find((bt) => bt.board.url === activeTab.boardUrl);
     if (boardTab === undefined || boardTab.subjects.length === 0) return;
 
-    const found = findNextThread(
-      activeTab.title,
-      `${activeTab.threadId}.dat`,
-      boardTab.subjects,
-    );
+    const found = findNextThread(activeTab.title, `${activeTab.threadId}.dat`, boardTab.subjects);
     setNextThreadCandidate(found ?? null);
   }, [activeTabId, activeTabResponseCount, boardTabs]);
 
@@ -1097,11 +1343,7 @@ export function ThreadView(): React.JSX.Element {
       setNextThreadCandidate(null);
       return;
     }
-    const found = findNextThread(
-      activeTab.title,
-      `${activeTab.threadId}.dat`,
-      boardTab.subjects,
-    );
+    const found = findNextThread(activeTab.title, `${activeTab.threadId}.dat`, boardTab.subjects);
     setNextThreadCandidate(found ?? null);
   }, [activeTab, boardTabs]);
 
@@ -1236,12 +1478,15 @@ export function ThreadView(): React.JSX.Element {
   resNumberToIndexRef.current = resNumberToIndex;
 
   // Scroll to a specific res number using the virtualizer
-  const scrollToResNumber = useCallback((resNumber: number) => {
-    const index = resNumberToIndex.get(resNumber);
-    if (index !== undefined) {
-      virtualizerRef.current.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
-    }
-  }, [resNumberToIndex]);
+  const scrollToResNumber = useCallback(
+    (resNumber: number) => {
+      const index = resNumberToIndex.get(resNumber);
+      if (index !== undefined) {
+        virtualizerRef.current.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+      }
+    },
+    [resNumberToIndex],
+  );
 
   // Pre-compute NG results for all responses in active tab
   const ngResults = useMemo(() => {
@@ -1262,7 +1507,12 @@ export function ThreadView(): React.JSX.Element {
     if (activeTab === undefined || !highlightSettings.highlightOwnPosts) {
       return new Set<number>();
     }
-    return buildOwnResNumbers(activeTab.responses, postHistory, activeTab.boardUrl, activeTab.threadId);
+    return buildOwnResNumbers(
+      activeTab.responses,
+      postHistory,
+      activeTab.boardUrl,
+      activeTab.threadId,
+    );
   }, [activeTab, postHistory, highlightSettings.highlightOwnPosts]);
 
   const replyResNumbers = useMemo(() => {
@@ -1272,11 +1522,14 @@ export function ThreadView(): React.JSX.Element {
     return buildReplyResNumbers(activeTab.responses, ownResNumbers);
   }, [activeTab, ownResNumbers, highlightSettings.highlightRepliesToOwn]);
 
-  const getHighlightType = useCallback((resNumber: number): HighlightType => {
-    if (ownResNumbers.has(resNumber)) return 'own';
-    if (replyResNumbers.has(resNumber)) return 'reply';
-    return 'none';
-  }, [ownResNumbers, replyResNumbers]);
+  const getHighlightType = useCallback(
+    (resNumber: number): HighlightType => {
+      if (ownResNumbers.has(resNumber)) return 'own';
+      if (replyResNumbers.has(resNumber)) return 'reply';
+      return 'none';
+    },
+    [ownResNumbers, replyResNumbers],
+  );
 
   const handleToggleHighlight = useCallback(() => {
     const bothOn = highlightSettings.highlightOwnPosts && highlightSettings.highlightRepliesToOwn;
@@ -1329,11 +1582,12 @@ export function ThreadView(): React.JSX.Element {
     const initScrollHeight = container.scrollHeight;
     const clientHeight = container.clientHeight;
 
-    diagLog('info',
+    diagLog(
+      'info',
       `[scroll-restore] START tabId=${activeTabId ?? 'null'} ` +
-      `resNum=${String(activeTabScrollResNumber)} scrollTop=${String(activeTabScrollTop)} ` +
-      `responses=${String(resCount)} container.scrollTop=${String(initScrollTop)} ` +
-      `scrollHeight=${String(initScrollHeight)} clientHeight=${String(clientHeight)}`
+        `resNum=${String(activeTabScrollResNumber)} scrollTop=${String(activeTabScrollTop)} ` +
+        `responses=${String(resCount)} container.scrollTop=${String(initScrollTop)} ` +
+        `scrollHeight=${String(initScrollHeight)} clientHeight=${String(clientHeight)}`,
     );
 
     if (activeTabScrollResNumber > 0) {
@@ -1348,17 +1602,19 @@ export function ThreadView(): React.JSX.Element {
         if (cancelled) return;
         const targetIndex = resNumberToIndexRef.current.get(targetResNumber);
         if (targetIndex === undefined) {
-          diagLog('warn',
-            `[scroll-restore] resNum=${String(targetResNumber)} not in displayResponses — abort`
+          diagLog(
+            'warn',
+            `[scroll-restore] resNum=${String(targetResNumber)} not in displayResponses — abort`,
           );
           return;
         }
         const totalSize = virtualizerRef.current.getTotalSize();
-        diagLog('info',
+        diagLog(
+          'info',
           `[scroll-restore] scrollToIndex retry=${String(retries)} ` +
-          `targetResNum=${String(targetResNumber)} targetIndex=${String(targetIndex)} ` +
-          `estimatedTotalSize=${String(totalSize)} ` +
-          `container.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+            `targetResNum=${String(targetResNumber)} targetIndex=${String(targetIndex)} ` +
+            `estimatedTotalSize=${String(totalSize)} ` +
+            `container.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`,
         );
         virtualizerRef.current.scrollToIndex(targetIndex, { align: 'start' });
         // Check visibility after retryDelay (DOM scroll is async, so the virtual
@@ -1369,12 +1625,13 @@ export function ThreadView(): React.JSX.Element {
           const isVisible = items.some((item) => item.index === targetIndex);
           const firstItem = items[0];
           const lastItem = items[items.length - 1];
-          diagLog(isVisible ? 'success' : 'warn',
+          diagLog(
+            isVisible ? 'success' : 'warn',
             `[scroll-restore] check retry=${String(retries)} ` +
-            `visible=${String(isVisible)} container.scrollTop=${String(container.scrollTop)} ` +
-            `scrollHeight=${String(container.scrollHeight)} ` +
-            `virtualItems=${String(items.length)} ` +
-            `range=[${String(firstItem?.index ?? -1)}..${String(lastItem?.index ?? -1)}]`
+              `visible=${String(isVisible)} container.scrollTop=${String(container.scrollTop)} ` +
+              `scrollHeight=${String(container.scrollHeight)} ` +
+              `virtualItems=${String(items.length)} ` +
+              `range=[${String(firstItem?.index ?? -1)}..${String(lastItem?.index ?? -1)}]`,
           );
           if (!isVisible && retries < maxRetries) {
             retries += 1;
@@ -1387,14 +1644,16 @@ export function ThreadView(): React.JSX.Element {
               const maxScroll = container.scrollHeight - container.clientHeight;
               container.scrollTop = Math.min(container.scrollTop + savedOffset, maxScroll);
             }
-            diagLog('success',
+            diagLog(
+              'success',
               `[scroll-restore] DONE (index) retries=${String(retries)} ` +
-              `offset=${String(savedOffset)} final.scrollTop=${String(container.scrollTop)}`
+                `offset=${String(savedOffset)} final.scrollTop=${String(container.scrollTop)}`,
             );
           } else {
-            diagLog('error',
+            diagLog(
+              'error',
               `[scroll-restore] GAVE UP after ${String(retries)} retries ` +
-              `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+                `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`,
             );
           }
         }, retryDelay);
@@ -1403,7 +1662,9 @@ export function ThreadView(): React.JSX.Element {
       requestAnimationFrame(() => {
         requestAnimationFrame(tryScrollToIndex);
       });
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (activeTabScrollTop <= 0) {
@@ -1417,10 +1678,11 @@ export function ThreadView(): React.JSX.Element {
     // retries when the saved offset exceeds the current scrollHeight.
     const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
     const clampedScrollTop = Math.min(activeTabScrollTop, maxScrollTop);
-    diagLog('info',
+    diagLog(
+      'info',
       `[scroll-restore] LEGACY path scrollTop=${String(activeTabScrollTop)} ` +
-      `clamped=${String(clampedScrollTop)} maxScrollTop=${String(maxScrollTop)} ` +
-      `scrollHeight=${String(container.scrollHeight)}`
+        `clamped=${String(clampedScrollTop)} maxScrollTop=${String(maxScrollTop)} ` +
+        `scrollHeight=${String(container.scrollHeight)}`,
     );
     let cancelled = false;
     let retries = 0;
@@ -1431,22 +1693,25 @@ export function ThreadView(): React.JSX.Element {
       if (cancelled) return;
       container.scrollTo(0, clampedScrollTop);
       const diff = Math.abs(container.scrollTop - clampedScrollTop);
-      diagLog(diff <= 2 ? 'success' : 'warn',
+      diagLog(
+        diff <= 2 ? 'success' : 'warn',
         `[scroll-restore] legacy retry=${String(retries)} ` +
-        `target=${String(clampedScrollTop)} actual=${String(container.scrollTop)} diff=${String(diff)} ` +
-        `scrollHeight=${String(container.scrollHeight)}`
+          `target=${String(clampedScrollTop)} actual=${String(container.scrollTop)} diff=${String(diff)} ` +
+          `scrollHeight=${String(container.scrollHeight)}`,
       );
       if (diff > 2 && retries < maxRetries) {
         retries += 1;
         setTimeout(tryScroll, retryDelay);
       } else if (diff <= 2) {
-        diagLog('success',
-          `[scroll-restore] DONE (legacy) retries=${String(retries)} final.scrollTop=${String(container.scrollTop)}`
+        diagLog(
+          'success',
+          `[scroll-restore] DONE (legacy) retries=${String(retries)} final.scrollTop=${String(container.scrollTop)}`,
         );
       } else {
-        diagLog('error',
+        diagLog(
+          'error',
           `[scroll-restore] GAVE UP (legacy) after ${String(retries)} retries ` +
-          `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`
+            `final.scrollTop=${String(container.scrollTop)} scrollHeight=${String(container.scrollHeight)}`,
         );
       }
     };
@@ -1455,7 +1720,9 @@ export function ThreadView(): React.JSX.Element {
       requestAnimationFrame(tryScroll);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeTabId]);
 
   // Track the last visible response number at the viewport bottom.
@@ -1492,11 +1759,14 @@ export function ThreadView(): React.JSX.Element {
             }
           }
 
-          void window.electronApi.invoke('diag:add-log', 'info', 'scroll',
+          void window.electronApi.invoke(
+            'diag:add-log',
+            'info',
+            'scroll',
             `[scroll-save] tabId=${activeTabId} scrollTop=${String(scrollTopVal)} ` +
-            `firstResNum=${String(firstVisible)} offset=${String(firstVisibleOffset)} ` +
-            `totalSize=${String(virtualizerRef.current.getTotalSize())} ` +
-            `scrollHeight=${String(container.scrollHeight)}`
+              `firstResNum=${String(firstVisible)} offset=${String(firstVisibleOffset)} ` +
+              `totalSize=${String(virtualizerRef.current.getTotalSize())} ` +
+              `scrollHeight=${String(container.scrollHeight)}`,
           );
           updateTabScroll(
             activeTabId,
@@ -1530,7 +1800,7 @@ export function ThreadView(): React.JSX.Element {
   // Close popup and reset AA overrides on tab change
   useEffect(() => {
     setPopup(null);
-    setAaOverrides((prev) => prev.size > 0 ? new Map<number, boolean>() : prev);
+    setAaOverrides((prev) => (prev.size > 0 ? new Map<number, boolean>() : prev));
     preFilterScrollTopRef.current = 0;
     preFilterResNumberRef.current = 0;
     prevFilterKeyRef.current = null;
@@ -1560,7 +1830,10 @@ export function ThreadView(): React.JSX.Element {
       }
       lastVisibleResRef.current = lastVisible;
     }, 800);
-    return () => { cancelled = true; clearTimeout(timer); };
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [activeTabId]);
 
   // Commit kokomade when leaving a tab (switch or component unmount).
@@ -1600,51 +1873,68 @@ export function ThreadView(): React.JSX.Element {
     setPopup(null);
   }, []);
 
-  const handleResNumberClick = useCallback((resNumber: number) => {
-    if (activeTabId !== null) openTabPostEditorWithQuote(activeTabId, resNumber);
-  }, [activeTabId, openTabPostEditorWithQuote]);
+  const handleResNumberClick = useCallback(
+    (resNumber: number) => {
+      if (activeTabId !== null) openTabPostEditorWithQuote(activeTabId, resNumber);
+    },
+    [activeTabId, openTabPostEditorWithQuote],
+  );
 
-  const handleSetKokomade = useCallback((resNumber: number) => {
-    if (activeTabId !== null) {
-      updateTabKokomade(activeTabId, resNumber);
-    }
-  }, [activeTabId, updateTabKokomade]);
+  const handleSetKokomade = useCallback(
+    (resNumber: number) => {
+      if (activeTabId !== null) {
+        updateTabKokomade(activeTabId, resNumber);
+      }
+    },
+    [activeTabId, updateTabKokomade],
+  );
 
   // F16: Scroll to a specific response number (virtualizer-based)
-  const handleScrollToRes = useCallback((resNumber: number) => {
-    scrollToResNumber(resNumber);
-  }, [scrollToResNumber]);
+  const handleScrollToRes = useCallback(
+    (resNumber: number) => {
+      scrollToResNumber(resNumber);
+    },
+    [scrollToResNumber],
+  );
 
-  const handleAddNgWord = useCallback((selectedText: string) => {
-    if (activeTab === undefined) return;
-    const boardId = extractBoardId(activeTab.boardUrl);
-    openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
-  }, [activeTab, openNgEditorWithToken]);
+  const handleAddNgWord = useCallback(
+    (selectedText: string) => {
+      if (activeTab === undefined) return;
+      const boardId = extractBoardId(activeTab.boardUrl);
+      openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
+    },
+    [activeTab, openNgEditorWithToken],
+  );
 
-  const handleThreadWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    const container = scrollRef.current;
-    if (container === null) return;
-    if (edgeRefreshLockedRef.current || refreshing) return;
+  const handleThreadWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      const container = scrollRef.current;
+      if (container === null) return;
+      if (edgeRefreshLockedRef.current || refreshing) return;
 
-    const atTop = container.scrollTop <= 0;
-    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
-    const scrollingUp = e.deltaY < 0;
-    const scrollingDown = e.deltaY > 0;
+      const atTop = container.scrollTop <= 0;
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 5;
+      const scrollingUp = e.deltaY < 0;
+      const scrollingDown = e.deltaY > 0;
 
-    if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
-      edgeRefreshLockedRef.current = true;
-      setEdgeRefreshing(true);
-      void handleRefreshCurrentThread().finally(() => { setEdgeRefreshing(false); });
+      if ((atTop && scrollingUp) || (atBottom && scrollingDown)) {
+        edgeRefreshLockedRef.current = true;
+        setEdgeRefreshing(true);
+        void handleRefreshCurrentThread().finally(() => {
+          setEdgeRefreshing(false);
+        });
 
-      if (edgeRefreshUnlockTimerRef.current !== null) {
-        clearTimeout(edgeRefreshUnlockTimerRef.current);
+        if (edgeRefreshUnlockTimerRef.current !== null) {
+          clearTimeout(edgeRefreshUnlockTimerRef.current);
+        }
+        edgeRefreshUnlockTimerRef.current = setTimeout(() => {
+          edgeRefreshLockedRef.current = false;
+          edgeRefreshUnlockTimerRef.current = null;
+        }, 1200);
       }
-      edgeRefreshUnlockTimerRef.current = setTimeout(() => {
-        edgeRefreshLockedRef.current = false;
-        edgeRefreshUnlockTimerRef.current = null;
-      }, 1200);
-    }
-  }, [refreshing, handleRefreshCurrentThread]);
+    },
+    [refreshing, handleRefreshCurrentThread],
+  );
 
   useEffect(() => {
     return () => {
@@ -1654,12 +1944,18 @@ export function ThreadView(): React.JSX.Element {
     };
   }, []);
 
-  const { getDragProps: getThreadTabDragProps, dragOverIndex: threadTabDragOverIndex, dragSourceIndex: threadTabDragSourceIndex } = useDragReorder({
+  const {
+    getDragProps: getThreadTabDragProps,
+    dragOverIndex: threadTabDragOverIndex,
+    dragSourceIndex: threadTabDragSourceIndex,
+  } = useDragReorder({
     itemCount: tabs.length,
     onReorder: reorderThreadTabs,
   });
 
-  const [threadTabOrientation, toggleThreadTabOrientation] = useTabOrientation('vbbb-thread-tab-orientation');
+  const [threadTabOrientation, toggleThreadTabOrientation] = useTabOrientation(
+    'vbbb-thread-tab-orientation',
+  );
   const isVerticalThreadTabs = threadTabOrientation === 'vertical';
 
   const threadTabDragIndicator = (i: number): string =>
@@ -1669,7 +1965,7 @@ export function ThreadView(): React.JSX.Element {
         : ' border-l-2 border-l-[var(--color-accent)]'
       : '';
 
-  const renderThreadTabItem = (tab: typeof tabs[number], i: number): React.ReactNode => (
+  const renderThreadTabItem = (tab: (typeof tabs)[number], i: number): React.ReactNode => (
     <div
       key={tab.id}
       role="tab"
@@ -1690,7 +1986,9 @@ export function ThreadView(): React.JSX.Element {
           setActiveTab(tab.id);
         }
       }}
-      onContextMenu={(e) => { handleTabContextMenu(e, tab.id); }}
+      onContextMenu={(e) => {
+        handleTabContextMenu(e, tab.id);
+      }}
       className={`group flex cursor-pointer items-center gap-1 text-xs transition-opacity ${
         isVerticalThreadTabs ? 'rounded px-2 py-1' : 'max-w-48 shrink-0 rounded-t px-2 py-1'
       } ${
@@ -1708,7 +2006,9 @@ export function ThreadView(): React.JSX.Element {
       </span>
       <button
         type="button"
-        onClick={(e) => { handleCloseTab(e, tab.id); }}
+        onClick={(e) => {
+          handleCloseTab(e, tab.id);
+        }}
         className="ml-1 shrink-0 rounded p-0.5 opacity-0 hover:bg-[var(--color-bg-tertiary)] group-hover:opacity-100"
         aria-label="タブを閉じる"
       >
@@ -1719,130 +2019,146 @@ export function ThreadView(): React.JSX.Element {
 
   const activeTabIndex = activeTabId !== null ? tabs.findIndex((t) => t.id === activeTabId) : -1;
 
-  const actionButtons = activeTab !== undefined ? (
-    <div className={`flex items-center gap-1 ${isVerticalThreadTabs ? 'px-2' : 'mr-2'}`}>
-      {/* 次スレッドに自動移動: prev/next tab navigation (Slevo: SwitchToPreviousTab / SwitchToNextTab) */}
-      <button
-        type="button"
-        onClick={() => { switchToAdjacentTab('prev'); }}
-        disabled={activeTabIndex <= 0}
-        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
-        title="前のスレッドへ (Alt+[)"
-      >
-        <MdiIcon path={mdiChevronLeft} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={() => { switchToAdjacentTab('next'); }}
-        disabled={activeTabIndex < 0 || activeTabIndex >= tabs.length - 1}
-        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
-        title="次のスレッドへ (Alt+])"
-      >
-        <MdiIcon path={mdiChevronRight} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={() => { void handleRefreshCurrentThread(); }}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          refreshing ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title="スレッドを更新"
-      >
-        <MdiIcon path={refreshing ? mdiLoading : mdiRefresh} size={14} className={refreshing ? 'animate-spin' : ''} />
-      </button>
-      {/* 次スレ検索ボタン: レス数が NEXT_THREAD_BUTTON_THRESHOLD 以上で表示 */}
-      {activeTabResponseCount >= NEXT_THREAD_BUTTON_THRESHOLD && (
+  const actionButtons =
+    activeTab !== undefined ? (
+      <div className={`flex items-center gap-1 ${isVerticalThreadTabs ? 'px-2' : 'mr-2'}`}>
+        {/* 次スレッドに自動移動: prev/next tab navigation (Slevo: SwitchToPreviousTab / SwitchToNextTab) */}
         <button
           type="button"
-          onClick={handleSearchNextThread}
-          className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-            nextThreadCandidate !== undefined && nextThreadCandidate !== null
-              ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
-              : nextThreadCandidate === null
-                ? 'text-[var(--color-text-muted)]'
-                : 'text-[var(--color-warning)]'
-          }`}
-          title="次スレを検索"
+          onClick={() => {
+            switchToAdjacentTab('prev');
+          }}
+          disabled={activeTabIndex <= 0}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
+          title="前のスレッドへ (Alt+[)"
         >
-          <MdiIcon path={mdiArrowRightBold} size={12} />
-          次スレ
+          <MdiIcon path={mdiChevronLeft} size={14} />
         </button>
-      )}
-      <button
-        type="button"
-        onClick={handleToggleInlineMedia}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          inlineMediaEnabled ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title={inlineMediaEnabled ? 'インライン画像/動画: ON' : 'インライン画像/動画: OFF'}
-      >
-        <MdiIcon path={mdiImage} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={handleToggleRelativeTime}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title={showRelativeTime ? '相対時刻: ON' : '相対時刻: OFF'}
-      >
-        <MdiIcon path={mdiClockOutline} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={handleToggleHighlight}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          highlightSettings.highlightOwnPosts ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]' : ''
-        }`}
-        title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
-      >
-        <MdiIcon path={mdiFormatColorHighlight} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={handleToggleAnalysis}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          analysisOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title="スレッド分析"
-      >
-        <MdiIcon path={mdiChartBar} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={toggleNgEditor}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
-        }`}
-        title="NG管理（共通）"
-      >
-        <MdiIcon path={mdiShieldOff} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={handleTogglePostEditor}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title="書き込み"
-      >
-        <MdiIcon path={mdiPencil} size={14} />
-      </button>
-      <button
-        type="button"
-        onClick={handleToggleProgPost}
-        className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-          progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
-        }`}
-        title="プログラマティック書き込み"
-      >
-        <MdiIcon path={mdiRobot} size={14} />
-      </button>
-    </div>
-  ) : null;
+        <button
+          type="button"
+          onClick={() => {
+            switchToAdjacentTab('next');
+          }}
+          disabled={activeTabIndex < 0 || activeTabIndex >= tabs.length - 1}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] disabled:opacity-30"
+          title="次のスレッドへ (Alt+])"
+        >
+          <MdiIcon path={mdiChevronRight} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void handleRefreshCurrentThread();
+          }}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            refreshing ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title="スレッドを更新"
+        >
+          <MdiIcon
+            path={refreshing ? mdiLoading : mdiRefresh}
+            size={14}
+            className={refreshing ? 'animate-spin' : ''}
+          />
+        </button>
+        {/* 次スレ検索ボタン: レス数が NEXT_THREAD_BUTTON_THRESHOLD 以上で表示 */}
+        {activeTabResponseCount >= NEXT_THREAD_BUTTON_THRESHOLD && (
+          <button
+            type="button"
+            onClick={handleSearchNextThread}
+            className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+              nextThreadCandidate !== undefined && nextThreadCandidate !== null
+                ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+                : nextThreadCandidate === null
+                  ? 'text-[var(--color-text-muted)]'
+                  : 'text-[var(--color-warning)]'
+            }`}
+            title="次スレを検索"
+          >
+            <MdiIcon path={mdiArrowRightBold} size={12} />
+            次スレ
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleToggleInlineMedia}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            inlineMediaEnabled ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title={inlineMediaEnabled ? 'インライン画像/動画: ON' : 'インライン画像/動画: OFF'}
+        >
+          <MdiIcon path={mdiImage} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleRelativeTime}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            showRelativeTime ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title={showRelativeTime ? '相対時刻: ON' : '相対時刻: OFF'}
+        >
+          <MdiIcon path={mdiClockOutline} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleHighlight}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            highlightSettings.highlightOwnPosts
+              ? 'bg-[var(--color-bg-active)] text-[var(--color-warning)]'
+              : ''
+          }`}
+          title={highlightSettings.highlightOwnPosts ? 'ハイライト: ON' : 'ハイライト: OFF'}
+        >
+          <MdiIcon path={mdiFormatColorHighlight} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleAnalysis}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            analysisOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title="スレッド分析"
+        >
+          <MdiIcon path={mdiChartBar} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={toggleNgEditor}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
+          }`}
+          title="NG管理（共通）"
+        >
+          <MdiIcon path={mdiShieldOff} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={handleTogglePostEditor}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title="書き込み"
+        >
+          <MdiIcon path={mdiPencil} size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleProgPost}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
+          }`}
+          title="プログラマティック書き込み"
+        >
+          <MdiIcon path={mdiRobot} size={14} />
+        </button>
+      </div>
+    ) : null;
 
   return (
-    <section className={`flex min-w-0 flex-1 ${isVerticalThreadTabs ? 'flex-row' : 'flex-col'}`} onKeyDown={handleScrollKeyboard}>
+    <section
+      className={`flex min-w-0 flex-1 ${isVerticalThreadTabs ? 'flex-row' : 'flex-col'}`}
+      onKeyDown={handleScrollKeyboard}
+    >
       {/* Tab bar */}
       {isVerticalThreadTabs ? (
         <div className="flex w-36 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
@@ -1886,188 +2202,224 @@ export function ThreadView(): React.JSX.Element {
           </div>
         )}
 
-      {/* Content */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        {activeTab === undefined ? (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-xs text-[var(--color-text-muted)]">スレッドを選択してください</p>
-          </div>
-        ) : (
-          <>
-            {/* Thread title */}
-            <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-4 py-1.5">
-              <h2 className="text-sm font-medium text-[var(--color-text-primary)]">
-                {activeTab.isDatFallen && (
-                  <span className="mr-1 font-bold text-[var(--color-error)]">【DAT落ち】</span>
-                )}
-                {activeTab.title}
-              </h2>
-              <p className="text-xs text-[var(--color-text-muted)]">{activeTab.responses.length} レス</p>
+        {/* Content */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {activeTab === undefined ? (
+            <div className="flex flex-1 items-center justify-center">
+              <p className="text-xs text-[var(--color-text-muted)]">スレッドを選択してください</p>
             </div>
-
-            {/* F31: Filter banner */}
-            {filterKey !== null && (
-              <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-4 py-1">
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  フィルタ: {filterKey.type === 'id' ? 'ID' : filterKey.type === 'watchoi' ? 'ワッチョイ' : 'コテハン'} = {filterKey.value}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleClearFilter}
-                  className="rounded px-1.5 py-0.5 text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"
-                >
-                  解除
-                </button>
+          ) : (
+            <>
+              {/* Thread title */}
+              <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/30 px-4 py-1.5">
+                <h2 className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {activeTab.isDatFallen && (
+                    <span className="mr-1 font-bold text-[var(--color-error)]">【DAT落ち】</span>
+                  )}
+                  {activeTab.title}
+                </h2>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {activeTab.responses.length} レス
+                </p>
               </div>
-            )}
 
-            {/* 次スレバナー: スレッドが1000レス超えかつ次スレ検索済みの場合に表示 */}
-            {activeTabResponseCount >= NEXT_THREAD_RESPONSE_THRESHOLD && nextThreadCandidate !== undefined && (
-              <div className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs ${
-                nextThreadCandidate !== null
-                  ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
-                  : 'border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/60'
-              }`}>
-                <span className="shrink-0 font-semibold text-[var(--color-text-muted)]">
-                  このスレッドは1000を超えました。
-                </span>
-                {nextThreadCandidate !== null ? (
-                  <>
-                    <span className="min-w-0 flex-1 truncate text-[var(--color-success)]" title={nextThreadCandidate.title}>
-                      次スレ: {nextThreadCandidate.title}
+              {/* F31: Filter banner */}
+              {filterKey !== null && (
+                <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-4 py-1">
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    フィルタ:{' '}
+                    {filterKey.type === 'id'
+                      ? 'ID'
+                      : filterKey.type === 'watchoi'
+                        ? 'ワッチョイ'
+                        : 'コテハン'}{' '}
+                    = {filterKey.value}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearFilter}
+                    className="rounded px-1.5 py-0.5 text-xs text-[var(--color-error)] hover:bg-[var(--color-bg-hover)]"
+                  >
+                    解除
+                  </button>
+                </div>
+              )}
+
+              {/* 次スレバナー: スレッドが1000レス超えかつ次スレ検索済みの場合に表示 */}
+              {activeTabResponseCount >= NEXT_THREAD_RESPONSE_THRESHOLD &&
+                nextThreadCandidate !== undefined && (
+                  <div
+                    className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs ${
+                      nextThreadCandidate !== null
+                        ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
+                        : 'border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/60'
+                    }`}
+                  >
+                    <span className="shrink-0 font-semibold text-[var(--color-text-muted)]">
+                      このスレッドは1000を超えました。
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleOpenNextThread}
-                      className="shrink-0 rounded bg-[var(--color-success)] px-2 py-0.5 text-white hover:opacity-90"
-                    >
-                      開く
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-[var(--color-text-muted)]">次スレは見つかりませんでした</span>
-                    <button
-                      type="button"
-                      onClick={handleSearchNextThread}
-                      className="shrink-0 rounded border border-[var(--color-border-primary)] px-2 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-                    >
-                      再検索
-                    </button>
-                  </>
+                    {nextThreadCandidate !== null ? (
+                      <>
+                        <span
+                          className="min-w-0 flex-1 truncate text-[var(--color-success)]"
+                          title={nextThreadCandidate.title}
+                        >
+                          次スレ: {nextThreadCandidate.title}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleOpenNextThread}
+                          className="shrink-0 rounded bg-[var(--color-success)] px-2 py-0.5 text-white hover:opacity-90"
+                        >
+                          開く
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-[var(--color-text-muted)]">
+                          次スレは見つかりませんでした
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleSearchNextThread}
+                          className="shrink-0 rounded border border-[var(--color-border-primary)] px-2 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                        >
+                          再検索
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            {/* Responses — virtual scrolling */}
-            <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
+              {/* Responses — virtual scrolling */}
               <div
-                style={{
-                  height: `${String(virtualizer.getTotalSize())}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
+                ref={scrollRef}
+                className="relative flex-1 overflow-y-auto"
+                onWheel={handleThreadWheel}
               >
-                {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const res = displayResponses[virtualRow.index];
-                  if (res === undefined) return null;
+                <div
+                  style={{
+                    height: `${String(virtualizer.getTotalSize())}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {virtualizer.getVirtualItems().map((virtualRow) => {
+                    const res = displayResponses[virtualRow.index];
+                    if (res === undefined) return null;
 
-                  const resIdVal = extractId(res);
-                  const resWatchoiVal = extractWatchoi(res);
-                  const resKotehanVal = extractKotehan(res);
+                    const resIdVal = extractId(res);
+                    const resWatchoiVal = extractWatchoi(res);
+                    const resKotehanVal = extractKotehan(res);
 
-                  return (
-                    <div
-                      key={res.number}
-                      data-index={virtualRow.index}
-                      ref={virtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${String(virtualRow.start)}px)`,
-                      }}
-                    >
-                      {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
-                        <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
-                          <span className="text-xs font-semibold text-[var(--color-warning)]">--- ここまで読んだ ---</span>
-                        </div>
-                      )}
-                      <ResItem
-                        res={res}
-                        boardUrl={activeTab.boardUrl}
-                        threadId={activeTab.threadId}
-                        ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
-                        highlightType={getHighlightType(res.number)}
-                        showRelativeTime={showRelativeTime}
-                        inlineMediaEnabled={inlineMediaEnabled}
-                        allThreadImageUrls={allThreadImageUrls}
-                        idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
-                        watchoiCount={resWatchoiVal !== null ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0) : 0}
-                        kotehanCount={resKotehanVal !== null ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0) : 0}
-                        replyNumbers={replyMap.get(res.number) ?? []}
-                        onAnchorHover={handleAnchorHover}
-                        onAnchorLeave={handleAnchorLeave}
-                        onResNumberClick={handleResNumberClick}
-                        onSetKokomade={handleSetKokomade}
-                        onAddNgWord={handleAddNgWord}
-                        onScrollToResNumber={scrollToResNumber}
-                        onFilterById={handleFilterById}
-                        onFilterByWatchoi={handleFilterByWatchoi}
-                        onFilterByKotehan={handleFilterByKotehan}
-                        aaOverride={aaOverrides.get(res.number)}
-                        onToggleAaFont={handleToggleAaFont}
-                      />
-                    </div>
-                  );
-                })}
+                    return (
+                      <div
+                        key={res.number}
+                        data-index={virtualRow.index}
+                        ref={virtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${String(virtualRow.start)}px)`,
+                        }}
+                      >
+                        {activeTab.kokomade >= 0 && res.number === activeTab.kokomade + 1 && (
+                          <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
+                            <span className="text-xs font-semibold text-[var(--color-warning)]">
+                              --- ここまで読んだ ---
+                            </span>
+                          </div>
+                        )}
+                        <ResItem
+                          res={res}
+                          boardUrl={activeTab.boardUrl}
+                          threadId={activeTab.threadId}
+                          ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
+                          highlightType={getHighlightType(res.number)}
+                          showRelativeTime={showRelativeTime}
+                          inlineMediaEnabled={inlineMediaEnabled}
+                          allThreadImageUrls={allThreadImageUrls}
+                          idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
+                          watchoiCount={
+                            resWatchoiVal !== null
+                              ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0)
+                              : 0
+                          }
+                          kotehanCount={
+                            resKotehanVal !== null
+                              ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0)
+                              : 0
+                          }
+                          replyNumbers={replyMap.get(res.number) ?? []}
+                          onAnchorHover={handleAnchorHover}
+                          onAnchorLeave={handleAnchorLeave}
+                          onResNumberClick={handleResNumberClick}
+                          onSetKokomade={handleSetKokomade}
+                          onAddNgWord={handleAddNgWord}
+                          onScrollToResNumber={scrollToResNumber}
+                          onFilterById={handleFilterById}
+                          onFilterByWatchoi={handleFilterByWatchoi}
+                          onFilterByKotehan={handleFilterByKotehan}
+                          aaOverride={aaOverrides.get(res.number)}
+                          onToggleAaFont={handleToggleAaFont}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* F16: Thread Analysis Panel */}
-            {analysisOpen && (
-              <Suspense fallback={null}>
-                <ThreadAnalysis
-                  responses={activeTab.responses}
-                  onClose={handleToggleAnalysis}
-                  onScrollToRes={handleScrollToRes}
-                />
-              </Suspense>
-            )}
+              {/* F16: Thread Analysis Panel */}
+              {analysisOpen && (
+                <Suspense fallback={null}>
+                  <ThreadAnalysis
+                    responses={activeTab.responses}
+                    onClose={handleToggleAnalysis}
+                    onScrollToRes={handleScrollToRes}
+                  />
+                </Suspense>
+              )}
 
-            {/* NG Editor (shared across all tabs) */}
-            {ngEditorOpen && (
-              <Suspense fallback={null}>
-                <NgEditor />
-              </Suspense>
-            )}
+              {/* NG Editor (shared across all tabs) */}
+              {ngEditorOpen && (
+                <Suspense fallback={null}>
+                  <NgEditor />
+                </Suspense>
+              )}
 
-            {/* Post editor (per tab) */}
-            {postEditorOpen && (
-              <Suspense fallback={null}>
-                <PostEditor
-                  boardUrl={activeTab.boardUrl}
-                  threadId={activeTab.threadId}
-                  hasExposedIps={hasExposedIps}
-                  onClose={() => { closeTabPostEditor(activeTab.id); }}
-                  initialMessage={postEditorInitialMessage}
-                />
-              </Suspense>
-            )}
+              {/* Post editor (per tab) */}
+              {postEditorOpen && (
+                <Suspense fallback={null}>
+                  <PostEditor
+                    boardUrl={activeTab.boardUrl}
+                    threadId={activeTab.threadId}
+                    hasExposedIps={hasExposedIps}
+                    onClose={() => {
+                      closeTabPostEditor(activeTab.id);
+                    }}
+                    initialMessage={postEditorInitialMessage}
+                  />
+                </Suspense>
+              )}
 
-            {/* F26: Programmatic post editor (per tab) */}
-            {progPostOpen && (
-              <Suspense fallback={null}>
-                <ProgrammaticPost boardUrl={activeTab.boardUrl} threadId={activeTab.threadId} onClose={handleCloseProgPost} />
-              </Suspense>
-            )}
-          </>
-        )}
-        {edgeRefreshing && <RefreshOverlay />}
+              {/* F26: Programmatic post editor (per tab) */}
+              {progPostOpen && (
+                <Suspense fallback={null}>
+                  <ProgrammaticPost
+                    boardUrl={activeTab.boardUrl}
+                    threadId={activeTab.threadId}
+                    onClose={handleCloseProgPost}
+                  />
+                </Suspense>
+              )}
+            </>
+          )}
+          {edgeRefreshing && <RefreshOverlay />}
+        </div>
       </div>
-
-      </div>{/* end main content column */}
+      {/* end main content column */}
 
       {/* Thread tab context menu (F12) */}
       {tabCtxMenu !== null && (
@@ -2080,7 +2432,9 @@ export function ThreadView(): React.JSX.Element {
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={() => { void handleRefreshTabFromMenu(); }}
+            onClick={() => {
+              void handleRefreshTabFromMenu();
+            }}
             role="menuitem"
           >
             更新

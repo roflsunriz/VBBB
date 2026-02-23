@@ -13,7 +13,8 @@ const logger = createLogger('image-preview');
  * Image URL patterns.
  * Matches common image formats including Twitter/X style suffixes.
  */
-const IMAGE_EXTENSIONS = /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
+const IMAGE_EXTENSIONS =
+  /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
 const IMAGE_QUERY_FORMAT = /[?&]format=(jpe?g|gif|png|webp)(?:&|$)/i;
 
 /** URL extraction pattern from HTML content */

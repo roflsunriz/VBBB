@@ -3,14 +3,16 @@
  */
 import type { DetectedImage, DetectedVideo } from '@shared/preview';
 
-const IMAGE_EXTENSIONS = /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
+const IMAGE_EXTENSIONS =
+  /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
 const IMAGE_QUERY_FORMAT = /[?&]format=(jpe?g|gif|png|webp)(?:&|$)/i;
 const URL_PATTERN = /https?:\/\/[^\s"'<>\]]+/gi;
 
 /** Patterns for rich media sites (F9/F10) */
 const IMGUR_SINGLE_PATTERN = /^https?:\/\/imgur\.com\/([A-Za-z0-9]+)$/;
 const GYAZO_PATTERN = /^https?:\/\/gyazo\.com\/([A-Fa-f0-9]+)$/;
-const YOUTUBE_PATTERN = /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+const YOUTUBE_PATTERN =
+  /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/;
 const NICONICO_PATTERN = /^https?:\/\/(?:www\.)?nicovideo\.jp\/watch\/([a-z]{2}\d+)/;
 
 /**

@@ -39,7 +39,12 @@ function safeFromCodePoint(codePoint: number, original: string): string {
 export function decodeHtmlEntities(text: string): string {
   return text.replace(
     /&(?:#x([0-9a-fA-F]+)|#(\d+)|(\w+));/g,
-    (match: string, hex: string | undefined, dec: string | undefined, name: string | undefined): string => {
+    (
+      match: string,
+      hex: string | undefined,
+      dec: string | undefined,
+      name: string | undefined,
+    ): string => {
       if (hex !== undefined) {
         return safeFromCodePoint(parseInt(hex, 16), match);
       }

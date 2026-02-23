@@ -53,9 +53,10 @@ function CategoryNode({
   }, []);
 
   // Filter boards: transparent NG = hidden, normal NG = placeholder
-  const visibleBoards = useMemo(() =>
-    category.boards.filter((b) => !boardNgSet.has(b.bbsId)),
-  [category.boards, boardNgSet]);
+  const visibleBoards = useMemo(
+    () => category.boards.filter((b) => !boardNgSet.has(b.bbsId)),
+    [category.boards, boardNgSet],
+  );
 
   return (
     <div>
@@ -64,8 +65,14 @@ function CategoryNode({
         onClick={toggle}
         className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
       >
-        <MdiIcon path={expanded ? mdiFolderOpen : mdiFolder} size={14} className="text-[var(--color-warning)]" />
-        <span className="truncate font-medium text-[var(--color-text-secondary)]">{category.name}</span>
+        <MdiIcon
+          path={expanded ? mdiFolderOpen : mdiFolder}
+          size={14}
+          className="text-[var(--color-warning)]"
+        />
+        <span className="truncate font-medium text-[var(--color-text-secondary)]">
+          {category.name}
+        </span>
         <span className="ml-auto text-[var(--color-text-muted)]">{visibleBoards.length}</span>
       </button>
       {expanded && (
@@ -77,9 +84,15 @@ function CategoryNode({
                 <div
                   key={board.url}
                   className="flex w-full items-center gap-1 rounded px-2 py-0.5 text-xs opacity-40"
-                  onContextMenu={(e) => { onContextMenu(e, board); }}
+                  onContextMenu={(e) => {
+                    onContextMenu(e, board);
+                  }}
                 >
-                  <MdiIcon path={mdiBulletinBoard} size={12} className="text-[var(--color-text-muted)]" />
+                  <MdiIcon
+                    path={mdiBulletinBoard}
+                    size={12}
+                    className="text-[var(--color-text-muted)]"
+                  />
                   <span className="truncate text-[var(--color-res-abon)]">あぼーん</span>
                 </div>
               );
@@ -88,15 +101,23 @@ function CategoryNode({
               <button
                 key={board.url}
                 type="button"
-                onClick={() => { onSelectBoard(board); }}
-                onContextMenu={(e) => { onContextMenu(e, board); }}
+                onClick={() => {
+                  onSelectBoard(board);
+                }}
+                onContextMenu={(e) => {
+                  onContextMenu(e, board);
+                }}
                 className={`flex w-full items-center gap-1 rounded px-2 py-0.5 text-left text-xs hover:bg-[var(--color-bg-hover)] ${
                   selectedBoardUrl === board.url
                     ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
                     : 'text-[var(--color-text-muted)]'
                 }`}
               >
-                <MdiIcon path={mdiBulletinBoard} size={12} className="text-[var(--color-text-muted)]" />
+                <MdiIcon
+                  path={mdiBulletinBoard}
+                  size={12}
+                  className="text-[var(--color-text-muted)]"
+                />
                 <span className="truncate">{board.title}</span>
               </button>
             );
@@ -130,9 +151,13 @@ export function BoardTree(): React.JSX.Element {
   // Close context menu on click
   useEffect(() => {
     if (ctxMenu === null) return;
-    const handler = (): void => { setCtxMenu(null); };
+    const handler = (): void => {
+      setCtxMenu(null);
+    };
     document.addEventListener('click', handler);
-    return () => { document.removeEventListener('click', handler); };
+    return () => {
+      document.removeEventListener('click', handler);
+    };
   }, [ctxMenu]);
 
   // Clamp context menu position within viewport
@@ -172,9 +197,10 @@ export function BoardTree(): React.JSX.Element {
   const favoriteUrls = useMemo(() => new Set(favoriteUrlToId.keys()), [favoriteUrlToId]);
 
   // Board-level NG rules
-  const boardNgRules = useMemo(() =>
-    ngRules.filter((r) => r.target === NgTarget.Board && r.enabled),
-  [ngRules]);
+  const boardNgRules = useMemo(
+    () => ngRules.filter((r) => r.target === NgTarget.Board && r.enabled),
+    [ngRules],
+  );
 
   // Sets of NG board IDs by type
   const boardNgTransparentSet = useMemo(() => {
@@ -338,7 +364,11 @@ export function BoardTree(): React.JSX.Element {
       {/* F33: Category search bar */}
       {menu !== null && (
         <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
-          <MdiIcon path={mdiMagnify} size={11} className="shrink-0 text-[var(--color-text-muted)]" />
+          <MdiIcon
+            path={mdiMagnify}
+            size={11}
+            className="shrink-0 text-[var(--color-text-muted)]"
+          />
           <SearchInputWithHistory
             value={searchFilter}
             onChange={setSearchFilter}
@@ -348,10 +378,14 @@ export function BoardTree(): React.JSX.Element {
           />
           {searchFilter.length > 0 && (
             <>
-              <span className="text-[10px] text-[var(--color-text-muted)]">{filteredCategories.length} カテゴリ</span>
+              <span className="text-[10px] text-[var(--color-text-muted)]">
+                {filteredCategories.length} カテゴリ
+              </span>
               <button
                 type="button"
-                onClick={() => { setSearchFilter(''); }}
+                onClick={() => {
+                  setSearchFilter('');
+                }}
                 className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
                 aria-label="検索をクリア"
               >

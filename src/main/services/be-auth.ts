@@ -23,7 +23,10 @@ const MDMD_COOKIE = 'MDMD';
  * @param mail - Be account email address
  * @param password - Be account password (NEVER persisted)
  */
-export async function beLogin(mail: string, password: string): Promise<{ success: boolean; message: string }> {
+export async function beLogin(
+  mail: string,
+  password: string,
+): Promise<{ success: boolean; message: string }> {
   logger.info('Attempting Be login (credentials masked)');
 
   const body = `mail=${encodeURIComponent(mail)}&pass=${encodeURIComponent(password)}`;

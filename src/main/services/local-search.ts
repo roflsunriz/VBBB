@@ -39,9 +39,8 @@ export function searchLocal(
 ): SearchResult[] {
   const boardDir = getBoardDir(dataDir, query.boardUrl);
   const results: SearchResult[] = [];
-  const encoding = boardType === BoardType.JBBS || boardType === BoardType.Shitaraba
-    ? 'EUC-JP'
-    : 'Shift_JIS';
+  const encoding =
+    boardType === BoardType.JBBS || boardType === BoardType.Shitaraba ? 'EUC-JP' : 'Shift_JIS';
 
   let datFiles: string[];
   try {
@@ -72,9 +71,8 @@ export function searchLocal(
     // Extract thread ID and title
     const threadId = datFile.replace('.dat', '');
     const firstRes = responses[0];
-    const threadTitle = firstRes?.title.length !== undefined && firstRes.title.length > 0
-      ? firstRes.title
-      : threadId;
+    const threadTitle =
+      firstRes?.title.length !== undefined && firstRes.title.length > 0 ? firstRes.title : threadId;
 
     for (const res of responses) {
       if (results.length >= MAX_RESULTS) break;
@@ -97,7 +95,13 @@ export function searchLocal(
 }
 
 function getMatchField(
-  res: { readonly name: string; readonly mail: string; readonly dateTime: string; readonly body: string; readonly id?: string | undefined },
+  res: {
+    readonly name: string;
+    readonly mail: string;
+    readonly dateTime: string;
+    readonly body: string;
+    readonly id?: string | undefined;
+  },
   target: SearchTarget,
 ): string | null {
   switch (target) {
@@ -130,7 +134,11 @@ function extractIdFromDateTime(dateTime: string): string | null {
  * Strip HTML tags for plain text search.
  */
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 /**
@@ -245,9 +253,7 @@ function resolveBoardLookup(
  */
 function encodingForHost(hostname: string): 'EUC-JP' | 'Shift_JIS' {
   const boardType = detectBoardTypeByHost(hostname);
-  return boardType === BoardType.JBBS || boardType === BoardType.Shitaraba
-    ? 'EUC-JP'
-    : 'Shift_JIS';
+  return boardType === BoardType.JBBS || boardType === BoardType.Shitaraba ? 'EUC-JP' : 'Shift_JIS';
 }
 
 // ---------------------------------------------------------------------------
@@ -373,9 +379,8 @@ async function searchDatAll(
 
       const threadId = datFile.replace('.dat', '');
       const firstRes = responses[0];
-      const threadTitle = firstRes !== undefined && firstRes.title.length > 0
-        ? firstRes.title
-        : threadId;
+      const threadTitle =
+        firstRes !== undefined && firstRes.title.length > 0 ? firstRes.title : threadId;
 
       for (const res of responses) {
         if (results.length >= MAX_RESULTS) break;
@@ -431,7 +436,9 @@ export async function searchLocalAll(
     const boardResults = searchBoards(regex, categories);
     results.push(...boardResults);
     if (results.length >= MAX_RESULTS) {
-      logger.info(`Cross-board search hit limit at board search (${String(results.length)} results)`);
+      logger.info(
+        `Cross-board search hit limit at board search (${String(results.length)} results)`,
+      );
       return results.slice(0, MAX_RESULTS);
     }
   }
@@ -449,7 +456,9 @@ export async function searchLocalAll(
       const subjectResults = await searchSubjects(regex, dataDir, boardDirs, lookupMap);
       results.push(...subjectResults);
       if (results.length >= MAX_RESULTS) {
-        logger.info(`Cross-board search hit limit at subject search (${String(results.length)} results)`);
+        logger.info(
+          `Cross-board search hit limit at subject search (${String(results.length)} results)`,
+        );
         return results.slice(0, MAX_RESULTS);
       }
     }
@@ -463,6 +472,8 @@ export async function searchLocalAll(
     }
   }
 
-  logger.info(`Cross-board search found ${String(results.length)} results for "${query.pattern}" (scope: ${scope})`);
+  logger.info(
+    `Cross-board search found ${String(results.length)} results for "${query.pattern}" (scope: ${scope})`,
+  );
   return results.slice(0, MAX_RESULTS);
 }

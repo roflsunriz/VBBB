@@ -86,7 +86,9 @@ describe('parseAnchors', () => {
 describe('convertAnchorsToLinks', () => {
   it('converts single anchor to link', () => {
     const result = convertAnchorsToLinks('&gt;&gt;123');
-    expect(result).toBe('<a href="#res-123" class="anchor-link" data-anchor-nums="123">&gt;&gt;123</a>');
+    expect(result).toBe(
+      '<a href="#res-123" class="anchor-link" data-anchor-nums="123">&gt;&gt;123</a>',
+    );
   });
 
   it('converts range anchor preserving all numbers in data attribute', () => {
@@ -97,7 +99,9 @@ describe('convertAnchorsToLinks', () => {
 
   it('preserves surrounding text', () => {
     const result = convertAnchorsToLinks('before &gt;&gt;5 after');
-    expect(result).toBe('before <a href="#res-5" class="anchor-link" data-anchor-nums="5">&gt;&gt;5</a> after');
+    expect(result).toBe(
+      'before <a href="#res-5" class="anchor-link" data-anchor-nums="5">&gt;&gt;5</a> after',
+    );
   });
 
   it('does not convert non-anchor content', () => {

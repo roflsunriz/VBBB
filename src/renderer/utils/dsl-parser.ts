@@ -55,12 +55,18 @@ export function parseDslScript(source: string): DslParseResult {
     if (upper.startsWith('SCHEDULE')) {
       const val = valueAfter(line, 'SCHEDULE').trim();
       if (val.length === 0) {
-        errors.push({ line: lineNo, message: 'SCHEDULEに値が必要です (例: SCHEDULE 2026-03-01T10:00:00)' });
+        errors.push({
+          line: lineNo,
+          message: 'SCHEDULEに値が必要です (例: SCHEDULE 2026-03-01T10:00:00)',
+        });
         continue;
       }
       const date = new Date(val);
       if (!Number.isFinite(date.getTime())) {
-        errors.push({ line: lineNo, message: `SCHEDULEの日時形式が無効です: "${val}" (ISO 8601形式で指定してください)` });
+        errors.push({
+          line: lineNo,
+          message: `SCHEDULEの日時形式が無効です: "${val}" (ISO 8601形式で指定してください)`,
+        });
       } else {
         scheduleAt = date;
       }
@@ -72,7 +78,10 @@ export function parseDslScript(source: string): DslParseResult {
       }
       const n = Number(val);
       if (!Number.isFinite(n) || n < 0) {
-        errors.push({ line: lineNo, message: `COUNTDOWNの値が無効です: "${val}" (0以上の数値を指定してください)` });
+        errors.push({
+          line: lineNo,
+          message: `COUNTDOWNの値が無効です: "${val}" (0以上の数値を指定してください)`,
+        });
       } else {
         countdownSec = n;
       }
@@ -109,7 +118,10 @@ export function parseDslScript(source: string): DslParseResult {
           const val = valueAfter(postLine, 'REPEAT');
           const n = Number(val);
           if (!Number.isFinite(n) || n < 1) {
-            errors.push({ line: postLineNo, message: `REPEATの値が無効です: "${val}" (1以上の整数を指定してください)` });
+            errors.push({
+              line: postLineNo,
+              message: `REPEATの値が無効です: "${val}" (1以上の整数を指定してください)`,
+            });
           } else {
             repeat = Math.floor(n);
           }
@@ -117,11 +129,14 @@ export function parseDslScript(source: string): DslParseResult {
           const val = valueAfter(postLine, 'INTERVAL');
           const n = Number(val);
           if (!Number.isFinite(n) || n < 0) {
-            errors.push({ line: postLineNo, message: `INTERVALの値が無効です: "${val}" (0以上の数値を指定してください)` });
+            errors.push({
+              line: postLineNo,
+              message: `INTERVALの値が無効です: "${val}" (0以上の数値を指定してください)`,
+            });
           } else {
             intervalSec = n;
           }
-        } else         if (postUpper.startsWith('MESSAGE')) {
+        } else if (postUpper.startsWith('MESSAGE')) {
           // Extract value from the raw (un-stripped) line so that '#' in
           // message content is preserved as-is, not treated as a comment.
           const rawTrimmed = rawPostLine.replace(/^\s+/u, '');

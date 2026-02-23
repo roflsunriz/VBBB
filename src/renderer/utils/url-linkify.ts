@@ -23,15 +23,10 @@ export function linkifyUrls(html: string): string {
         return part;
       }
       if (insideAnchor) return part;
-      return part.replace(
-        /(https?:\/\/[^\s<>"'\u3000\uff01-\uff5e]+)/g,
-        (url) => {
-          const safeUrl = url
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;');
-          return `<a href="#" class="external-url text-[var(--color-link)] hover:underline break-all" data-url="${safeUrl}" title="${safeUrl}">${safeUrl}</a>`;
-        },
-      );
+      return part.replace(/(https?:\/\/[^\s<>"'\u3000\uff01-\uff5e]+)/g, (url) => {
+        const safeUrl = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<a href="#" class="external-url text-[var(--color-link)] hover:underline break-all" data-url="${safeUrl}" title="${safeUrl}">${safeUrl}</a>`;
+      });
     })
     .join('');
 }

@@ -83,7 +83,13 @@ function loadPersistedVisible(): boolean {
   return true;
 }
 
-const ALL_CATEGORIES: readonly StatusLogCategory[] = ['network', 'board', 'thread', 'post', 'media'];
+const ALL_CATEGORIES: readonly StatusLogCategory[] = [
+  'network',
+  'board',
+  'thread',
+  'post',
+  'media',
+];
 
 export function StatusConsole(): React.JSX.Element {
   const entries = useStatusLogStore((s) => s.entries);
@@ -171,12 +177,18 @@ export function StatusConsole(): React.JSX.Element {
           <TopResizeHandle onResize={handleResize} onResizeEnd={handleResizeEnd} />
           {/* Filter bar */}
           <div className="flex shrink-0 items-center gap-0.5 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-1.5 py-0.5">
-            <MdiIcon path={mdiFilterOutline} size={10} className="mr-0.5 text-[var(--color-text-muted)]" />
+            <MdiIcon
+              path={mdiFilterOutline}
+              size={10}
+              className="mr-0.5 text-[var(--color-text-muted)]"
+            />
             {ALL_CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
-                onClick={() => { handleCategoryClick(cat); }}
+                onClick={() => {
+                  handleCategoryClick(cat);
+                }}
                 className={`flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] transition-colors ${
                   filterCategory === cat
                     ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
@@ -207,9 +219,7 @@ export function StatusConsole(): React.JSX.Element {
             style={{ height }}
           >
             {filteredEntries.length === 0 ? (
-              <p className="py-4 text-center text-[var(--color-text-muted)]">
-                ステータスログなし
-              </p>
+              <p className="py-4 text-center text-[var(--color-text-muted)]">ステータスログなし</p>
             ) : (
               filteredEntries.map((entry) => (
                 <div
@@ -224,9 +234,7 @@ export function StatusConsole(): React.JSX.Element {
                   <span className="shrink-0 tabular-nums text-[var(--color-text-muted)]">
                     {formatTime(entry.timestamp)}
                   </span>
-                  <span className="min-w-0 break-all">
-                    {entry.message}
-                  </span>
+                  <span className="min-w-0 break-all">{entry.message}</span>
                 </div>
               ))
             )}

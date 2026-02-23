@@ -38,15 +38,20 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
       void openThread(parsed.board.url, parsed.threadId, '');
     }
 
-    setResult(`${parsed.board.title} を追加しました${parsed.threadId !== undefined ? ' (スレッドを開きます)' : ''}`);
+    setResult(
+      `${parsed.board.title} を追加しました${parsed.threadId !== undefined ? ' (スレッドを開きます)' : ''}`,
+    );
     setUrl('');
   }, [url, selectBoard, openThread]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      void handleAdd();
-    }
-  }, [handleAdd]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        void handleAdd();
+      }
+    },
+    [handleAdd],
+  );
 
   return (
     <div className="flex flex-col gap-3 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-4">
@@ -56,7 +61,12 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
           <MdiIcon path={mdiLinkVariant} size={16} />
           外部掲示板を追加
         </h3>
-        <button type="button" onClick={onClose} className="rounded p-1 hover:bg-[var(--color-bg-hover)]" aria-label="閉じる">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 hover:bg-[var(--color-bg-hover)]"
+          aria-label="閉じる"
+        >
           <MdiIcon path={mdiClose} size={14} />
         </button>
       </div>
@@ -70,14 +80,18 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
         <input
           type="text"
           value={url}
-          onChange={(e) => { setUrl(e.target.value); }}
+          onChange={(e) => {
+            setUrl(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="https://jbbs.shitaraba.jp/game/12345/"
           className="min-w-0 flex-1 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-3 py-1.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
         />
         <button
           type="button"
-          onClick={() => { void handleAdd(); }}
+          onClick={() => {
+            void handleAdd();
+          }}
           className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:opacity-90"
         >
           <MdiIcon path={mdiPlus} size={12} />
@@ -86,12 +100,8 @@ export function AddBoardDialog({ onClose }: { readonly onClose: () => void }): R
       </div>
 
       {/* Feedback */}
-      {error !== null && (
-        <p className="text-xs text-[var(--color-error)]">{error}</p>
-      )}
-      {result !== null && (
-        <p className="text-xs text-[var(--color-success)]">{result}</p>
-      )}
+      {error !== null && <p className="text-xs text-[var(--color-error)]">{error}</p>}
+      {result !== null && <p className="text-xs text-[var(--color-success)]">{result}</p>}
 
       {/* Supported URL examples */}
       <div className="rounded bg-[var(--color-bg-primary)] p-2 text-xs text-[var(--color-text-muted)]">

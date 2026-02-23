@@ -49,9 +49,7 @@ export function extractBoardTitleFromBoardInfoHtml(html: string): string | null 
 
   const heading = extractTagText(html, 'h1');
   if (heading !== null) {
-    const fromHeading = heading
-      .replace(/^掲示板情報(?:（β版）)?\s*/, '')
-      .trim();
+    const fromHeading = heading.replace(/^掲示板情報(?:（β版）)?\s*/, '').trim();
     if (fromHeading.length > 0) {
       return fromHeading;
     }
@@ -115,7 +113,10 @@ export function extractBoardTitleFromBoardTopHtml(html: string): string | null {
   return null;
 }
 
-async function fetchHtml(url: string, encoding: 'Shift_JIS' | 'EUC-JP' | 'UTF-8'): Promise<string | null> {
+async function fetchHtml(
+  url: string,
+  encoding: 'Shift_JIS' | 'EUC-JP' | 'UTF-8',
+): Promise<string | null> {
   try {
     const response = await httpFetch({
       url,
@@ -127,7 +128,9 @@ async function fetchHtml(url: string, encoding: 'Shift_JIS' | 'EUC-JP' | 'UTF-8'
     }
     return decodeBuffer(response.body, encoding);
   } catch (err) {
-    logger.warn(`Board title fetch failed: ${url} (${err instanceof Error ? err.message : String(err)})`);
+    logger.warn(
+      `Board title fetch failed: ${url} (${err instanceof Error ? err.message : String(err)})`,
+    );
     return null;
   }
 }

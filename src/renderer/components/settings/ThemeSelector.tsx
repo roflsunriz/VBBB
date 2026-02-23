@@ -49,7 +49,10 @@ interface ThemeSelectorProps {
   readonly onThemeChange: (theme: ThemeName) => void;
 }
 
-export function ThemeSelector({ currentTheme, onThemeChange }: ThemeSelectorProps): React.JSX.Element {
+export function ThemeSelector({
+  currentTheme,
+  onThemeChange,
+}: ThemeSelectorProps): React.JSX.Element {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;

@@ -78,7 +78,11 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-4 py-2">
         <h2 className="text-sm font-bold text-[var(--color-text-primary)]">Cookie / UA 管理</h2>
-        <button type="button" onClick={onClose} className="rounded p-1 hover:bg-[var(--color-bg-hover)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 hover:bg-[var(--color-bg-hover)]"
+        >
           <MdiIcon path={mdiClose} size={14} className="text-[var(--color-text-muted)]" />
         </button>
       </div>
@@ -87,7 +91,9 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
       <div className="flex border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
         <button
           type="button"
-          onClick={() => { setActiveTab('cookies'); }}
+          onClick={() => {
+            setActiveTab('cookies');
+          }}
           className={`flex items-center gap-1 px-4 py-2 text-xs ${
             activeTab === 'cookies'
               ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
@@ -99,7 +105,9 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         </button>
         <button
           type="button"
-          onClick={() => { setActiveTab('useragent'); }}
+          onClick={() => {
+            setActiveTab('useragent');
+          }}
           className={`flex items-center gap-1 px-4 py-2 text-xs ${
             activeTab === 'useragent'
               ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
@@ -116,21 +124,37 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         {activeTab === 'cookies' && (
           <div className="space-y-3">
             {Object.keys(groupedCookies).length === 0 ? (
-              <p className="text-center text-xs text-[var(--color-text-muted)]">Cookie はありません</p>
+              <p className="text-center text-xs text-[var(--color-text-muted)]">
+                Cookie はありません
+              </p>
             ) : (
               Object.entries(groupedCookies).map(([domain, domainCookies]) => (
-                <div key={domain} className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)]">
+                <div
+                  key={domain}
+                  className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)]"
+                >
                   <div className="border-b border-[var(--color-border-secondary)] px-3 py-1.5">
-                    <span className="text-xs font-medium text-[var(--color-text-secondary)]">{domain}</span>
-                    <span className="ml-2 text-xs text-[var(--color-text-muted)]">({domainCookies.length})</span>
+                    <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+                      {domain}
+                    </span>
+                    <span className="ml-2 text-xs text-[var(--color-text-muted)]">
+                      ({domainCookies.length})
+                    </span>
                   </div>
                   <div className="divide-y divide-[var(--color-border-secondary)]">
                     {domainCookies.map((cookie) => (
-                      <div key={`${cookie.domain}-${cookie.name}`} className="flex items-center justify-between px-3 py-1.5">
+                      <div
+                        key={`${cookie.domain}-${cookie.name}`}
+                        className="flex items-center justify-between px-3 py-1.5"
+                      >
                         <div className="min-w-0 flex-1">
-                          <span className="text-xs font-medium text-[var(--color-text-primary)]">{cookie.name}</span>
+                          <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                            {cookie.name}
+                          </span>
                           <span className="ml-2 truncate text-xs text-[var(--color-text-muted)]">
-                            {cookie.value.length > 60 ? `${cookie.value.substring(0, 60)}...` : cookie.value}
+                            {cookie.value.length > 60
+                              ? `${cookie.value.substring(0, 60)}...`
+                              : cookie.value}
                           </span>
                           {cookie.expires !== undefined && (
                             <span className="ml-2 text-xs text-[var(--color-text-muted)]">
@@ -140,7 +164,9 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
                         </div>
                         <button
                           type="button"
-                          onClick={() => { void handleDeleteCookie(cookie.name, cookie.domain); }}
+                          onClick={() => {
+                            void handleDeleteCookie(cookie.name, cookie.domain);
+                          }}
                           className="ml-2 shrink-0 rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-error)]"
                           title="Cookie を削除"
                         >
@@ -158,14 +184,19 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         {activeTab === 'useragent' && (
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]" htmlFor="ua-input">
+              <label
+                className="mb-1 block text-xs text-[var(--color-text-secondary)]"
+                htmlFor="ua-input"
+              >
                 User-Agent 文字列
               </label>
               <input
                 id="ua-input"
                 type="text"
                 value={userAgent}
-                onChange={(e) => { setUserAgent(e.target.value); }}
+                onChange={(e) => {
+                  setUserAgent(e.target.value);
+                }}
                 className="w-full rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-3 py-2 text-xs text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
               />
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">
@@ -175,7 +206,9 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => { void handleSaveUserAgent(); }}
+                onClick={() => {
+                  void handleSaveUserAgent();
+                }}
                 className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-xs text-white hover:opacity-90"
               >
                 保存

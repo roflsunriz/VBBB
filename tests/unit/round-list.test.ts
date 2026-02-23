@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseRoundBoard, serializeRoundBoard,
-  parseRoundItem, serializeRoundItem,
+  parseRoundBoard,
+  serializeRoundBoard,
+  parseRoundItem,
+  serializeRoundItem,
 } from '../../src/main/services/round-list';
 
 describe('parseRoundBoard', () => {
@@ -47,7 +49,8 @@ describe('serializeRoundBoard', () => {
 
 describe('parseRoundItem', () => {
   it('parses item entries', () => {
-    const content = '2.00\nhttps://news.5ch.net/newsplus/#1ニュース速報+#11234567890.dat#1Test Thread#1ニュース巡回';
+    const content =
+      '2.00\nhttps://news.5ch.net/newsplus/#1ニュース速報+#11234567890.dat#1Test Thread#1ニュース巡回';
     const entries = parseRoundItem(content);
     expect(entries).toHaveLength(1);
     expect(entries[0]?.url).toBe('https://news.5ch.net/newsplus/');
@@ -58,13 +61,15 @@ describe('parseRoundItem', () => {
 
 describe('serializeRoundItem', () => {
   it('round-trips correctly', () => {
-    const original = [{
-      url: 'https://a.com/',
-      boardTitle: 'A',
-      fileName: '123.dat',
-      threadTitle: 'Thread',
-      roundName: 'R',
-    }];
+    const original = [
+      {
+        url: 'https://a.com/',
+        boardTitle: 'A',
+        fileName: '123.dat',
+        threadTitle: 'Thread',
+        roundName: 'R',
+      },
+    ];
     const serialized = serializeRoundItem(original);
     const parsed = parseRoundItem(serialized);
     expect(parsed).toStrictEqual(original);

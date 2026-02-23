@@ -11,8 +11,8 @@ publish:
   repo: VBBB
 files:
   - out/**/*
-  - "!out/**/*.map"
-  - "!out/tsconfig.node.tsbuildinfo"
+  - '!out/**/*.map'
+  - '!out/tsconfig.node.tsbuildinfo'
 
 # ────────────────────────────────────────────────
 # Windows (Windows 10/11 x64) — 動作確認済み

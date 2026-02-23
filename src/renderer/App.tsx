@@ -15,6 +15,7 @@ import {
   mdiLinkPlus,
   mdiHistory,
   mdiGithub,
+  mdiScriptText,
 } from '@mdi/js';
 import { useBBSStore } from './stores/bbs-store';
 import { BoardTree } from './components/board-tree/BoardTree';
@@ -24,7 +25,12 @@ import { StatusConsole } from './components/status-console/StatusConsole';
 import { MdiIcon } from './components/common/MdiIcon';
 import { Modal } from './components/common/Modal';
 import { ResizeHandle } from './components/common/ResizeHandle';
-import { type ThemeName, ThemeSelector, getStoredTheme, applyTheme } from './components/settings/ThemeSelector';
+import {
+  type ThemeName,
+  ThemeSelector,
+  getStoredTheme,
+  applyTheme,
+} from './components/settings/ThemeSelector';
 
 // Left-pane tabs: loaded on first activation (not needed on startup)
 const FavoriteTree = lazy(() =>
@@ -62,9 +68,23 @@ const AddBoardDialog = lazy(() =>
 const UpdateDialog = lazy(() =>
   import('./components/update/UpdateDialog').then((m) => ({ default: m.UpdateDialog })),
 );
+const DslEditor = lazy(() =>
+  import('./components/dsl-editor/DslEditor').then((m) => ({ default: m.DslEditor })),
+);
 
 type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
-type ModalType = 'auth' | 'proxy' | 'round' | 'ng' | 'about' | 'cookie-manager' | 'console' | 'add-board' | 'update' | null;
+type ModalType =
+  | 'auth'
+  | 'proxy'
+  | 'round'
+  | 'ng'
+  | 'about'
+  | 'cookie-manager'
+  | 'console'
+  | 'add-board'
+  | 'update'
+  | 'dsl-editor'
+  | null;
 
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
@@ -102,14 +122,22 @@ export function App(): React.JSX.Element {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   // Resizable pane widths
-  const [leftWidth, setLeftWidth] = useState(() => loadPaneWidth(STORAGE_KEY_LEFT, LEFT_PANE_DEFAULT));
-  const [centerWidth, setCenterWidth] = useState(() => loadPaneWidth(STORAGE_KEY_CENTER, CENTER_PANE_DEFAULT));
+  const [leftWidth, setLeftWidth] = useState(() =>
+    loadPaneWidth(STORAGE_KEY_LEFT, LEFT_PANE_DEFAULT),
+  );
+  const [centerWidth, setCenterWidth] = useState(() =>
+    loadPaneWidth(STORAGE_KEY_CENTER, CENTER_PANE_DEFAULT),
+  );
 
   // Refs to avoid stale closures in IPC listeners
   const setLeftTabRef = useRef(setLeftTab);
   const setActiveModalRef = useRef(setActiveModal);
-  useEffect(() => { setLeftTabRef.current = setLeftTab; }, [setLeftTab]);
-  useEffect(() => { setActiveModalRef.current = setActiveModal; }, [setActiveModal]);
+  useEffect(() => {
+    setLeftTabRef.current = setLeftTab;
+  }, [setLeftTab]);
+  useEffect(() => {
+    setActiveModalRef.current = setActiveModal;
+  }, [setActiveModal]);
 
   // Apply theme on mount and change
   useEffect(() => {
@@ -197,22 +225,39 @@ export function App(): React.JSX.Element {
               void useBBSStore.getState().fetchMenu();
               break;
             case 'switch-tab':
-              if (action.tab === 'boards' || action.tab === 'favorites' || action.tab === 'search' || action.tab === 'history') {
+              if (
+                action.tab === 'boards' ||
+                action.tab === 'favorites' ||
+                action.tab === 'search' ||
+                action.tab === 'history'
+              ) {
                 setLeftTabRef.current(action.tab);
               }
               break;
             case 'open-modal':
-              if (action.modal === 'auth' || action.modal === 'proxy' || action.modal === 'round' || action.modal === 'ng' || action.modal === 'about' || action.modal === 'cookie-manager' || action.modal === 'console' || action.modal === 'update') {
+              if (
+                action.modal === 'auth' ||
+                action.modal === 'proxy' ||
+                action.modal === 'round' ||
+                action.modal === 'ng' ||
+                action.modal === 'about' ||
+                action.modal === 'cookie-manager' ||
+                action.modal === 'console' ||
+                action.modal === 'update' ||
+                action.modal === 'dsl-editor'
+              ) {
                 setActiveModalRef.current(action.modal);
               }
               break;
             case 'toggle-ng':
-              setActiveModalRef.current((prev) => prev === 'ng' ? null : 'ng');
+              setActiveModalRef.current((prev) => (prev === 'ng' ? null : 'ng'));
               break;
           }
         } catch {
           if (!cancelled) {
-            await new Promise<void>((r) => { setTimeout(r, 1000); });
+            await new Promise<void>((r) => {
+              setTimeout(r, 1000);
+            });
           }
         }
       }
@@ -229,30 +274,60 @@ export function App(): React.JSX.Element {
     setTheme(newTheme);
   }, []);
 
-  const switchToBoards = useCallback(() => { setLeftTab('boards'); }, []);
-  const switchToFavorites = useCallback(() => { setLeftTab('favorites'); }, []);
-  const switchToSearch = useCallback(() => { setLeftTab('search'); }, []);
-  const switchToHistory = useCallback(() => { setLeftTab('history'); }, []);
-  const closeModal = useCallback(() => { setActiveModal(null); }, []);
+  const switchToBoards = useCallback(() => {
+    setLeftTab('boards');
+  }, []);
+  const switchToFavorites = useCallback(() => {
+    setLeftTab('favorites');
+  }, []);
+  const switchToSearch = useCallback(() => {
+    setLeftTab('search');
+  }, []);
+  const switchToHistory = useCallback(() => {
+    setLeftTab('history');
+  }, []);
+  const closeModal = useCallback(() => {
+    setActiveModal(null);
+  }, []);
 
   const handleRefreshBoards = useCallback(() => {
     void fetchMenu();
   }, [fetchMenu]);
 
-  const openAuth = useCallback(() => { setActiveModal('auth'); }, []);
-  const openProxy = useCallback(() => { setActiveModal('proxy'); }, []);
-  const openRound = useCallback(() => { setActiveModal('round'); }, []);
-  const openCookieManager = useCallback(() => { setActiveModal('cookie-manager'); }, []);
-  const openConsole = useCallback(() => { setActiveModal('console'); }, []);
-  const openAbout = useCallback(() => { setActiveModal('about'); }, []);
-  const openAddBoard = useCallback(() => { setActiveModal('add-board'); }, []);
+  const openAuth = useCallback(() => {
+    setActiveModal('auth');
+  }, []);
+  const openProxy = useCallback(() => {
+    setActiveModal('proxy');
+  }, []);
+  const openRound = useCallback(() => {
+    setActiveModal('round');
+  }, []);
+  const openCookieManager = useCallback(() => {
+    setActiveModal('cookie-manager');
+  }, []);
+  const openConsole = useCallback(() => {
+    setActiveModal('console');
+  }, []);
+  const openAbout = useCallback(() => {
+    setActiveModal('about');
+  }, []);
+  const openAddBoard = useCallback(() => {
+    setActiveModal('add-board');
+  }, []);
+  const openDslEditor = useCallback(() => {
+    setActiveModal('dsl-editor');
+  }, []);
 
   const handleLeftResize = useCallback((delta: number) => {
     setLeftWidth((w) => Math.max(LEFT_PANE_MIN, Math.min(LEFT_PANE_MAX, w + delta)));
   }, []);
 
   const handleLeftResizeEnd = useCallback(() => {
-    setLeftWidth((w) => { localStorage.setItem(STORAGE_KEY_LEFT, String(w)); return w; });
+    setLeftWidth((w) => {
+      localStorage.setItem(STORAGE_KEY_LEFT, String(w));
+      return w;
+    });
   }, []);
 
   const handleCenterResize = useCallback((delta: number) => {
@@ -260,7 +335,10 @@ export function App(): React.JSX.Element {
   }, []);
 
   const handleCenterResizeEnd = useCallback(() => {
-    setCenterWidth((w) => { localStorage.setItem(STORAGE_KEY_CENTER, String(w)); return w; });
+    setCenterWidth((w) => {
+      localStorage.setItem(STORAGE_KEY_CENTER, String(w));
+      return w;
+    });
   }, []);
 
   return (
@@ -349,6 +427,19 @@ export function App(): React.JSX.Element {
         >
           <MdiIcon path={mdiConsoleLine} size={14} />
           コンソール
+        </button>
+
+        <div className="mx-1 h-4 w-px bg-[var(--color-border-primary)]" />
+
+        {/* DSL Editor */}
+        <button
+          type="button"
+          onClick={openDslEditor}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          title="DSLエディタ (Ctrl+Shift+D)"
+        >
+          <MdiIcon path={mdiScriptText} size={14} />
+          DSL
         </button>
 
         <div className="flex-1" />
@@ -462,14 +553,26 @@ export function App(): React.JSX.Element {
       </footer>
 
       {/* Modal: Auth (resizable) */}
-      <Modal open={activeModal === 'auth'} onClose={closeModal} resizable initialWidth={500} initialHeight={400}>
+      <Modal
+        open={activeModal === 'auth'}
+        onClose={closeModal}
+        resizable
+        initialWidth={500}
+        initialHeight={400}
+      >
         <Suspense fallback={null}>
           <AuthPanel onClose={closeModal} />
         </Suspense>
       </Modal>
 
       {/* Modal: Proxy (resizable) */}
-      <Modal open={activeModal === 'proxy'} onClose={closeModal} resizable initialWidth={520} initialHeight={480}>
+      <Modal
+        open={activeModal === 'proxy'}
+        onClose={closeModal}
+        resizable
+        initialWidth={520}
+        initialHeight={480}
+      >
         <Suspense fallback={null}>
           <ProxySettings onClose={closeModal} />
         </Suspense>
@@ -485,7 +588,13 @@ export function App(): React.JSX.Element {
       </Modal>
 
       {/* Modal: Round (resizable) */}
-      <Modal open={activeModal === 'round'} onClose={closeModal} resizable initialWidth={480} initialHeight={500}>
+      <Modal
+        open={activeModal === 'round'}
+        onClose={closeModal}
+        resizable
+        initialWidth={480}
+        initialHeight={500}
+      >
         <div className="h-full overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
           <Suspense fallback={null}>
             <RoundPanel onClose={closeModal} />
@@ -494,14 +603,26 @@ export function App(): React.JSX.Element {
       </Modal>
 
       {/* Modal: Cookie/UA Manager (resizable) */}
-      <Modal open={activeModal === 'cookie-manager'} onClose={closeModal} resizable initialWidth={600} initialHeight={500}>
+      <Modal
+        open={activeModal === 'cookie-manager'}
+        onClose={closeModal}
+        resizable
+        initialWidth={600}
+        initialHeight={500}
+      >
         <Suspense fallback={null}>
           <CookieManager onClose={closeModal} />
         </Suspense>
       </Modal>
 
       {/* Modal: Console (resizable) */}
-      <Modal open={activeModal === 'console'} onClose={closeModal} resizable initialWidth={900} initialHeight={600}>
+      <Modal
+        open={activeModal === 'console'}
+        onClose={closeModal}
+        resizable
+        initialWidth={900}
+        initialHeight={600}
+      >
         <Suspense fallback={null}>
           <ConsoleModal onClose={closeModal} />
         </Suspense>
@@ -521,6 +642,19 @@ export function App(): React.JSX.Element {
         </Suspense>
       </Modal>
 
+      {/* Modal: DSL Editor (resizable) */}
+      <Modal
+        open={activeModal === 'dsl-editor'}
+        onClose={closeModal}
+        resizable
+        initialWidth={800}
+        initialHeight={600}
+      >
+        <Suspense fallback={null}>
+          <DslEditor onClose={closeModal} />
+        </Suspense>
+      </Modal>
+
       {/* Modal: About */}
       <Modal open={activeModal === 'about'} onClose={closeModal} width="max-w-sm">
         <div className="flex flex-col items-center gap-3 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-6">
@@ -529,9 +663,7 @@ export function App(): React.JSX.Element {
           <p className="text-center text-sm font-medium text-[var(--color-text-secondary)]">
             Versatile BBS Browser
           </p>
-          <p className="text-center text-xs text-[var(--color-text-muted)]">
-            v{__APP_VERSION__}
-          </p>
+          <p className="text-center text-xs text-[var(--color-text-muted)]">v{__APP_VERSION__}</p>
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             2ch/5ch互換BBSブラウザ
           </p>
@@ -540,7 +672,12 @@ export function App(): React.JSX.Element {
           </p>
           <button
             type="button"
-            onClick={() => { void window.electronApi.invoke('shell:open-external', 'https://github.com/roflsunriz/VBBB'); }}
+            onClick={() => {
+              void window.electronApi.invoke(
+                'shell:open-external',
+                'https://github.com/roflsunriz/VBBB',
+              );
+            }}
             className="flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           >
             <MdiIcon path={mdiGithub} size={14} />

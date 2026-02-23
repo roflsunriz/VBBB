@@ -86,7 +86,9 @@ export function SearchInputWithHistory({
       <input
         type="text"
         value={value}
-        onChange={(e) => { onChange(e.target.value); }}
+        onChange={(e) => {
+          onChange(e.target.value);
+        }}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
@@ -104,16 +106,28 @@ export function SearchInputWithHistory({
             <div
               key={item}
               className="group flex cursor-pointer items-center gap-1 px-2 py-1 hover:bg-[var(--color-bg-hover)]"
-              onClick={() => { handleHistoryItemClick(item); }}
+              onClick={() => {
+                handleHistoryItemClick(item);
+              }}
               role="option"
               aria-selected={false}
             >
-              <MdiIcon path={mdiClockOutline} size={10} className="shrink-0 text-[var(--color-text-muted)]" />
-              <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-text-secondary)]">{item}</span>
+              <MdiIcon
+                path={mdiClockOutline}
+                size={10}
+                className="shrink-0 text-[var(--color-text-muted)]"
+              />
+              <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-text-secondary)]">
+                {item}
+              </span>
               <button
                 type="button"
-                onClick={(e) => { handleDeleteHistoryItem(e, item); }}
-                onMouseDown={(e) => { e.preventDefault(); }}
+                onClick={(e) => {
+                  handleDeleteHistoryItem(e, item);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                }}
                 className="shrink-0 rounded p-0.5 opacity-0 text-[var(--color-text-muted)] hover:text-[var(--color-error)] group-hover:opacity-100"
                 aria-label="履歴から削除"
               >

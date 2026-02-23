@@ -31,24 +31,38 @@ function loadHistory(storageKey: string): readonly string[] {
 export function useSearchHistory(storageKey: string): UseSearchHistoryResult {
   const [history, setHistory] = useState<readonly string[]>(() => loadHistory(storageKey));
 
-  const addToHistory = useCallback((query: string) => {
-    const trimmed = query.trim();
-    if (trimmed.length < MIN_QUERY_LENGTH) return;
-    setHistory((prev) => {
-      const filtered = prev.filter((s) => s !== trimmed);
-      const next = [trimmed, ...filtered].slice(0, MAX_HISTORY_ITEMS);
-      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, [storageKey]);
+  const addToHistory = useCallback(
+    (query: string) => {
+      const trimmed = query.trim();
+      if (trimmed.length < MIN_QUERY_LENGTH) return;
+      setHistory((prev) => {
+        const filtered = prev.filter((s) => s !== trimmed);
+        const next = [trimmed, ...filtered].slice(0, MAX_HISTORY_ITEMS);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    },
+    [storageKey],
+  );
 
-  const removeFromHistory = useCallback((query: string) => {
-    setHistory((prev) => {
-      const next = prev.filter((s) => s !== query);
-      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, [storageKey]);
+  const removeFromHistory = useCallback(
+    (query: string) => {
+      setHistory((prev) => {
+        const next = prev.filter((s) => s !== query);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    },
+    [storageKey],
+  );
 
   return { history, addToHistory, removeFromHistory };
 }

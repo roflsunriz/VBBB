@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { detectImageUrls, isImageUrl, parseExtPreviewIni, clearExtPreviewCache } from '../../src/main/services/image-preview';
+import {
+  detectImageUrls,
+  isImageUrl,
+  parseExtPreviewIni,
+  clearExtPreviewCache,
+} from '../../src/main/services/image-preview';
 
 beforeEach(() => {
   clearExtPreviewCache();

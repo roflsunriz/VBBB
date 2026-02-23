@@ -5,12 +5,7 @@
 import DOMPurify from 'dompurify';
 
 /** Dangerous URL schemes to reject */
-const DANGEROUS_SCHEMES = new Set([
-  'javascript:',
-  'vbscript:',
-  'data:',
-  'blob:',
-]);
+const DANGEROUS_SCHEMES = new Set(['javascript:', 'vbscript:', 'data:', 'blob:']);
 
 /**
  * Check if a URL is safe (not a dangerous scheme).
@@ -26,7 +21,8 @@ export function isSafeUrl(url: string): boolean {
 }
 
 /** Tags that must never appear in sanitized output */
-const STRIP_TAG_PATTERN = /<\/?(script|iframe|object|embed|form|input|style|applet|meta|link|base)[^>]*>/gi;
+const STRIP_TAG_PATTERN =
+  /<\/?(script|iframe|object|embed|form|input|style|applet|meta|link|base)[^>]*>/gi;
 
 /** Dangerous URL patterns in attributes */
 const DANGEROUS_HREF_PATTERN = /\s(href|src)\s*=\s*["']?\s*(javascript|vbscript|data):/gi;

@@ -25,9 +25,5 @@
       "@shared/*": ["./src/types/*"]
     }
   },
-  "include": [
-    "src/renderer/**/*.ts",
-    "src/renderer/**/*.tsx",
-    "src/types/**/*.ts"
-  ]
+  "include": ["src/renderer/**/*.ts", "src/renderer/**/*.tsx", "src/types/**/*.ts"]
 }

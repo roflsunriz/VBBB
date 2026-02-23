@@ -3,12 +3,24 @@
  */
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { type Board, BoardType, DatFetchStatus, type DatFetchResult, type Res } from '@shared/domain';
+import {
+  type Board,
+  BoardType,
+  DatFetchStatus,
+  type DatFetchResult,
+  type Res,
+} from '@shared/domain';
 import { DAT_ADJUST_MARGIN } from '@shared/file-format';
 import { createLogger } from '../logger';
 import { applyDatReplace, loadReplaceRules } from './dat-replace';
 import { decodeBuffer } from './encoding';
-import { atomicAppendFile, atomicWriteFile, getBoardDir, readFileLastBytes, readFileSafe } from './file-io';
+import {
+  atomicAppendFile,
+  atomicWriteFile,
+  getBoardDir,
+  readFileLastBytes,
+  readFileSafe,
+} from './file-io';
 import { httpFetch } from './http-client';
 import { getUpliftSid } from './uplift-auth';
 
@@ -177,14 +189,19 @@ function getKakoUrls(board: Board, threadId: string): string[] {
 /**
  * Fetch DAT with differential support.
  */
-export async function fetchDat(board: Board, threadId: string, dataDir: string): Promise<DatFetchResult> {
+export async function fetchDat(
+  board: Board,
+  threadId: string,
+  dataDir: string,
+): Promise<DatFetchResult> {
   const boardDir = getBoardDir(dataDir, board.url);
   const localPath = join(boardDir, `${threadId}.dat`);
   const datUrl = getDatUrl(board, threadId);
 
-  const encoding = (board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS)
-    ? 'Shift_JIS'
-    : 'EUC-JP';
+  const encoding =
+    board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
+      ? 'Shift_JIS'
+      : 'EUC-JP';
   const localExists = existsSync(localPath);
   let localSize = 0;
   if (localExists) {
@@ -204,16 +221,14 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
     });
 
     // Load replacement rules
-  const replaceRules = loadReplaceRules(dataDir);
+    const replaceRules = loadReplaceRules(dataDir);
 
-  if (response.status === 206) {
+    if (response.status === 206) {
       // Differential response — verify 16-byte overlap
       const localTail = readFileLastBytes(localPath, DAT_ADJUST_MARGIN);
       if (localTail !== null) {
         // Strip CR from local tail for comparison
-        const cleanLocalTail = Buffer.from(
-          Array.from(localTail).filter((b) => b !== 0x0d),
-        );
+        const cleanLocalTail = Buffer.from(Array.from(localTail).filter((b) => b !== 0x0d));
         const responseFront = response.body.subarray(0, cleanLocalTail.length);
 
         if (cleanLocalTail.equals(responseFront)) {
@@ -225,7 +240,13 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
 
           const fullContent = readFileSafe(localPath);
           if (fullContent === null) {
-            return { status: DatFetchStatus.Error, responses: [], lastModified: null, size: 0, errorMessage: 'Failed to read merged DAT' };
+            return {
+              status: DatFetchStatus.Error,
+              responses: [],
+              lastModified: null,
+              size: 0,
+              errorMessage: 'Failed to read merged DAT',
+            };
           }
           const text = applyDatReplace(decodeBuffer(fullContent, encoding), replaceRules);
           return {
@@ -284,13 +305,18 @@ export async function fetchDat(board: Board, threadId: string, dataDir: string):
   return fetchDatFull(board, threadId, dataDir);
 }
 
-async function fetchDatFull(board: Board, threadId: string, dataDir: string): Promise<DatFetchResult> {
+async function fetchDatFull(
+  board: Board,
+  threadId: string,
+  dataDir: string,
+): Promise<DatFetchResult> {
   const boardDir = getBoardDir(dataDir, board.url);
   const localPath = join(boardDir, `${threadId}.dat`);
   const datUrl = getDatUrl(board, threadId);
-  const encoding = (board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS)
-    ? 'Shift_JIS'
-    : 'EUC-JP';
+  const encoding =
+    board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
+      ? 'Shift_JIS'
+      : 'EUC-JP';
   const replaceRules = loadReplaceRules(dataDir);
 
   const response = await httpFetch({

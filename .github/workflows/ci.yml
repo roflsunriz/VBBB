@@ -17,9 +17,9 @@ jobs:
       fail-fast: true
       matrix:
         check:
-          - { script: lint,       name: Lint }
+          - { script: lint, name: Lint }
           - { script: type-check, name: Type Check }
-          - { script: test,       name: Unit Tests }
+          - { script: test, name: Unit Tests }
     steps:
       - uses: actions/checkout@v4
 

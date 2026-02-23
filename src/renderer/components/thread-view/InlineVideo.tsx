@@ -36,15 +36,12 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
   }, [url, originalUrl]);
 
-  const videoRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      videoElRef.current = el;
-      if (el) {
-        el.volume = INITIAL_VOLUME;
-      }
-    },
-    [],
-  );
+  const videoRef = useCallback((el: HTMLVideoElement | null) => {
+    videoElRef.current = el;
+    if (el) {
+      el.volume = INITIAL_VOLUME;
+    }
+  }, []);
 
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);
@@ -64,7 +61,14 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
   }
 
   return (
-    <span ref={ref} className="my-1 inline-block" style={{ minWidth: `${String(VIDEO_MAX_WIDTH)}px`, minHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}>
+    <span
+      ref={ref}
+      className="my-1 inline-block"
+      style={{
+        minWidth: `${String(VIDEO_MAX_WIDTH)}px`,
+        minHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
+      }}
+    >
       {isVisible ? (
         <video
           ref={videoRef}
@@ -76,7 +80,10 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
           onError={handleError}
           onKeyDown={handleVideoKeyDown}
           className="rounded border border-[var(--color-border-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
-          style={{ maxWidth: `${String(VIDEO_MAX_WIDTH)}px`, maxHeight: `${String(VIDEO_MAX_HEIGHT)}px` }}
+          style={{
+            maxWidth: `${String(VIDEO_MAX_WIDTH)}px`,
+            maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
+          }}
         />
       ) : (
         <MediaPlaceholder width={VIDEO_MAX_WIDTH} height={VIDEO_MAX_HEIGHT} mediaType="video" />
