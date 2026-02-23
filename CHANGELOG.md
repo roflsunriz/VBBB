@@ -5,6 +5,29 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-02-23
+
+### Added
+
+- スレッド新規作成機能を実装（Slevo の ThreadCreatePostDialogExecutor を参考に移植）
+  - スレッド一覧ヘッダーの「✏️+」ボタンから `NewThreadEditor` パネルを開いて板にスレッドを立てられる
+  - タイトル（subject）・名前・メール・本文を入力して Ctrl+Enter または「スレッドを立てる」ボタンで送信
+  - 作成成功後はスレッド一覧を自動リフレッシュし、新スレを自動で開く
+- 次スレ自動移動機能を実装（5ch 閲覧ソフト標準的なシリーズ番号インクリメント方式）
+  - スレッドが 950 レス以上でツールバーに「次スレ」ボタンが出現（手動検索）
+  - スレッドが 1000 レス到達時に自動検索が走り、コンテンツ上部にバナーを表示
+  - 次スレ検出アルゴリズム: タイトル最右端の数字を +1 してプレフィックス類似度で照合
+  - 次スレが見つかった場合は「開く」ボタンでワンクリック移動、見つからない場合は「再検索」可能
+- スレッドタブ間の前後移動機能を追加（Slevo の SwitchToNextTab / SwitchToPreviousTab に相当）
+  - ThreadView のアクションバーに「‹」「›」ボタンを追加
+  - `Alt+[` / `Alt+]` キーボードショートカットで前後のスレッドタブへ移動
+
+### Changed
+
+- `PostParams` 型に `subject?: string` フィールドを追加（新規スレッド作成時のスレッドタイトル）
+- `PostParamsSchema` (Zod) を拡張し、`threadId` 空文字列時に `subject` を必須バリデーション
+- `buildPostBody()` を新規スレッド作成モード対応に修正（`key` 省略・`subject` 追加・submit 文字列切替）
+
 ## [1.3.1] - 2026-02-22
 
 ### Added
