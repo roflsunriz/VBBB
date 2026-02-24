@@ -6,13 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # -----------------------------------------------------------------------
   # Quality checks: lint / type-check / test run in parallel (matrix)
   # -----------------------------------------------------------------------
   quality:
     name: ${{ matrix.check.name }}
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
@@ -22,14 +26,12 @@ jobs:
           - { script: test, name: Unit Tests }
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
 
       - name: Cache bun store
         uses: actions/cache@v4
@@ -53,14 +55,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
 
       - name: Cache bun store
         uses: actions/cache@v4
