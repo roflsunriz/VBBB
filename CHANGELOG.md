@@ -5,6 +5,22 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-25
+
+### Added
+
+- `+N` 返信ポップアップの返信ツリー自動展開機能を実装
+  - BFS（幅優先探索）で返信の連鎖（デイジーチェーン）や分岐を再帰的に収集し、1つのポップアップ内にフラット表示
+  - 深さ1のみの制限を撤廃し、任意の深さの返信ツリーに対応（最大10件表示、超過時は「他にも返信があります」を表示）
+- ポップアップ内の `>>N` アンカーリンクをクリッカブルに変換し、ホバーでネストされた子ポップアップを表示（最大深さ10段）
+- ポップアップ内の外部URLクリックでブラウザで開く機能を追加
+- CountBadge・ResItem コンポーネントにホバーインタラクション機能を追加
+- スレッド内検索機能を追加
+
+### Changed
+
+- CI/リリースワークフローの実行環境を Ubuntu に変更
+
 ## [1.5.0] - 2026-02-23
 
 ### Added
@@ -163,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.6.0]: https://github.com/roflsunriz/VBBB/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/roflsunriz/VBBB/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/roflsunriz/VBBB/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/roflsunriz/VBBB/compare/v1.3.0...v1.3.1
