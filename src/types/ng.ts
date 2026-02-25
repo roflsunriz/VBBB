@@ -134,6 +134,18 @@ export interface NgTimeCondition {
 }
 
 // ---------------------------------------------------------------------------
+// Matching context
+// ---------------------------------------------------------------------------
+
+export interface NgMatchContext {
+  readonly extractedFields: Record<NgStringField, string>;
+  readonly numericValues: Record<string, number>;
+  readonly parsedDate: Date | null;
+  /** Optional rule ID for log messages (e.g. invalid regex) */
+  readonly ruleId?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Unified rule
 // ---------------------------------------------------------------------------
 

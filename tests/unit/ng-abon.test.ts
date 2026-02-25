@@ -8,7 +8,17 @@ import {
   matchesThreadNgRule,
   matchesBoardNgRule,
   legacyRuleToNew,
+  matchStringCondition,
+  matchNumericCondition,
+  matchTimeCondition,
 } from '../../src/main/services/ng-abon';
+import {
+  extractStringFields,
+  parseDateTimeField,
+  countAnchors,
+  buildIdCountMap,
+  buildRepliedCountMap,
+} from '../../src/types/ng-field-extractor';
 import type { Res } from '../../src/types/domain';
 import type { NgRule } from '../../src/types/ng';
 import {
@@ -18,6 +28,9 @@ import {
   NgTarget,
   NgStringField,
   NgStringMatchMode,
+  NgNumericTarget,
+  NgNumericOp,
+  NgTimeTarget,
 } from '../../src/types/ng';
 
 const makeRes = (overrides: Partial<Res> = {}): Res => ({
@@ -495,5 +508,351 @@ describe('matchesBoardNgRule', () => {
       condition: { tokens: ['テスト'] },
     });
     expect(matchesBoardNgRule(rule, 'テスト板', 'test')).toBe(false);
+  });
+});
+
+// ───────────── Phase 2: Field extraction ─────────────
+
+describe('ng-field-extractor', () => {
+  it('extracts ID from dateTime', () => {
+    const res = makeRes({ dateTime: '2024/01/15(月) 12:34:56 ID:AbCdEfGh0' });
+    const fields = extractStringFields(res, '');
+    expect(fields.id).toBe('AbCdEfGh0');
+  });
+
+  it('extracts trip from name', () => {
+    const res = makeRes({ name: '名無しさん◆abc123' });
+    const fields = extractStringFields(res, '');
+    expect(fields.trip).toBe('abc123');
+  });
+
+  it('extracts watchoi from name', () => {
+    const res = makeRes({ name: '名無しさん (ﾜｯﾁｮｲ ABCD-1234)' });
+    const fields = extractStringFields(res, '');
+    expect(fields.watchoi).toContain('ﾜｯﾁｮｲ');
+  });
+
+  it('extracts IP from name or dateTime', () => {
+    const res = makeRes({
+      dateTime: '2024/01/15(月) 12:34:56 [192.168.1.1]',
+      name: '名無し',
+    });
+    const fields = extractStringFields(res, '');
+    expect(fields.ip).toBe('192.168.1.1');
+  });
+
+  it('extracts BE from dateTime', () => {
+    const res = makeRes({ dateTime: '2024/01/15(月) 12:34:56 BE:12345-67' });
+    const fields = extractStringFields(res, '');
+    expect(fields.be).toBe('12345-67');
+  });
+
+  it('extracts URLs from body', () => {
+    const res = makeRes({
+      body: 'see https://example.com/page and http://test.co.jp/path',
+    });
+    const fields = extractStringFields(res, '');
+    expect(fields.url).toContain('https://example.com/page');
+    expect(fields.url).toContain('http://test.co.jp/path');
+  });
+
+  it('parseDateTimeField parses 5ch format', () => {
+    const d = parseDateTimeField('2024/01/15(月) 12:34:56.78');
+    expect(d).not.toBeNull();
+    expect(d?.getFullYear()).toBe(2024);
+    expect(d?.getMonth()).toBe(0);
+    expect(d?.getDate()).toBe(15);
+    expect(d?.getHours()).toBe(12);
+    expect(d?.getMinutes()).toBe(34);
+    expect(d?.getSeconds()).toBe(56);
+  });
+
+  it('countAnchors counts >>N patterns', () => {
+    expect(countAnchors('>>123 >>456 >>123')).toBe(3);
+    expect(countAnchors('no anchors')).toBe(0);
+  });
+
+  it('buildIdCountMap counts posts per ID', () => {
+    const responses: Res[] = [
+      makeRes({ number: 1, dateTime: '2024/01/15(月) 12:00:00 ID:same' }),
+      makeRes({ number: 2, dateTime: '2024/01/15(月) 12:01:00 ID:same' }),
+      makeRes({ number: 3, dateTime: '2024/01/15(月) 12:02:00 ID:other' }),
+    ];
+    const map = buildIdCountMap(responses);
+    expect(map.get('same')).toBe(2);
+    expect(map.get('other')).toBe(1);
+  });
+
+  it('buildRepliedCountMap counts replies per res', () => {
+    const responses: Res[] = [
+      makeRes({ number: 1, body: 'test' }),
+      makeRes({ number: 2, body: '>>1 >>3' }),
+      makeRes({ number: 3, body: '>>1' }),
+    ];
+    const map = buildRepliedCountMap(responses);
+    expect(map.get(1)).toBe(2);
+    expect(map.get(3)).toBe(1);
+    expect(map.get(2)).toBeUndefined();
+  });
+});
+
+// ───────────── Phase 2: Numeric matching ─────────────
+
+describe('matchNumericCondition', () => {
+  const makeNumericRule = (op: string, value: number, value2?: number, negate = false): NgRule => ({
+    id: 'num-rule',
+    condition: {
+      type: 'numeric',
+      target: NgNumericTarget.ResNumber,
+      op: op as 'eq' | 'gte' | 'lte' | 'lt' | 'gt' | 'between',
+      value,
+      value2,
+      negate,
+    },
+    target: NgTarget.Response,
+    abonType: AbonType.Normal,
+    enabled: true,
+  });
+
+  it('matches eq', () => {
+    expect(
+      matchNumericCondition(
+        makeNumericRule('eq', 10).condition as Parameters<typeof matchNumericCondition>[0],
+        { resNumber: 10 },
+      ),
+    ).toBe(true);
+    expect(
+      matchNumericCondition(
+        makeNumericRule('eq', 10).condition as Parameters<typeof matchNumericCondition>[0],
+        { resNumber: 9 },
+      ),
+    ).toBe(false);
+  });
+
+  it('matches gte, lte, lt, gt', () => {
+    const vals = { resNumber: 50 };
+    expect(
+      matchNumericCondition(
+        makeNumericRule('gte', 50).condition as Parameters<typeof matchNumericCondition>[0],
+        vals,
+      ),
+    ).toBe(true);
+    expect(
+      matchNumericCondition(
+        makeNumericRule('lte', 50).condition as Parameters<typeof matchNumericCondition>[0],
+        vals,
+      ),
+    ).toBe(true);
+    expect(
+      matchNumericCondition(
+        makeNumericRule('lt', 50).condition as Parameters<typeof matchNumericCondition>[0],
+        vals,
+      ),
+    ).toBe(false);
+    expect(
+      matchNumericCondition(
+        makeNumericRule('gt', 49).condition as Parameters<typeof matchNumericCondition>[0],
+        vals,
+      ),
+    ).toBe(true);
+  });
+
+  it('matches between', () => {
+    const cond = makeNumericRule('between', 10, 20).condition as Parameters<
+      typeof matchNumericCondition
+    >[0];
+    expect(matchNumericCondition(cond, { resNumber: 15 })).toBe(true);
+    expect(matchNumericCondition(cond, { resNumber: 5 })).toBe(false);
+    expect(matchNumericCondition(cond, { resNumber: 25 })).toBe(false);
+  });
+
+  it('respects negate', () => {
+    const cond = makeNumericRule('eq', 10, undefined, true).condition as Parameters<
+      typeof matchNumericCondition
+    >[0];
+    expect(matchNumericCondition(cond, { resNumber: 10 })).toBe(false);
+    expect(matchNumericCondition(cond, { resNumber: 9 })).toBe(true);
+  });
+});
+
+// ───────────── Phase 2: Time matching ─────────────
+
+describe('matchTimeCondition', () => {
+  it('matches weekday (0=Sun, 1=Mon, ..., 6=Sat)', () => {
+    const cond = {
+      type: 'time' as const,
+      target: NgTimeTarget.Weekday,
+      value: { days: [1, 3, 5] },
+      negate: false,
+    };
+    const mon = new Date(2024, 0, 15); // Monday (1)
+    const tue = new Date(2024, 0, 16); // Tuesday (2)
+    expect(matchTimeCondition(cond, mon)).toBe(true);
+    expect(matchTimeCondition(cond, tue)).toBe(false);
+  });
+
+  it('matches hour range', () => {
+    const cond = {
+      type: 'time' as const,
+      target: NgTimeTarget.Hour,
+      value: { from: 9, to: 17 },
+      negate: false,
+    };
+    const noon = new Date(2024, 0, 15, 12, 0, 0);
+    const night = new Date(2024, 0, 15, 22, 0, 0);
+    expect(matchTimeCondition(cond, noon)).toBe(true);
+    expect(matchTimeCondition(cond, night)).toBe(false);
+  });
+
+  it('matches relativeTime (within minutes)', () => {
+    const cond = {
+      type: 'time' as const,
+      target: NgTimeTarget.RelativeTime,
+      value: { withinMinutes: 10 },
+      negate: false,
+    };
+    const recent = new Date(Date.now() - 5 * 60 * 1000);
+    const old = new Date(Date.now() - 20 * 60 * 1000);
+    expect(matchTimeCondition(cond, recent)).toBe(true);
+    expect(matchTimeCondition(cond, old)).toBe(false);
+  });
+
+  it('matches datetime range', () => {
+    const cond = {
+      type: 'time' as const,
+      target: NgTimeTarget.Datetime,
+      value: { from: '2024-01-15T00:00:00Z', to: '2024-01-15T23:59:59Z' },
+      negate: false,
+    };
+    const mid = new Date('2024-01-15T12:00:00Z');
+    const out = new Date('2024-01-16T00:00:00Z');
+    expect(matchTimeCondition(cond, mid)).toBe(true);
+    expect(matchTimeCondition(cond, out)).toBe(false);
+  });
+
+  it('respects negate for time', () => {
+    const cond = {
+      type: 'time' as const,
+      target: NgTimeTarget.Weekday,
+      value: { days: [1] },
+      negate: true,
+    };
+    const mon = new Date(2024, 0, 15);
+    expect(matchTimeCondition(cond, mon)).toBe(false);
+    const tue = new Date(2024, 0, 16);
+    expect(matchTimeCondition(cond, tue)).toBe(true);
+  });
+});
+
+// ───────────── Phase 2: Fuzzy matching ─────────────
+
+describe('matchStringCondition fuzzy', () => {
+  it('fuzzy matches when chars appear in order', () => {
+    const cond = {
+      type: 'string' as const,
+      matchMode: 'fuzzy' as const,
+      fields: [NgStringField.Body] as const,
+      tokens: ['abc'],
+      negate: false,
+    };
+    const fields = extractStringFields(makeRes({ body: 'a x b x c' }), '');
+    expect(matchStringCondition(cond, fields)).toBe(true);
+  });
+
+  it('fuzzy fails when chars not in order', () => {
+    const cond = {
+      type: 'string' as const,
+      matchMode: 'fuzzy' as const,
+      fields: [NgStringField.Body] as const,
+      tokens: ['cab'],
+      negate: false,
+    };
+    const fields = extractStringFields(makeRes({ body: 'abc' }), '');
+    expect(matchStringCondition(cond, fields)).toBe(false);
+  });
+});
+
+// ───────────── Phase 2: Full matchesNgRule with numeric/time ─────────────
+
+describe('matchesNgRule numeric and time', () => {
+  it('matches numeric resNumber rule', () => {
+    const rule: NgRule = {
+      id: 'n1',
+      condition: {
+        type: 'numeric',
+        target: NgNumericTarget.ResNumber,
+        op: NgNumericOp.Gte,
+        value: 5,
+        negate: false,
+      },
+      target: NgTarget.Response,
+      abonType: AbonType.Normal,
+      enabled: true,
+    };
+    const res = makeRes({ number: 10 });
+    expect(
+      matchesNgRule(rule, res, 'board', 'thread', {
+        responses: [res],
+        threadTitle: '',
+      }),
+    ).toBe(true);
+  });
+
+  it('matches idCount with aggregation map', () => {
+    const responses: Res[] = [
+      makeRes({ number: 1, dateTime: '2024/01/15(月) 12:00:00 ID:spammer' }),
+      makeRes({ number: 2, dateTime: '2024/01/15(月) 12:01:00 ID:spammer' }),
+      makeRes({ number: 3, dateTime: '2024/01/15(月) 12:02:00 ID:spammer' }),
+    ];
+    const rule: NgRule = {
+      id: 'idc',
+      condition: {
+        type: 'numeric',
+        target: NgNumericTarget.IdCount,
+        op: NgNumericOp.Gte,
+        value: 3,
+        negate: false,
+      },
+      target: NgTarget.Response,
+      abonType: AbonType.Normal,
+      enabled: true,
+    };
+    const res0 = responses[0];
+    if (res0 === undefined) throw new Error('test setup');
+    expect(
+      matchesNgRule(rule, res0, 'board', 'thread', {
+        responses,
+        threadTitle: '',
+      }),
+    ).toBe(true);
+  });
+
+  it('matches repliedCount with aggregation map', () => {
+    const responses: Res[] = [
+      makeRes({ number: 1, body: 'first' }),
+      makeRes({ number: 2, body: '>>1' }),
+      makeRes({ number: 3, body: '>>1 >>1' }),
+    ];
+    const rule: NgRule = {
+      id: 'rep',
+      condition: {
+        type: 'numeric',
+        target: NgNumericTarget.RepliedCount,
+        op: NgNumericOp.Gte,
+        value: 2,
+        negate: false,
+      },
+      target: NgTarget.Response,
+      abonType: AbonType.Normal,
+      enabled: true,
+    };
+    const res0 = responses[0];
+    if (res0 === undefined) throw new Error('test setup');
+    expect(
+      matchesNgRule(rule, res0, 'board', 'thread', {
+        responses,
+        threadTitle: '',
+      }),
+    ).toBe(true);
   });
 });

@@ -30,12 +30,19 @@ import type { FavItem, FavNode } from '@shared/favorite';
 import {
   type NgRule,
   type NgFilterResult,
+  type NgMatchContext,
   AbonType,
   NgTarget,
-  NgStringField,
-  NgStringMatchMode,
   NgFilterResult as NgFilterResultEnum,
 } from '@shared/ng';
+import {
+  extractStringFields,
+  parseDateTimeField,
+  buildIdCountMap,
+  buildRepliedCountMap,
+  buildNumericValuesForRes,
+} from '@shared/ng-field-extractor';
+import { matchNgCondition } from '@shared/ng-matcher';
 import type { PostHistoryEntry } from '@shared/post-history';
 import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
@@ -178,43 +185,12 @@ interface PopupState {
   readonly expandReplies: boolean;
 }
 
-/**
- * Get text to match for a string condition (field-specific or full).
- */
-function getTextToMatchForRes(
-  cond: { readonly fields: readonly string[]; readonly tokens: readonly string[] },
-  res: Res,
-): string {
-  if (
-    cond.fields.length === 0 ||
-    cond.fields.includes('all') ||
-    cond.fields.includes(NgStringField.All)
-  ) {
-    return `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
-  }
-  const parts: string[] = [];
-  for (const f of cond.fields) {
-    switch (f) {
-      case NgStringField.Name:
-        parts.push(res.name);
-        break;
-      case NgStringField.Body:
-        parts.push(res.body);
-        break;
-      case NgStringField.Mail:
-        parts.push(res.mail);
-        break;
-      case NgStringField.Id:
-        parts.push(res.id ?? '');
-        break;
-      case NgStringField.ThreadTitle:
-        parts.push(res.title ?? '');
-        break;
-      default:
-        parts.push(`${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`);
-    }
-  }
-  return parts.join('\t');
+/** Context for applyNgFilter with precomputed aggregation maps */
+interface ApplyNgFilterContext {
+  readonly threadTitle: string;
+  readonly idCountMap: ReadonlyMap<string, number>;
+  readonly repliedCountMap: ReadonlyMap<number, number>;
+  readonly threadResCount: number;
 }
 
 /**
@@ -225,49 +201,35 @@ function applyNgFilter(
   res: Res,
   boardId: string,
   threadId: string,
+  context: ApplyNgFilterContext,
 ): NgFilterResult {
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (rule.target !== NgTarget.Response) continue; // Only response-level rules apply to res
+    if (rule.target !== NgTarget.Response) continue;
     if (rule.boardId !== undefined && rule.boardId !== boardId) continue;
     if (rule.threadId !== undefined && rule.threadId !== threadId) continue;
 
-    if (rule.condition.type === 'numeric' || rule.condition.type === 'time') {
-      continue; // Phase 2
-    }
+    const extractedFields = extractStringFields(res, context.threadTitle);
+    const numericValues = buildNumericValuesForRes(
+      res,
+      context.idCountMap,
+      context.repliedCountMap,
+      context.threadResCount,
+      0,
+    );
+    const parsedDate = parseDateTimeField(res.dateTime);
 
-    const cond = rule.condition;
-    const text = getTextToMatchForRes(cond, res);
+    const matchContext: NgMatchContext = {
+      extractedFields,
+      numericValues,
+      parsedDate,
+      ruleId: rule.id,
+    };
 
-    if (
-      cond.matchMode === NgStringMatchMode.Regexp ||
-      cond.matchMode === NgStringMatchMode.RegexpNoCase
-    ) {
-      const pattern = cond.tokens[0];
-      if (pattern === undefined) continue;
-      try {
-        const regex = new RegExp(
-          pattern,
-          cond.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
-        );
-        const matches = regex.test(text);
-        const result = cond.negate ? !matches : matches;
-        if (result) {
-          return rule.abonType === AbonType.Transparent
-            ? NgFilterResultEnum.TransparentAbon
-            : NgFilterResultEnum.NormalAbon;
-        }
-      } catch {
-        continue;
-      }
-    } else {
-      const matches = cond.tokens.every((token) => text.includes(token));
-      const result = cond.negate ? !matches : matches;
-      if (result) {
-        return rule.abonType === AbonType.Transparent
-          ? NgFilterResultEnum.TransparentAbon
-          : NgFilterResultEnum.NormalAbon;
-      }
+    if (matchNgCondition(rule.condition, matchContext)) {
+      return rule.abonType === AbonType.Transparent
+        ? NgFilterResultEnum.TransparentAbon
+        : NgFilterResultEnum.NormalAbon;
     }
   }
   return NgFilterResultEnum.None;
@@ -1660,9 +1622,18 @@ export function ThreadView(): React.JSX.Element {
   const ngResults = useMemo(() => {
     if (activeTab === undefined || ngRules.length === 0) return new Map<number, NgFilterResult>();
     const boardId = extractBoardId(activeTab.boardUrl);
+    const threadTitle = activeTab.responses[0]?.title ?? activeTab.title ?? '';
+    const idCountMap = buildIdCountMap(activeTab.responses);
+    const repliedCountMap = buildRepliedCountMap(activeTab.responses);
+    const context: ApplyNgFilterContext = {
+      threadTitle,
+      idCountMap,
+      repliedCountMap,
+      threadResCount: activeTab.responses.length,
+    };
     const results = new Map<number, NgFilterResult>();
     for (const res of activeTab.responses) {
-      const result = applyNgFilter(ngRules, res, boardId, activeTab.threadId);
+      const result = applyNgFilter(ngRules, res, boardId, activeTab.threadId, context);
       if (result !== NgFilterResultEnum.None) {
         results.set(res.number, result);
       }

@@ -12,6 +12,7 @@ import {
   type NgRule,
   type NgLegacyRule,
   type NgStringCondition,
+  type NgMatchContext,
   AbonType,
   NgMatchMode,
   NgTarget,
@@ -19,6 +20,22 @@ import {
   NgStringMatchMode,
   NgFilterResult as NgFilterResultEnum,
 } from '@shared/ng';
+import {
+  extractStringFields,
+  parseDateTimeField,
+  buildIdCountMap,
+  buildRepliedCountMap,
+  buildNumericValuesForRes,
+} from '@shared/ng-field-extractor';
+import { matchNgCondition, matchStringCondition } from '@shared/ng-matcher';
+
+// Re-export for tests
+export {
+  matchStringCondition,
+  matchNumericCondition,
+  matchTimeCondition,
+  matchNgCondition,
+} from '@shared/ng-matcher';
 import { NgRulesFileSchema } from '@shared/zod-schemas';
 import { readFileSafe, atomicWriteFile, ensureDir } from './file-io';
 import { createLogger } from '../logger';
@@ -211,85 +228,43 @@ export function serializeNgRules(rules: readonly NgRule[]): string {
   return lines.join('\n');
 }
 
-/**
- * Match string condition tokens against a text string.
- */
+/** Legacy: match string condition against raw text (for thread/board rules) */
 function matchStringConditionAgainstText(
   cond: NgStringCondition,
   ruleId: string,
   text: string,
 ): boolean {
-  if (
-    cond.matchMode === NgStringMatchMode.Regexp ||
-    cond.matchMode === NgStringMatchMode.RegexpNoCase
-  ) {
-    const pattern = cond.tokens[0];
-    if (pattern === undefined) return false;
-    try {
-      const regex = new RegExp(
-        pattern,
-        cond.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
-      );
-      const matches = regex.test(text);
-      return cond.negate ? !matches : matches;
-    } catch {
-      logger.warn(`Invalid regex pattern in NG rule ${ruleId}: ${pattern}`);
-      return false;
-    }
-  }
-  if (cond.matchMode === NgStringMatchMode.Fuzzy) {
-    // Phase 2: fuzzy matching - for now treat as plain
-    const matches = cond.tokens.every((token) => text.includes(token));
-    return cond.negate ? !matches : matches;
-  }
-  // Plain
-  const matches = cond.tokens.every((token) => text.includes(token));
-  return cond.negate ? !matches : matches;
+  const fakeFields: Record<NgStringField, string> = {
+    [NgStringField.Name]: '',
+    [NgStringField.Body]: '',
+    [NgStringField.Mail]: '',
+    [NgStringField.Id]: '',
+    [NgStringField.Trip]: '',
+    [NgStringField.Watchoi]: '',
+    [NgStringField.Ip]: '',
+    [NgStringField.Be]: '',
+    [NgStringField.Url]: '',
+    [NgStringField.ThreadTitle]: '',
+    [NgStringField.All]: text,
+  };
+  return matchStringCondition(cond, fakeFields, ruleId);
 }
 
-/**
- * Extract text for the given field from a Res.
- */
-function getResFieldText(res: Res, field: NgStringField): string {
-  switch (field) {
-    case NgStringField.Name:
-      return res.name;
-    case NgStringField.Body:
-      return res.body;
-    case NgStringField.Mail:
-      return res.mail;
-    case NgStringField.Id:
-      return res.id ?? '';
-    case NgStringField.ThreadTitle:
-      return res.title ?? '';
-    case NgStringField.All:
-      return `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
-    default:
-      // trip, watchoi, ip, be, url - Phase 2: extract from dateTime/body
-      return `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
-  }
-}
-
-/**
- * Get the text to match against for a string condition.
- * If fields is empty or contains 'all', use full combined text.
- */
-function getTextToMatch(cond: NgStringCondition, res: Res): string {
-  if (cond.fields.length === 0 || cond.fields.includes(NgStringField.All)) {
-    return `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
-  }
-  return cond.fields.map((f) => getResFieldText(res, f)).join('\t');
+/** Options for applyNgRules with precomputed thread context */
+export interface ApplyNgRulesOptions {
+  readonly responses?: readonly Res[];
+  readonly threadTitle?: string;
 }
 
 /**
  * Check if a response matches an NG rule.
- * Matching is against the full DAT line (name + mail + dateTime + body) for string conditions.
  */
 export function matchesNgRule(
   rule: NgRule,
   res: Res,
   currentBoardId: string,
   currentThreadId: string,
+  options?: ApplyNgRulesOptions,
 ): boolean {
   // Only apply response-level rules (default target)
   if (rule.target !== NgTarget.Response) return false;
@@ -304,12 +279,30 @@ export function matchesNgRule(
     return false;
   }
 
-  if (rule.condition.type === 'string') {
-    const text = getTextToMatch(rule.condition, res);
-    return matchStringConditionAgainstText(rule.condition, rule.id, text);
-  }
-  // Numeric and time conditions: Phase 2
-  return false;
+  const threadTitle = options?.threadTitle ?? res.title ?? '';
+  const responses = options?.responses ?? [res];
+  const idCountMap = buildIdCountMap(responses);
+  const repliedCountMap = buildRepliedCountMap(responses);
+  const threadResCount = responses.length;
+  const threadMomentum = 0; // TODO: compute from thread metadata if available
+
+  const extractedFields = extractStringFields(res, threadTitle);
+  const numericValues = buildNumericValuesForRes(
+    res,
+    idCountMap,
+    repliedCountMap,
+    threadResCount,
+    threadMomentum,
+  );
+  const parsedDate = parseDateTimeField(res.dateTime);
+
+  const context: NgMatchContext = {
+    extractedFields,
+    numericValues,
+    parsedDate,
+    ruleId: rule.id,
+  };
+  return matchNgCondition(rule.condition, context);
 }
 
 /**
@@ -349,16 +342,18 @@ export function matchesBoardNgRule(rule: NgRule, boardName: string, boardId: str
 
 /**
  * Apply all NG rules to a response and return the filter result.
+ * Pass options with responses and threadTitle for proper idCount/repliedCount/threadResCount.
  */
 export function applyNgRules(
   rules: readonly NgRule[],
   res: Res,
   boardId: string,
   threadId: string,
+  options?: ApplyNgRulesOptions,
 ): NgFilterResult {
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (matchesNgRule(rule, res, boardId, threadId)) {
+    if (matchesNgRule(rule, res, boardId, threadId, options)) {
       return rule.abonType === AbonType.Transparent
         ? NgFilterResultEnum.TransparentAbon
         : NgFilterResultEnum.NormalAbon;
