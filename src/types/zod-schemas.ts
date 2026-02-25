@@ -114,3 +114,81 @@ export const BoardUrlSchema = z
     },
     { message: 'Board URL must end with /' },
   );
+
+// ---------------------------------------------------------------------------
+// NG rules JSON schema
+// ---------------------------------------------------------------------------
+
+const NgStringConditionSchema = z.object({
+  type: z.literal('string'),
+  matchMode: z.enum(['plain', 'regexp', 'regexp_nocase', 'fuzzy']),
+  fields: z.array(
+    z.enum([
+      'name',
+      'body',
+      'mail',
+      'id',
+      'trip',
+      'watchoi',
+      'ip',
+      'be',
+      'url',
+      'threadTitle',
+      'all',
+    ]),
+  ),
+  tokens: z.array(z.string()),
+  negate: z.boolean(),
+});
+
+const NgNumericConditionSchema = z.object({
+  type: z.literal('numeric'),
+  target: z.enum([
+    'resNumber',
+    'lineCount',
+    'charCount',
+    'idCount',
+    'replyCount',
+    'repliedCount',
+    'threadMomentum',
+    'threadResCount',
+  ]),
+  op: z.enum(['eq', 'gte', 'lte', 'lt', 'gt', 'between']),
+  value: z.number(),
+  value2: z.number().optional(),
+  negate: z.boolean(),
+});
+
+const NgTimeConditionSchema = z.object({
+  type: z.literal('time'),
+  target: z.enum(['weekday', 'hour', 'relativeTime', 'datetime']),
+  value: z.union([
+    z.object({ days: z.array(z.number()) }),
+    z.object({ from: z.number(), to: z.number() }),
+    z.object({ withinMinutes: z.number() }),
+    z.object({ from: z.string(), to: z.string() }),
+  ]),
+  negate: z.boolean(),
+});
+
+const NgConditionSchema = z.discriminatedUnion('type', [
+  NgStringConditionSchema,
+  NgNumericConditionSchema,
+  NgTimeConditionSchema,
+]);
+
+export const NgRuleSchema = z.object({
+  id: z.string(),
+  condition: NgConditionSchema,
+  target: z.enum(['response', 'thread', 'board']),
+  abonType: z.enum(['normal', 'transparent']),
+  boardId: z.string().optional(),
+  threadId: z.string().optional(),
+  enabled: z.boolean(),
+  label: z.string().optional(),
+});
+
+export const NgRulesFileSchema = z.object({
+  version: z.literal(1),
+  rules: z.array(NgRuleSchema),
+});

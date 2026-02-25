@@ -5,8 +5,14 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { mdiClose, mdiPlus, mdiDelete } from '@mdi/js';
-import { AbonType, NgMatchMode, NgTarget } from '@shared/ng';
-import type { NgRule } from '@shared/ng';
+import {
+  type NgRule,
+  type NgStringCondition,
+  AbonType,
+  NgTarget,
+  NgStringField,
+  NgStringMatchMode,
+} from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { TopResizeHandle } from '../common/TopResizeHandle';
@@ -23,7 +29,6 @@ function NgRuleRow({
   readonly onRemove: (id: string) => void;
 }): React.JSX.Element {
   const abonLabel = rule.abonType === AbonType.Transparent ? '透明' : '通常';
-  const modeLabel = rule.matchMode === NgMatchMode.Regexp ? '正規表現' : 'テキスト';
   const targetLabel =
     rule.target === NgTarget.Thread ? '[スレ]' : rule.target === NgTarget.Board ? '[板]' : '[レス]';
   const scopeLabel =
@@ -32,6 +37,23 @@ function NgRuleRow({
       : rule.boardId !== undefined
         ? `板: ${rule.boardId}`
         : '全体';
+
+  let modeLabel = 'テキスト';
+  let tokensDisplay = '';
+  if (rule.condition.type === 'string') {
+    modeLabel =
+      rule.condition.matchMode === NgStringMatchMode.Regexp ||
+      rule.condition.matchMode === NgStringMatchMode.RegexpNoCase
+        ? '正規表現'
+        : 'テキスト';
+    tokensDisplay = rule.condition.tokens.join(' AND ');
+  } else if (rule.condition.type === 'numeric') {
+    modeLabel = '数値';
+    tokensDisplay = String(rule.condition.value);
+  } else if (rule.condition.type === 'time') {
+    modeLabel = '時間';
+    tokensDisplay = String(rule.condition.target);
+  }
 
   return (
     <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] px-3 py-1.5 text-xs">
@@ -47,7 +69,7 @@ function NgRuleRow({
       <span className="shrink-0 text-[var(--color-text-muted)]">{targetLabel}</span>
       <span className="shrink-0 text-[var(--color-text-muted)]">[{modeLabel}]</span>
       <span className="min-w-0 flex-1 truncate text-[var(--color-text-primary)]">
-        {rule.tokens.join(' AND ')}
+        {tokensDisplay}
       </span>
       <span className="shrink-0 text-[var(--color-text-muted)]">{scopeLabel}</span>
       <button
@@ -109,12 +131,19 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
 
     const tokens = newMatchMode === 'regexp' ? [newToken.trim()] : newToken.trim().split(/\s+/);
 
+    const condition: NgStringCondition = {
+      type: 'string',
+      matchMode: newMatchMode === 'regexp' ? NgStringMatchMode.Regexp : NgStringMatchMode.Plain,
+      fields: [NgStringField.All],
+      tokens,
+      negate: false,
+    };
+
     const rule: NgRule = {
       id: generateId(),
-      target: newTarget === NgTarget.Response ? undefined : newTarget,
+      condition,
+      target: newTarget,
       abonType: newAbonType,
-      matchMode: newMatchMode,
-      tokens,
       boardId: newBoardId.length > 0 ? newBoardId : undefined,
       threadId: newThreadId.length > 0 ? newThreadId : undefined,
       enabled: true,

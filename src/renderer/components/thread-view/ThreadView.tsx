@@ -31,6 +31,9 @@ import {
   type NgRule,
   type NgFilterResult,
   AbonType,
+  NgTarget,
+  NgStringField,
+  NgStringMatchMode,
   NgFilterResult as NgFilterResultEnum,
 } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
@@ -64,10 +67,7 @@ import {
   buildCountMap,
   estimateFromWatchoi,
 } from '../../utils/thread-analysis';
-import {
-  findNextThread,
-  NEXT_THREAD_RESPONSE_THRESHOLD,
-} from '../../utils/next-thread-detect';
+import { findNextThread, NEXT_THREAD_RESPONSE_THRESHOLD } from '../../utils/next-thread-detect';
 import { generateNextThreadTemplate } from '../../utils/next-thread-template';
 import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
@@ -179,6 +179,45 @@ interface PopupState {
 }
 
 /**
+ * Get text to match for a string condition (field-specific or full).
+ */
+function getTextToMatchForRes(
+  cond: { readonly fields: readonly string[]; readonly tokens: readonly string[] },
+  res: Res,
+): string {
+  if (
+    cond.fields.length === 0 ||
+    cond.fields.includes('all') ||
+    cond.fields.includes(NgStringField.All)
+  ) {
+    return `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
+  }
+  const parts: string[] = [];
+  for (const f of cond.fields) {
+    switch (f) {
+      case NgStringField.Name:
+        parts.push(res.name);
+        break;
+      case NgStringField.Body:
+        parts.push(res.body);
+        break;
+      case NgStringField.Mail:
+        parts.push(res.mail);
+        break;
+      case NgStringField.Id:
+        parts.push(res.id ?? '');
+        break;
+      case NgStringField.ThreadTitle:
+        parts.push(res.title ?? '');
+        break;
+      default:
+        parts.push(`${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`);
+    }
+  }
+  return parts.join('\t');
+}
+
+/**
  * Apply NG rules to a single response (renderer-side matching).
  */
 function applyNgFilter(
@@ -187,17 +226,33 @@ function applyNgFilter(
   boardId: string,
   threadId: string,
 ): NgFilterResult {
-  const fullText = `${res.name}\t${res.mail}\t${res.dateTime}\t${res.body}`;
   for (const rule of rules) {
     if (!rule.enabled) continue;
+    if (rule.target !== NgTarget.Response) continue; // Only response-level rules apply to res
     if (rule.boardId !== undefined && rule.boardId !== boardId) continue;
     if (rule.threadId !== undefined && rule.threadId !== threadId) continue;
 
-    if (rule.matchMode === 'regexp') {
-      const pattern = rule.tokens[0];
+    if (rule.condition.type === 'numeric' || rule.condition.type === 'time') {
+      continue; // Phase 2
+    }
+
+    const cond = rule.condition;
+    const text = getTextToMatchForRes(cond, res);
+
+    if (
+      cond.matchMode === NgStringMatchMode.Regexp ||
+      cond.matchMode === NgStringMatchMode.RegexpNoCase
+    ) {
+      const pattern = cond.tokens[0];
       if (pattern === undefined) continue;
       try {
-        if (new RegExp(pattern, 'i').test(fullText)) {
+        const regex = new RegExp(
+          pattern,
+          cond.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
+        );
+        const matches = regex.test(text);
+        const result = cond.negate ? !matches : matches;
+        if (result) {
           return rule.abonType === AbonType.Transparent
             ? NgFilterResultEnum.TransparentAbon
             : NgFilterResultEnum.NormalAbon;
@@ -206,7 +261,9 @@ function applyNgFilter(
         continue;
       }
     } else {
-      if (rule.tokens.every((token) => fullText.includes(token))) {
+      const matches = cond.tokens.every((token) => text.includes(token));
+      const result = cond.negate ? !matches : matches;
+      if (result) {
         return rule.abonType === AbonType.Transparent
           ? NgFilterResultEnum.TransparentAbon
           : NgFilterResultEnum.NormalAbon;

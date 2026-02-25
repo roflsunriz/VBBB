@@ -17,7 +17,7 @@ import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { Board, Category } from '@shared/domain';
 import { BoardType } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
-import { AbonType, NgTarget } from '@shared/ng';
+import { AbonType, NgStringField, NgStringMatchMode, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -300,10 +300,15 @@ export function BoardTree(): React.JSX.Element {
     if (ctxMenu !== null) {
       const rule: NgRule = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [NgStringField.All],
+          tokens: [ctxMenu.board.title],
+          negate: false,
+        },
         target: NgTarget.Board,
         abonType: AbonType.Normal,
-        matchMode: 'plain',
-        tokens: [ctxMenu.board.title],
         boardId: ctxMenu.board.bbsId,
         enabled: true,
       };
@@ -316,10 +321,15 @@ export function BoardTree(): React.JSX.Element {
     if (ctxMenu !== null) {
       const rule: NgRule = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [NgStringField.All],
+          tokens: [ctxMenu.board.title],
+          negate: false,
+        },
         target: NgTarget.Board,
         abonType: AbonType.Transparent,
-        matchMode: 'plain',
-        tokens: [ctxMenu.board.title],
         boardId: ctxMenu.board.bbsId,
         enabled: true,
       };

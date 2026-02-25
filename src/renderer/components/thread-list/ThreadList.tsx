@@ -25,7 +25,7 @@ import { ContextMenuContainer } from '../common/ContextMenuContainer';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
 import { BoardType } from '@shared/domain';
-import { AbonType, NgTarget } from '@shared/ng';
+import { AbonType, NgStringField, NgStringMatchMode, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -87,16 +87,27 @@ function matchesThreadNg(rule: NgRule, title: string, boardId: string, threadId:
   if (!rule.enabled) return false;
   if (rule.boardId !== undefined && rule.boardId !== boardId) return false;
   if (rule.threadId !== undefined) return rule.threadId === threadId;
-  if (rule.matchMode === 'regexp') {
-    const pattern = rule.tokens[0];
+  if (rule.condition.type !== 'string') return false;
+  const cond = rule.condition;
+  if (
+    cond.matchMode === NgStringMatchMode.Regexp ||
+    cond.matchMode === NgStringMatchMode.RegexpNoCase
+  ) {
+    const pattern = cond.tokens[0];
     if (pattern === undefined) return false;
     try {
-      return new RegExp(pattern, 'i').test(title);
+      const regex = new RegExp(
+        pattern,
+        cond.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
+      );
+      const matches = regex.test(title);
+      return cond.negate ? !matches : matches;
     } catch {
       return false;
     }
   }
-  return rule.tokens.every((t) => title.includes(t));
+  const matches = cond.tokens.every((t: string) => title.includes(t));
+  return cond.negate ? !matches : matches;
 }
 
 export function ThreadList(): React.JSX.Element {
@@ -432,10 +443,15 @@ export function ThreadList(): React.JSX.Element {
       const threadId = ctxMenu.subject.fileName.replace('.dat', '');
       const rule: NgRule = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [NgStringField.ThreadTitle],
+          tokens: [ctxMenu.subject.title],
+          negate: false,
+        },
         target: NgTarget.Thread,
         abonType: AbonType.Normal,
-        matchMode: 'plain',
-        tokens: [ctxMenu.subject.title],
         boardId: currentBoardId.length > 0 ? currentBoardId : undefined,
         threadId,
         enabled: true,
@@ -450,10 +466,15 @@ export function ThreadList(): React.JSX.Element {
       const threadId = ctxMenu.subject.fileName.replace('.dat', '');
       const rule: NgRule = {
         id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [NgStringField.ThreadTitle],
+          tokens: [ctxMenu.subject.title],
+          negate: false,
+        },
         target: NgTarget.Thread,
         abonType: AbonType.Transparent,
-        matchMode: 'plain',
-        tokens: [ctxMenu.subject.title],
         boardId: currentBoardId.length > 0 ? currentBoardId : undefined,
         threadId,
         enabled: true,
