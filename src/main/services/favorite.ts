@@ -232,6 +232,7 @@ export function reorderNode(
   dropNodeId: string,
   position: 'before' | 'after' | 'inside',
 ): readonly FavNode[] {
+  if (dragNodeId === dropNodeId) return children;
   const dragNode = findNodeById(children, dragNodeId);
   if (dragNode === null) return children;
   const removed = removeNodeById(children, dragNodeId);

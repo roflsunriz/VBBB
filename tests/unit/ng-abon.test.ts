@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseNgLine,
   parseNgFile,
+  parseLegacyNgFile,
   serializeNgRules,
   matchesNgRule,
   applyNgRules,
@@ -18,6 +19,8 @@ import {
   countAnchors,
   buildIdCountMap,
   buildRepliedCountMap,
+  stripHtmlTags,
+  buildNumericValuesForRes,
 } from '../../src/types/ng-field-extractor';
 import type { Res } from '../../src/types/domain';
 import type { NgRule } from '../../src/types/ng';
@@ -43,10 +46,15 @@ const makeRes = (overrides: Partial<Res> = {}): Res => ({
   ...overrides,
 });
 
-/** Overrides for makeRule: supports shorthand condition fields (tokens, matchMode) */
+/** Overrides for makeRule: supports shorthand condition fields (tokens, matchMode, fields, negate) */
 interface MakeRuleOverrides {
   id?: string;
-  condition?: { tokens?: readonly string[]; matchMode?: 'plain' | 'regexp' };
+  condition?: {
+    tokens?: readonly string[];
+    matchMode?: 'plain' | 'regexp' | 'regexp_nocase';
+    fields?: readonly NgStringField[];
+    negate?: boolean;
+  };
   target?: NgTarget;
   abonType?: AbonType;
   boardId?: string;
@@ -56,12 +64,18 @@ interface MakeRuleOverrides {
 
 const makeRule = (overrides: MakeRuleOverrides = {}): NgRule => {
   const cond = overrides.condition;
+  const matchMode =
+    cond?.matchMode === 'regexp'
+      ? NgStringMatchMode.Regexp
+      : cond?.matchMode === 'regexp_nocase'
+        ? NgStringMatchMode.RegexpNoCase
+        : NgStringMatchMode.Plain;
   const condition = {
     type: 'string' as const,
-    matchMode: cond?.matchMode === 'regexp' ? NgStringMatchMode.Regexp : NgStringMatchMode.Plain,
-    fields: [NgStringField.All] as const,
+    matchMode,
+    fields: (cond?.fields ?? [NgStringField.All]) as readonly NgStringField[],
     tokens: cond?.tokens ?? ['荒らし'],
-    negate: false,
+    negate: cond?.negate ?? false,
   };
   return {
     id: overrides.id ?? 'test-rule',
@@ -854,5 +868,224 @@ describe('matchesNgRule numeric and time', () => {
         threadTitle: '',
       }),
     ).toBe(true);
+  });
+});
+
+// ───────────── String field-specific matching ─────────────
+
+describe('matchStringCondition field-specific', () => {
+  it('matches against body field only (not all)', () => {
+    const rule = makeRule({
+      condition: { tokens: ['secret'], fields: [NgStringField.Body] },
+    });
+    const res = makeRes({ body: 'secret', name: 'other', dateTime: '2024/01/15 12:00:00' });
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(true);
+
+    const resNoBody = makeRes({ body: 'x', name: 'secret', dateTime: '2024/01/15 12:00:00' });
+    expect(matchesNgRule(rule, resNoBody, 'board', 'thread')).toBe(false);
+  });
+
+  it('matches against name field only', () => {
+    const rule = makeRule({
+      condition: { tokens: ['VIP'], fields: [NgStringField.Name] },
+    });
+    const res = makeRes({ name: 'VIP', body: 'hello' });
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(true);
+
+    const resNoName = makeRes({ name: 'normal', body: 'VIP user' });
+    expect(matchesNgRule(rule, resNoName, 'board', 'thread')).toBe(false);
+  });
+
+  it('matches against id field extracted from dateTime', () => {
+    const rule = makeRule({
+      condition: { tokens: ['SpAmId123'], fields: [NgStringField.Id] },
+    });
+    const res = makeRes({ dateTime: '2024/01/15 12:00:00 ID:SpAmId123', body: 'x' });
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(true);
+
+    const resNoId = makeRes({ dateTime: '2024/01/15 12:00:00', body: 'SpAmId123' });
+    expect(matchesNgRule(rule, resNoId, 'board', 'thread')).toBe(false);
+  });
+
+  it('matches against threadTitle field', () => {
+    const rule = makeRule({
+      condition: { tokens: ['荒らし'], fields: [NgStringField.ThreadTitle] },
+    });
+    const res = makeRes({ body: 'normal', title: '' });
+    expect(
+      matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '荒らしスレッド' }),
+    ).toBe(true);
+    expect(
+      matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '普通のスレ' }),
+    ).toBe(false);
+  });
+
+  it('matches against multiple fields (name + body)', () => {
+    const rule = makeRule({
+      condition: { tokens: ['a', 'b'], fields: [NgStringField.Name, NgStringField.Body] },
+    });
+    const res = makeRes({ name: 'aaa', body: 'bbb' });
+    expect(matchesNgRule(rule, res, 'board', 'thread')).toBe(true);
+
+    const resPartial = makeRes({ name: 'aaa', body: 'xxx' });
+    expect(matchesNgRule(rule, resPartial, 'board', 'thread')).toBe(false);
+  });
+});
+
+// ───────────── String negate tests ─────────────
+
+describe('matchStringCondition negate', () => {
+  it('negate=true with plain: token present → false, token absent → true', () => {
+    const rule = makeRule({
+      condition: { tokens: ['NG'], negate: true },
+    });
+    const resWith = makeRes({ body: 'NG word' });
+    const resWithout = makeRes({ body: 'ok' });
+    expect(matchesNgRule(rule, resWith, 'board', 'thread')).toBe(false);
+    expect(matchesNgRule(rule, resWithout, 'board', 'thread')).toBe(true);
+  });
+
+  it('negate=true with regexp match', () => {
+    const rule = makeRule({
+      condition: { tokens: ['[Ss]pam'], matchMode: 'regexp', negate: true },
+    });
+    const resMatch = makeRes({ body: 'spam' });
+    const resNoMatch = makeRes({ body: 'legit' });
+    expect(matchesNgRule(rule, resMatch, 'board', 'thread')).toBe(false);
+    expect(matchesNgRule(rule, resNoMatch, 'board', 'thread')).toBe(true);
+  });
+});
+
+// ───────────── regexp_nocase tests ─────────────
+
+describe('matchStringCondition regexp_nocase', () => {
+  it('regexp_nocase matches case-insensitively', () => {
+    const rule = makeRule({
+      condition: { tokens: ['SPAM'], matchMode: 'regexp_nocase' },
+    });
+    expect(matchesNgRule(rule, makeRes({ body: 'SPAM' }), 'board', 'thread')).toBe(true);
+    expect(matchesNgRule(rule, makeRes({ body: 'spam' }), 'board', 'thread')).toBe(true);
+    expect(matchesNgRule(rule, makeRes({ body: 'SpAm' }), 'board', 'thread')).toBe(true);
+  });
+
+  it('regexp (without nocase) is case-sensitive', () => {
+    const rule = makeRule({
+      condition: { tokens: ['SPAM'], matchMode: 'regexp' },
+    });
+    expect(matchesNgRule(rule, makeRes({ body: 'SPAM' }), 'board', 'thread')).toBe(true);
+    expect(matchesNgRule(rule, makeRes({ body: 'spam' }), 'board', 'thread')).toBe(false);
+  });
+});
+
+// ───────────── Migration tests ─────────────
+
+describe('parseLegacyNgFile', () => {
+  it('converts old NGword.txt format to NgRule[]', () => {
+    const content = `荒らし\tスパム
+\t{{REGEXP}}\t[Ss]pam
+{{BOARD:newsplus}}\t政治`;
+    const rules = parseLegacyNgFile(content);
+    expect(rules).toHaveLength(3);
+    expect(rules[0]?.condition.type).toBe('string');
+    if (rules[0]?.condition.type === 'string') {
+      expect(rules[0].condition.tokens).toEqual(['荒らし', 'スパム']);
+    }
+    if (rules[2]?.condition.type === 'string') {
+      expect(rules[2].condition.tokens).toEqual(['政治']);
+    }
+    expect(rules[2]?.boardId).toBe('newsplus');
+  });
+});
+
+describe('legacyRuleToNew preservation', () => {
+  it('preserves boardId and threadId', () => {
+    const legacy = {
+      id: 'leg',
+      target: NgTarget.Response,
+      abonType: AbonType.Normal,
+      matchMode: NgMatchMode.Plain,
+      tokens: ['x'],
+      boardId: 'news',
+      threadId: '123456',
+      enabled: true,
+    };
+    const rule = legacyRuleToNew(legacy);
+    expect(rule.boardId).toBe('news');
+    expect(rule.threadId).toBe('123456');
+  });
+
+  it('preserves disabled rules through legacy conversion', () => {
+    const legacy = {
+      id: 'leg-disabled',
+      abonType: AbonType.Normal,
+      matchMode: NgMatchMode.Plain,
+      tokens: ['x'],
+      enabled: false,
+    };
+    const rule = legacyRuleToNew(legacy);
+    expect(rule.enabled).toBe(false);
+  });
+});
+
+// ───────────── Additional numeric tests ─────────────
+
+describe('buildNumericValuesForRes', () => {
+  it('returns correct lineCount, charCount, replyCount', () => {
+    const idCountMap = new Map<string, number>([['id1', 2]]);
+    const repliedCountMap = new Map<number, number>([[1, 3]]);
+    const res = makeRes({
+      number: 1,
+      body: 'line1\nline2\nline3',
+      dateTime: '2024/01/15 12:00:00 ID:id1',
+    });
+    const vals = buildNumericValuesForRes(res, idCountMap, repliedCountMap, 10, 0);
+    expect(vals['lineCount']).toBe(3);
+    expect(vals['charCount']).toBe(15); // "line1" + "line2" + "line3" (newlines stripped)
+    expect(vals['replyCount']).toBe(0);
+    expect(vals['repliedCount']).toBe(3);
+    expect(vals['idCount']).toBe(2);
+  });
+
+  it('lineCount counts newlines correctly', () => {
+    const emptyMap = new Map<string, number>();
+    const repliedMap = new Map<number, number>();
+    const res = makeRes({ body: 'a\n\nb' });
+    const vals = buildNumericValuesForRes(res, emptyMap, repliedMap, 0, 0);
+    expect(vals['lineCount']).toBe(3);
+  });
+
+  it('charCount strips HTML tags before counting', () => {
+    const emptyMap = new Map<string, number>();
+    const repliedMap = new Map<number, number>();
+    const res = makeRes({ body: '<br>hi</br><a href="#">link</a>' });
+    const vals = buildNumericValuesForRes(res, emptyMap, repliedMap, 0, 0);
+    expect(vals['charCount']).toBe(6); // "hi" + "link" = 2+4
+  });
+});
+
+// ───────────── Additional field extraction tests ─────────────
+
+describe('stripHtmlTags and extractStringFields', () => {
+  it('stripHtmlTags strips <br> and <a> tags', () => {
+    expect(stripHtmlTags('<br>text</br>')).toBe('text');
+    expect(stripHtmlTags('<a href="x">link</a>')).toBe('link');
+  });
+
+  it('extractStringFields with empty dateTime (no ID found)', () => {
+    const res = makeRes({ dateTime: '2024/01/15(月) 12:34:56', body: 'x' });
+    const fields = extractStringFields(res, '');
+    expect(fields.id).toBe('');
+  });
+
+  it('extractStringFields with 発信元 pattern instead of ID', () => {
+    const res = makeRes({ dateTime: '2024/01/15(月) 12:34:56 発信元:abc123', body: 'x' });
+    const fields = extractStringFields(res, '');
+    expect(fields.id).toBe('abc123');
+  });
+
+  it('threadTitle is correctly passed through', () => {
+    const res = makeRes({ body: 'x', title: '' });
+    const fields = extractStringFields(res, 'スレタイトル');
+    expect(fields.threadTitle).toBe('スレタイトル');
   });
 });

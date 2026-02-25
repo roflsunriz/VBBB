@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseFavoriteXml, serializeFavoriteXml } from '../../src/main/services/favorite';
+import {
+  parseFavoriteXml,
+  serializeFavoriteXml,
+  reorderNode,
+  moveNodeToFolder,
+} from '../../src/main/services/favorite';
+import type { FavItem, FavFolder, FavNode } from '../../src/types/favorite';
 
 describe('parseFavoriteXml', () => {
   it('parses empty favorite root', () => {
@@ -66,6 +72,23 @@ describe('parseFavoriteXml', () => {
         expect(subfolder.children).toHaveLength(1);
       }
     }
+  });
+
+  it('parses separator and round-trips to XML', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<favorite>
+  <favitem type="2ch" favtype="board" url="https://example.com/" title="Board"/>
+  <separator/>
+  <favitem type="2ch" favtype="thread" url="https://example.com/t" title="Thread"/>
+</favorite>`;
+    const tree = parseFavoriteXml(xml);
+    expect(tree.children).toHaveLength(3);
+    const sep = tree.children[1];
+    expect(sep).toBeDefined();
+    expect(sep?.kind).toBe('separator');
+
+    const serialized = serializeFavoriteXml(tree);
+    expect(serialized).toContain('<separator');
   });
 });
 
@@ -141,6 +164,104 @@ describe('serializeFavoriteXml', () => {
     if (reparsed.children[0]?.kind === 'folder') {
       expect(reparsed.children[0].title).toBe('Test');
       expect(reparsed.children[0].children).toHaveLength(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// reorderNode and moveNodeToFolder
+// ---------------------------------------------------------------------------
+
+const mkItem = (id: string, title: string): FavItem => ({
+  id,
+  kind: 'item',
+  type: 'board',
+  boardType: '2ch',
+  url: `https://example.com/${id}`,
+  title,
+});
+
+const mkFolder = (
+  id: string,
+  title: string,
+  children: readonly FavNode[] = [] as FavNode[],
+): FavFolder => ({
+  id,
+  kind: 'folder',
+  title,
+  expanded: true,
+  children: [...children] as FavNode[],
+});
+
+describe('reorderNode', () => {
+  it('moves node B before node A in flat list [A, B, C] → [B, A, C]', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const c = mkItem('c', 'C');
+    const children = [a, b, c];
+    const result = reorderNode(children, 'b', 'a', 'before');
+    expect(result.map((n) => n.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('moves node A after node C → [B, C, A]', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const c = mkItem('c', 'C');
+    const children = [a, b, c];
+    const result = reorderNode(children, 'a', 'c', 'after');
+    expect(result.map((n) => n.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('moves node A inside folder F', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const f = mkFolder('f', 'Folder', [b]);
+    const children = [a, f];
+    const result = reorderNode(children, 'a', 'f', 'inside');
+    expect(result).toHaveLength(1);
+    const folder = result[0];
+    expect(folder?.kind).toBe('folder');
+    if (folder?.kind === 'folder') {
+      expect(folder.children.map((n) => n.id)).toEqual(['b', 'a']);
+    }
+  });
+
+  it('moves item from inside folder to root (before another item)', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const c = mkItem('c', 'C');
+    const f = mkFolder('f', 'Folder', [a]);
+    const children = [b, f, c];
+    const result = reorderNode(children, 'a', 'b', 'before');
+    expect(result.map((n) => n.id)).toEqual(['a', 'b', 'f', 'c']);
+    const folder = result[2];
+    expect(folder?.kind).toBe('folder');
+    if (folder?.kind === 'folder') {
+      expect(folder.children).toHaveLength(0);
+    }
+  });
+
+  it('dragging a node to itself does not change the tree', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const children = [a, b];
+    const result = reorderNode(children, 'a', 'a', 'before');
+    expect(result.map((n) => n.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('moveNodeToFolder', () => {
+  it('moves node to folder and removes from root', () => {
+    const a = mkItem('a', 'A');
+    const b = mkItem('b', 'B');
+    const f = mkFolder('f', 'Folder', []);
+    const children = [a, f, b];
+    const result = moveNodeToFolder(children, 'a', 'f');
+    expect(result.map((n) => n.id)).toEqual(['f', 'b']);
+    const folder = result[0];
+    expect(folder?.kind).toBe('folder');
+    if (folder?.kind === 'folder') {
+      expect(folder.children.map((n) => n.id)).toEqual(['a']);
     }
   });
 });
