@@ -134,6 +134,7 @@ interface BBSState {
   fetchNgRules: () => Promise<void>;
   addNgRule: (rule: NgRule) => Promise<void>;
   removeNgRule: (ruleId: string) => Promise<void>;
+  saveNgRules: (rules: readonly NgRule[]) => Promise<void>;
   toggleNgEditor: () => void;
   openNgEditorWithToken: (token: string, boardId?: string, threadId?: string) => void;
   fetchFavorites: () => Promise<void>;
@@ -655,6 +656,15 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     try {
       await getApi().invoke('ng:remove-rule', ruleId);
       set((state) => ({ ngRules: state.ngRules.filter((r) => r.id !== ruleId) }));
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  saveNgRules: async (rules: readonly NgRule[]) => {
+    try {
+      await getApi().invoke('ng:set-rules', rules);
+      set({ ngRules: rules });
     } catch {
       // Silently ignore
     }
