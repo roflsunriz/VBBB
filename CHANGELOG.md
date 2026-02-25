@@ -5,6 +5,37 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-25
+
+### Added
+
+- NG機能を大幅に強化（Siki準拠の高度なフィルタリング）
+  - 文字列条件: 単純比較・正規表現・正規表現(大文字小文字無視)・あいまい検索に対応
+  - 数値条件: ID数・被返信数・レス番号・行数・文字数・スレッドレス数などを eq/gte/lte/lt/gt/between で比較
+  - 時間条件: 投稿曜日・投稿時間帯・相対時間・投稿日時範囲に対応
+  - フィールド別照合: 名前・本文・メール・ID・トリップ・ﾜｯﾁｮｲ・IP・BE・URL・スレッドタイトルを個別指定可能
+  - 全条件に否定(negate)オプションを追加
+  - NGルール保存形式を NGword.txt からJSON形式 (ng-rules.json) に移行（旧形式からの自動マイグレーション付き）
+  - NGエディタUIを文字列/数値/時間の3タブ構成にリニューアル
+- お気に入り整理機能を実装
+  - フォルダ作成・水平線(セパレータ)追加
+  - ドラッグ＆ドロップによる並べ替え（before/after/inside対応）
+  - 右クリックメニューの「フォルダに移動」サブメニュー
+- スレッドタブ右クリックメニューに「外部ブラウザで開く」を追加
+- 巡回タイマーのON/OFF状態をツールバーとパネルに視覚的に表示
+
+### Changed
+
+- 次スレ作成支援ボタンの表示条件（950レス以上）を撤廃し、常時表示に変更
+- スレッド一覧の★クリック動作をお気に入り追加からトグル（追加/削除）に変更
+- スレッドタブのアクションボタン群をタブバーとタイトルの間に移動し、常時表示に変更
+- 巡回完了後に該当する板・スレッドを自動でリフレッシュするよう改善
+
+### Fixed
+
+- 巡回タイマーが起動しない問題を修正
+- お気に入りフォルダ作成ボタンが反応しない問題を修正（Electron の window.prompt() 非対応をインライン入力に置換）
+
 ## [1.6.2] - 2026-02-25
 
 ### Changed
@@ -200,6 +231,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[2.0.0]: https://github.com/roflsunriz/VBBB/compare/v1.6.2...v2.0.0
 [1.6.2]: https://github.com/roflsunriz/VBBB/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/roflsunriz/VBBB/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/roflsunriz/VBBB/compare/v1.5.0...v1.6.0
