@@ -174,6 +174,8 @@ interface PopupState {
   readonly resNumbers: readonly number[];
   readonly x: number;
   readonly y: number;
+  /** When true, ResPopup auto-expands the full reply tree via BFS */
+  readonly expandReplies: boolean;
 }
 
 /**
@@ -478,6 +480,7 @@ function ResItem({
   kotehanResNumbers,
   replyNumbers,
   onAnchorHover,
+  onReplyBadgeHover,
   onAnchorLeave,
   onResNumberClick,
   onSetKokomade,
@@ -506,6 +509,7 @@ function ResItem({
   /** Response numbers that reference (reply to) this response */
   readonly replyNumbers: readonly number[];
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
+  readonly onReplyBadgeHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onAnchorLeave: () => void;
   readonly onResNumberClick: (resNumber: number) => void;
   readonly onSetKokomade: (resNumber: number) => void;
@@ -685,12 +689,12 @@ function ResItem({
             type="button"
             className="cursor-pointer rounded border-none bg-transparent p-0 text-[10px] font-semibold text-[var(--color-link)] hover:underline"
             onMouseEnter={(e) => {
-              onAnchorHover(replyNumbers, e.clientX, e.clientY);
+              onReplyBadgeHover(replyNumbers, e.clientX, e.clientY);
             }}
             onMouseLeave={onAnchorLeave}
             onClick={(e) => {
               e.stopPropagation();
-              onAnchorHover(replyNumbers, e.clientX, e.clientY);
+              onReplyBadgeHover(replyNumbers, e.clientX, e.clientY);
             }}
             title={`${String(replyCount)}件の返信`}
           >
@@ -1946,7 +1950,11 @@ export function ThreadView(): React.JSX.Element {
   );
 
   const handleAnchorHover = useCallback((nums: readonly number[], x: number, y: number) => {
-    setPopup({ resNumbers: nums, x, y });
+    setPopup({ resNumbers: nums, x, y, expandReplies: false });
+  }, []);
+
+  const handleReplyBadgeHover = useCallback((nums: readonly number[], x: number, y: number) => {
+    setPopup({ resNumbers: nums, x, y, expandReplies: true });
   }, []);
 
   const handleAnchorLeave = useCallback(() => {
@@ -2516,6 +2524,7 @@ export function ThreadView(): React.JSX.Element {
                           }
                           replyNumbers={replyMap.get(res.number) ?? []}
                           onAnchorHover={handleAnchorHover}
+                          onReplyBadgeHover={handleReplyBadgeHover}
                           onAnchorLeave={handleAnchorLeave}
                           onResNumberClick={handleResNumberClick}
                           onSetKokomade={handleSetKokomade}
@@ -2626,7 +2635,9 @@ export function ThreadView(): React.JSX.Element {
         <ResPopup
           resNumbers={popup.resNumbers}
           responses={activeTab.responses}
+          replyMap={replyMap}
           position={{ x: popup.x, y: popup.y }}
+          expandReplies={popup.expandReplies}
           onClose={handlePopupClose}
         />
       )}
