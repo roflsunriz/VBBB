@@ -5,6 +5,17 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-02-25
+
+### Added
+
+- 次スレ立て支援機能を実装
+  - 現スレの >>1 をベースに次スレ用テンプレートを自動生成（タイトル番号+1、前スレURL置換、VIPQ2 `!extend` コマンド2行追加、`VIPQ2_EXTDAT` 除去）
+  - レス数950以上のスレッドでツールバーに「次スレを立てる」ボタンを表示
+  - 1000レス超過時の次スレバナーで次スレが見つからない場合に「次スレを立てる」ボタンを表示
+  - DAT落ちスレッドに「次スレを立てる」ボタン付きバナーを表示
+  - 新規スレッド作成エディタにテンプレートの初期値（タイトル・本文）を自動入力
+
 ## [1.6.0] - 2026-02-25
 
 ### Added
@@ -179,6 +190,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.6.1]: https://github.com/roflsunriz/VBBB/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/roflsunriz/VBBB/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/roflsunriz/VBBB/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/roflsunriz/VBBB/compare/v1.3.1...v1.4.0
