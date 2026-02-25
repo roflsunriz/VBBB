@@ -100,16 +100,19 @@ export function RoundPanel({ onClose }: { readonly onClose: () => void }): React
       </div>
 
       {/* Timer controls */}
-      <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-2 py-1">
+      <div
+        className={`flex items-center gap-2 border-b px-2 py-1.5 ${timerConfig.enabled ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10' : 'border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]'}`}
+      >
         <button
           type="button"
           onClick={() => {
             void handleToggleTimer();
           }}
-          className={`rounded p-0.5 ${timerConfig.enabled ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} hover:bg-[var(--color-bg-hover)]`}
+          className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium ${timerConfig.enabled ? 'bg-[var(--color-success)] text-white' : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)]'} hover:opacity-80`}
           title={timerConfig.enabled ? '自動巡回停止' : '自動巡回開始'}
         >
-          <MdiIcon path={timerConfig.enabled ? mdiPause : mdiPlay} size={14} />
+          <MdiIcon path={timerConfig.enabled ? mdiPause : mdiPlay} size={12} />
+          {timerConfig.enabled ? '自動巡回 ON' : '自動巡回 OFF'}
         </button>
         <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
           間隔:

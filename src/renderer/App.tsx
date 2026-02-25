@@ -120,6 +120,7 @@ export function App(): React.JSX.Element {
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [roundTimerEnabled, setRoundTimerEnabled] = useState(false);
 
   // Resizable pane widths
   const [leftWidth, setLeftWidth] = useState(() =>
@@ -181,14 +182,16 @@ export function App(): React.JSX.Element {
 
     const init = async (): Promise<void> => {
       // Phase 1: Fetch menu + local data + prefetch session/tab data — all in parallel
-      const [, , , , sessionData, savedTabs] = await Promise.all([
+      const [, , , , sessionData, savedTabs, timerConfig] = await Promise.all([
         fetchMenu(),
         fetchFavorites(),
         fetchNgRules(),
         loadPostHistory(),
         api.invoke('session:load'),
         api.invoke('tab:load'),
+        api.invoke('round:get-timer'),
       ]);
+      setRoundTimerEnabled(timerConfig.enabled);
 
       // Phase 2: Restore board sessions and thread tabs in parallel.
       // restoreSession needs the menu (populated by fetchMenu above).
@@ -322,6 +325,13 @@ export function App(): React.JSX.Element {
     setActiveModal(null);
   }, []);
 
+  const closeRoundModal = useCallback(() => {
+    setActiveModal(null);
+    void window.electronApi.invoke('round:get-timer').then((cfg) => {
+      setRoundTimerEnabled(cfg.enabled);
+    });
+  }, []);
+
   const handleRefreshBoards = useCallback(() => {
     void fetchMenu();
   }, [fetchMenu]);
@@ -432,11 +442,11 @@ export function App(): React.JSX.Element {
         <button
           type="button"
           onClick={openRound}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-          title="巡回リスト (Ctrl+Shift+R)"
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${roundTimerEnabled ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]`}
+          title={roundTimerEnabled ? '巡回リスト (自動巡回 ON) (Ctrl+Shift+R)' : '巡回リスト (Ctrl+Shift+R)'}
         >
           <MdiIcon path={mdiSync} size={14} />
-          巡回
+          巡回{roundTimerEnabled ? ' ON' : ''}
         </button>
 
         {/* Cookie/UA Manager */}
@@ -622,14 +632,14 @@ export function App(): React.JSX.Element {
       {/* Modal: Round (resizable) */}
       <Modal
         open={activeModal === 'round'}
-        onClose={closeModal}
+        onClose={closeRoundModal}
         resizable
         initialWidth={480}
         initialHeight={500}
       >
         <div className="h-full overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
           <Suspense fallback={null}>
-            <RoundPanel onClose={closeModal} />
+            <RoundPanel onClose={closeRoundModal} />
           </Suspense>
         </div>
       </Modal>
