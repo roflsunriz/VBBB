@@ -167,6 +167,8 @@ function renderDateTimeWithBe(
   );
 }
 
+const EMPTY_RES_NUMBERS: readonly number[] = [];
+
 /** Popup state for anchor hover */
 interface PopupState {
   readonly resNumbers: readonly number[];
@@ -218,10 +220,16 @@ type HighlightType = 'none' | 'own' | 'reply';
 /** F31: Count badge component */
 function CountBadge({
   count,
+  resNumbers,
   onClick,
+  onHover,
+  onLeave,
 }: {
   readonly count: number;
+  readonly resNumbers: readonly number[];
   readonly onClick: () => void;
+  readonly onHover: (nums: readonly number[], x: number, y: number) => void;
+  readonly onLeave: () => void;
 }): React.JSX.Element | null {
   if (count <= 1) return null;
   const color =
@@ -237,8 +245,12 @@ function CountBadge({
         e.stopPropagation();
         onClick();
       }}
+      onMouseEnter={(e) => {
+        onHover(resNumbers, e.clientX, e.clientY);
+      }}
+      onMouseLeave={onLeave}
       className={`ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] font-bold ${color} hover:opacity-80`}
-      title={`${String(count)}回書き込み — クリックで一覧`}
+      title={`${String(count)}回書き込み — クリックで一覧 / ホバーでプレビュー`}
     >
       ({count})
     </button>
@@ -459,8 +471,11 @@ function ResItem({
   inlineMediaEnabled,
   allThreadImageUrls,
   idCount,
+  idResNumbers,
   watchoiCount,
+  watchoiResNumbers,
   kotehanCount,
+  kotehanResNumbers,
   replyNumbers,
   onAnchorHover,
   onAnchorLeave,
@@ -483,8 +498,11 @@ function ResItem({
   readonly inlineMediaEnabled: boolean;
   readonly allThreadImageUrls: readonly string[];
   readonly idCount: number;
+  readonly idResNumbers: readonly number[];
   readonly watchoiCount: number;
+  readonly watchoiResNumbers: readonly number[];
   readonly kotehanCount: number;
+  readonly kotehanResNumbers: readonly number[];
   /** Response numbers that reference (reply to) this response */
   readonly replyNumbers: readonly number[];
   readonly onAnchorHover: (nums: readonly number[], x: number, y: number) => void;
@@ -695,9 +713,12 @@ function ResItem({
           {resKotehan !== null && (
             <CountBadge
               count={kotehanCount}
+              resNumbers={kotehanResNumbers}
               onClick={() => {
                 onFilterByKotehan(resKotehan);
               }}
+              onHover={onAnchorHover}
+              onLeave={onAnchorLeave}
             />
           )}
           {resWatchoi !== null && (
@@ -712,9 +733,12 @@ function ResItem({
               </button>
               <CountBadge
                 count={watchoiCount}
+                resNumbers={watchoiResNumbers}
                 onClick={() => {
                   onFilterByWatchoi(resWatchoi.label);
                 }}
+                onHover={onAnchorHover}
+                onLeave={onAnchorLeave}
               />
             </>
           )}
@@ -726,9 +750,12 @@ function ResItem({
           {resId !== null && (
             <CountBadge
               count={idCount}
+              resNumbers={idResNumbers}
               onClick={() => {
                 onFilterById(resId);
               }}
+              onHover={onAnchorHover}
+              onLeave={onAnchorLeave}
             />
           )}
         </span>
@@ -2466,15 +2493,26 @@ export function ThreadView(): React.JSX.Element {
                           inlineMediaEnabled={inlineMediaEnabled}
                           allThreadImageUrls={allThreadImageUrls}
                           idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
+                          idResNumbers={resIdVal !== null ? (idCountMap.get(resIdVal)?.resNumbers ?? EMPTY_RES_NUMBERS) : EMPTY_RES_NUMBERS}
                           watchoiCount={
                             resWatchoiVal !== null
                               ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0)
                               : 0
                           }
+                          watchoiResNumbers={
+                            resWatchoiVal !== null
+                              ? (watchoiCountMap.get(resWatchoiVal.label)?.resNumbers ?? EMPTY_RES_NUMBERS)
+                              : EMPTY_RES_NUMBERS
+                          }
                           kotehanCount={
                             resKotehanVal !== null
                               ? (kotehanCountMap.get(resKotehanVal)?.count ?? 0)
                               : 0
+                          }
+                          kotehanResNumbers={
+                            resKotehanVal !== null
+                              ? (kotehanCountMap.get(resKotehanVal)?.resNumbers ?? EMPTY_RES_NUMBERS)
+                              : EMPTY_RES_NUMBERS
                           }
                           replyNumbers={replyMap.get(res.number) ?? []}
                           onAnchorHover={handleAnchorHover}
