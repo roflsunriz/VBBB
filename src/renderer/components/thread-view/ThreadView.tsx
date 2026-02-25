@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   mdiClose,
+  mdiMagnify,
   mdiPencil,
   mdiShieldOff,
   mdiFormatColorHighlight,
@@ -36,7 +37,7 @@ import type { PostHistoryEntry } from '@shared/post-history';
 import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
-import { sanitizeHtml } from '../../hooks/use-sanitize';
+import { sanitizeHtml, stripHtml } from '../../hooks/use-sanitize';
 import { convertAnchorsToLinks, parseAnchors } from '../../utils/anchor-parser';
 import { detectImageUrls, detectVideoUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
@@ -76,6 +77,9 @@ import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 import { useDragReorder } from '../../hooks/use-drag-reorder';
 import { useTabOrientation } from '../../hooks/use-tab-orientation';
 import { ContextMenuContainer } from '../common/ContextMenuContainer';
+
+/** Search field selector for the thread search bar */
+type SearchField = 'all' | 'name' | 'id' | 'body' | 'watchoi';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -1203,6 +1207,16 @@ export function ThreadView(): React.JSX.Element {
     value: string;
   } | null>(null);
 
+  // Thread search bar state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchField, setSearchField] = useState<SearchField>('all');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Clear search when switching tabs
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activeTabId]);
+
   // Preserve scroll position across filter apply/clear cycles.
   // Saved when transitioning from no-filter → filter; restored when transitioning back to no-filter.
   // preFilterResNumberRef stores the first visible res number for index-based restoration
@@ -1438,12 +1452,57 @@ export function ThreadView(): React.JSX.Element {
     return set;
   }, [filterKey, activeTab]);
 
+  // Search bar filtering: compute matching res numbers
+  const searchFilteredResNumbers = useMemo<ReadonlySet<number> | null>(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed === '' || activeTab === undefined) return null;
+    const lowerQuery = trimmed.toLowerCase();
+    const set = new Set<number>();
+    for (const res of activeTab.responses) {
+      let matched = false;
+      switch (searchField) {
+        case 'name':
+          matched = stripHtml(res.name).toLowerCase().includes(lowerQuery);
+          break;
+        case 'id': {
+          const id = extractId(res);
+          matched = id !== null && id.toLowerCase().includes(lowerQuery);
+          break;
+        }
+        case 'body':
+          matched = stripHtml(res.body).toLowerCase().includes(lowerQuery);
+          break;
+        case 'watchoi': {
+          const w = extractWatchoi(res);
+          matched = w !== null && w.label.toLowerCase().includes(lowerQuery);
+          break;
+        }
+        case 'all':
+          matched =
+            stripHtml(res.name).toLowerCase().includes(lowerQuery) ||
+            res.dateTime.toLowerCase().includes(lowerQuery) ||
+            stripHtml(res.body).toLowerCase().includes(lowerQuery);
+          break;
+        default: {
+          const _exhaustive: never = searchField;
+          throw new Error(`Unexpected search field: ${String(_exhaustive)}`);
+        }
+      }
+      if (matched) set.add(res.number);
+    }
+    return set;
+  }, [searchQuery, searchField, activeTab]);
+
   // Build the display-ready response list (filtered or full)
   const displayResponses = useMemo(() => {
     if (activeTab === undefined) return [];
-    if (filteredResNumbers === null) return activeTab.responses;
-    return activeTab.responses.filter((res) => filteredResNumbers.has(res.number));
-  }, [activeTab, filteredResNumbers]);
+    const responses =
+      filteredResNumbers === null
+        ? activeTab.responses
+        : activeTab.responses.filter((res) => filteredResNumbers.has(res.number));
+    if (searchFilteredResNumbers === null) return responses;
+    return responses.filter((res) => searchFilteredResNumbers.has(res.number));
+  }, [activeTab, filteredResNumbers, searchFilteredResNumbers]);
 
   // Map resNumber -> index in displayResponses for virtual scroll navigation
   const resNumberToIndex = useMemo(() => {
@@ -2221,6 +2280,71 @@ export function ThreadView(): React.JSX.Element {
                 <p className="text-xs text-[var(--color-text-muted)]">
                   {activeTab.responses.length} レス
                 </p>
+              </div>
+
+              {/* Thread search bar */}
+              <div className="flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/20 px-3 py-1">
+                <MdiIcon
+                  path={mdiMagnify}
+                  size={13}
+                  className="shrink-0 text-[var(--color-text-muted)]"
+                />
+                <div className="relative flex-1">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                    }}
+                    placeholder="スレッド内検索…"
+                    className="w-full rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-0.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
+                  />
+                  {searchQuery !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        searchInputRef.current?.focus();
+                      }}
+                      className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                    >
+                      <MdiIcon path={mdiClose} size={10} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {(
+                    [
+                      ['all', '全て'],
+                      ['name', '名前'],
+                      ['id', 'ID'],
+                      ['body', '本文'],
+                      ['watchoi', 'ﾜｯﾁｮｲ'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setSearchField(value);
+                        searchInputRef.current?.focus();
+                      }}
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                        searchField === value
+                          ? 'bg-[var(--color-accent)] text-white'
+                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {searchQuery.trim() !== '' && searchFilteredResNumbers !== null && (
+                  <span className="shrink-0 text-[10px] text-[var(--color-text-muted)]">
+                    {searchFilteredResNumbers.size}件
+                  </span>
+                )}
               </div>
 
               {/* F31: Filter banner */}
