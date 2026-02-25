@@ -205,6 +205,38 @@ export function App(): React.JSX.Element {
     void init();
   }, [fetchMenu, fetchFavorites, fetchNgRules, loadPostHistory, restoreSession, restoreTabs]);
 
+  // Subscribe to round:completed push events to auto-refresh displayed data
+  useEffect(() => {
+    const unsubscribe = window.electronApi.on('round:completed', (...args: unknown[]) => {
+      const payload = args[0] as
+        | {
+            updatedBoards?: string[];
+            updatedThreads?: Array<{ boardUrl: string; threadId: string }>;
+          }
+        | undefined;
+      if (payload === undefined) return;
+      const state = useBBSStore.getState();
+      const selectedBoardUrl = state.selectedBoard?.url;
+      if (
+        selectedBoardUrl !== undefined &&
+        payload.updatedBoards !== undefined &&
+        payload.updatedBoards.includes(selectedBoardUrl)
+      ) {
+        void state.refreshSelectedBoard();
+      }
+      if (payload.updatedThreads !== undefined) {
+        for (const updated of payload.updatedThreads) {
+          const tabId = `${updated.boardUrl}:${updated.threadId}`;
+          const tab = state.tabs.find((t) => t.id === tabId);
+          if (tab !== undefined) {
+            void state.refreshThreadTab(tabId);
+          }
+        }
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // Subscribe to menu actions from main process via invoke-based long-poll.
   // No ref guard: each mount starts its own poll, cleanup cancels it.
   // This is safe with React Strict Mode's double-invoke.

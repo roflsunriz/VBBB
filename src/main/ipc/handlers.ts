@@ -65,6 +65,8 @@ import {
   saveRoundBoard,
   saveRoundItem,
   setTimerConfig,
+  startRoundTimer,
+  stopRoundTimer,
 } from '../services/round-list';
 import { buildRemoteSearchUrl } from '../services/remote-search';
 import type { SavedTab, SessionState } from '@shared/history';
@@ -497,14 +499,11 @@ export async function registerIpcHandlers(): Promise<void> {
     return Promise.resolve(getTimerConfig());
   });
 
-  handle('round:set-timer', async (config) => {
-    await setTimerConfig(dataDir, config);
-  });
-
-  handle('round:execute', async () => {
-    // Execute round fetching for all board and item entries
+  const executeRound = async (): Promise<void> => {
     const boards = getRoundBoards();
     const items = getRoundItems();
+    const updatedBoards: string[] = [];
+    const updatedThreads: Array<{ boardUrl: string; threadId: string }> = [];
     for (const board of boards) {
       try {
         const boardObj = lookupBoard(board.url);
@@ -514,6 +513,7 @@ export async function registerIpcHandlers(): Promise<void> {
         } else {
           await fetchSubject(boardObj, dataDir);
         }
+        updatedBoards.push(board.url);
       } catch {
         logger.warn(`Round: failed to fetch subject for ${board.url}`);
       }
@@ -528,11 +528,34 @@ export async function registerIpcHandlers(): Promise<void> {
         } else {
           await fetchDat(boardObj, threadId, dataDir);
         }
+        updatedThreads.push({ boardUrl: item.url, threadId });
       } catch {
         logger.warn(`Round: failed to fetch dat for ${item.url}/${item.fileName}`);
       }
     }
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win !== undefined) {
+      win.webContents.send('round:completed', { updatedBoards, updatedThreads });
+    }
+    logger.info(
+      `Round completed: ${String(updatedBoards.length)} boards, ${String(updatedThreads.length)} threads`,
+    );
+  };
+
+  handle('round:set-timer', async (config) => {
+    await setTimerConfig(dataDir, config);
   });
+
+  handle('round:execute', async () => {
+    await executeRound();
+  });
+
+  // Register round callback so setTimerConfig can restart the timer
+  const timerConfig = getTimerConfig();
+  startRoundTimer(timerConfig.intervalMinutes, executeRound);
+  if (!timerConfig.enabled) {
+    stopRoundTimer();
+  }
 
   // Post history
   handle('post:save-history', async (entry) => {
