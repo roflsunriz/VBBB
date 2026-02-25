@@ -30,8 +30,14 @@ export interface FavFolder {
   readonly children: readonly FavNode[];
 }
 
-/** A node in the favorite tree (either a folder or an item) */
-export type FavNode = FavFolder | FavItem;
+/** A horizontal separator line in the favorite tree */
+export interface FavSeparator {
+  readonly id: string;
+  readonly kind: 'separator';
+}
+
+/** A node in the favorite tree */
+export type FavNode = FavFolder | FavItem | FavSeparator;
 
 /** Root favorites structure */
 export interface FavTree {

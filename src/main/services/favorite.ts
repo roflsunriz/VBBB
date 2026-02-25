@@ -5,7 +5,7 @@
  */
 import { join } from 'node:path';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
-import type { FavFolder, FavItem, FavNode, FavTree } from '@shared/favorite';
+import type { FavFolder, FavItem, FavNode, FavSeparator, FavTree } from '@shared/favorite';
 import { FavItemType } from '@shared/favorite';
 import type { BoardType } from '@shared/domain';
 import { readFileSafe, atomicWriteFile, ensureDir } from './file-io';
@@ -50,6 +50,13 @@ function parseXmlNode(element: Element): FavNode | null {
       expanded,
       children,
     } satisfies FavFolder;
+  }
+
+  if (tagName === 'separator') {
+    return {
+      id: generateId(),
+      kind: 'separator',
+    } satisfies FavSeparator;
   }
 
   if (tagName === 'favitem') {
@@ -114,7 +121,10 @@ function serializeFavNode(doc: Document, node: FavNode): Element {
     return el;
   }
 
-  // FavItem
+  if (node.kind === 'separator') {
+    return doc.createElement('separator');
+  }
+
   const el = doc.createElement('favitem');
   el.setAttribute('type', node.boardType);
   el.setAttribute('favtype', node.type);
@@ -162,6 +172,81 @@ function removeNodeById(nodes: readonly FavNode[], nodeId: string): readonly Fav
     }
   }
   return result;
+}
+
+function findNodeById(nodes: readonly FavNode[], nodeId: string): FavNode | null {
+  for (const node of nodes) {
+    if (node.id === nodeId) return node;
+    if (node.kind === 'folder') {
+      const found = findNodeById(node.children, nodeId);
+      if (found !== null) return found;
+    }
+  }
+  return null;
+}
+
+function insertNode(
+  nodes: readonly FavNode[],
+  targetId: string,
+  newNode: FavNode,
+  position: 'before' | 'after' | 'inside',
+): readonly FavNode[] {
+  if (position === 'inside') {
+    return nodes.map((node) => {
+      if (node.id === targetId && node.kind === 'folder') {
+        return { ...node, children: [...node.children, newNode] };
+      }
+      if (node.kind === 'folder') {
+        return { ...node, children: insertNode(node.children, targetId, newNode, position) };
+      }
+      return node;
+    });
+  }
+
+  const result: FavNode[] = [];
+  for (const node of nodes) {
+    if (node.id === targetId && position === 'before') {
+      result.push(newNode);
+    }
+    if (node.kind === 'folder') {
+      result.push({
+        ...node,
+        children: insertNode(node.children, targetId, newNode, position),
+      });
+    } else {
+      result.push(node);
+    }
+    if (node.id === targetId && position === 'after') {
+      result.push(newNode);
+    }
+  }
+  return result;
+}
+
+/**
+ * Move a node relative to another node.
+ */
+export function reorderNode(
+  children: readonly FavNode[],
+  dragNodeId: string,
+  dropNodeId: string,
+  position: 'before' | 'after' | 'inside',
+): readonly FavNode[] {
+  const dragNode = findNodeById(children, dragNodeId);
+  if (dragNode === null) return children;
+  const removed = removeNodeById(children, dragNodeId);
+  return insertNode(removed, dropNodeId, dragNode, position);
+}
+
+/**
+ * Move a node into a folder (append to children).
+ */
+export function moveNodeToFolder(
+  children: readonly FavNode[],
+  nodeId: string,
+  folderId: string,
+): readonly FavNode[] {
+  return reorderNode(children, nodeId, folderId, 'inside');
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +309,57 @@ export async function removeFavorite(dataDir: string, nodeId: string): Promise<v
     children: removeNodeById(tree.children, nodeId),
   };
   await saveFavorites(dataDir, updated);
+}
+
+/**
+ * Add a new folder to the root of favorites.
+ */
+export async function addFavFolder(dataDir: string, title: string): Promise<void> {
+  const tree = loadFavorites(dataDir);
+  const folder: FavFolder = {
+    id: generateId(),
+    kind: 'folder',
+    title,
+    expanded: true,
+    children: [],
+  };
+  await saveFavorites(dataDir, { children: [...tree.children, folder] });
+}
+
+/**
+ * Add a separator to the root of favorites.
+ */
+export async function addFavSeparator(dataDir: string): Promise<void> {
+  const tree = loadFavorites(dataDir);
+  const sep: FavSeparator = { id: generateId(), kind: 'separator' };
+  await saveFavorites(dataDir, { children: [...tree.children, sep] });
+}
+
+/**
+ * Move a node into a target folder.
+ */
+export async function moveFavNodeToFolder(
+  dataDir: string,
+  nodeId: string,
+  folderId: string,
+): Promise<void> {
+  const tree = loadFavorites(dataDir);
+  const updated = moveNodeToFolder(tree.children, nodeId, folderId);
+  await saveFavorites(dataDir, { children: updated });
+}
+
+/**
+ * Reorder a node relative to another node.
+ */
+export async function reorderFavNode(
+  dataDir: string,
+  dragNodeId: string,
+  dropNodeId: string,
+  position: 'before' | 'after' | 'inside',
+): Promise<void> {
+  const tree = loadFavorites(dataDir);
+  const updated = reorderNode(tree.children, dragNodeId, dropNodeId, position);
+  await saveFavorites(dataDir, { children: updated });
 }
 
 /**

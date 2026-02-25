@@ -127,6 +127,26 @@ export interface IpcChannelMap {
     args: [nodeId: string];
     result: void;
   };
+  /** Add a new folder to favorites root */
+  'fav:add-folder': {
+    args: [title: string];
+    result: void;
+  };
+  /** Add a separator to favorites root */
+  'fav:add-separator': {
+    args: [];
+    result: void;
+  };
+  /** Move a node into a folder */
+  'fav:move-to-folder': {
+    args: [nodeId: string, folderId: string];
+    result: void;
+  };
+  /** Reorder a node relative to another */
+  'fav:reorder': {
+    args: [dragNodeId: string, dropNodeId: string, position: 'before' | 'after' | 'inside'];
+    result: void;
+  };
   /** Get proxy configuration */
   'proxy:get-config': {
     args: [];

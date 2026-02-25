@@ -31,7 +31,16 @@ import {
   loadBrowsingHistory,
   saveBrowsingHistory,
 } from '../services/browsing-history';
-import { loadFavorites, saveFavorites, addFavorite, removeFavorite } from '../services/favorite';
+import {
+  loadFavorites,
+  saveFavorites,
+  addFavorite,
+  removeFavorite,
+  addFavFolder,
+  addFavSeparator,
+  moveFavNodeToFolder,
+  reorderFavNode,
+} from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
 import {
   getAllCookies,
@@ -368,6 +377,22 @@ export async function registerIpcHandlers(): Promise<void> {
 
   handle('fav:remove', async (nodeId: string) => {
     await removeFavorite(dataDir, nodeId);
+  });
+
+  handle('fav:add-folder', async (title: string) => {
+    await addFavFolder(dataDir, title);
+  });
+
+  handle('fav:add-separator', async () => {
+    await addFavSeparator(dataDir);
+  });
+
+  handle('fav:move-to-folder', async (nodeId: string, folderId: string) => {
+    await moveFavNodeToFolder(dataDir, nodeId, folderId);
+  });
+
+  handle('fav:reorder', async (dragNodeId: string, dropNodeId: string, position) => {
+    await reorderFavNode(dataDir, dragNodeId, dropNodeId, position);
   });
 
   // Tab persistence

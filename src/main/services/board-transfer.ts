@@ -66,12 +66,13 @@ function replaceFavNodeUrls(node: FavNode, urlMap: ReadonlyMap<string, string>):
       children: node.children.map((child) => replaceFavNodeUrls(child, urlMap)),
     };
   }
-  // FavItem
+  if (node.kind === 'separator') {
+    return node;
+  }
   const newUrl = urlMap.get(node.url);
   if (newUrl !== undefined) {
     return { ...node, url: newUrl };
   }
-  // Also check if the URL starts with any old board URL (for thread URLs)
   for (const [oldUrl, newBaseUrl] of urlMap) {
     if (node.url.startsWith(oldUrl)) {
       return { ...node, url: node.url.replace(oldUrl, newBaseUrl) };

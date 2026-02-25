@@ -140,6 +140,14 @@ interface BBSState {
   addFavorite: (node: FavNode) => Promise<void>;
   removeFavorite: (nodeId: string) => Promise<void>;
   saveFavorites: (tree: FavTree) => Promise<void>;
+  addFavFolder: (title: string) => Promise<void>;
+  addFavSeparator: () => Promise<void>;
+  moveFavToFolder: (nodeId: string, folderId: string) => Promise<void>;
+  reorderFavorite: (
+    dragNodeId: string,
+    dropNodeId: string,
+    position: 'before' | 'after' | 'inside',
+  ) => Promise<void>;
   toggleFavorites: () => void;
   openThread: (boardUrl: string, threadId: string, title: string) => Promise<void>;
   closeTab: (tabId: string) => void;
@@ -705,6 +713,50 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     try {
       await getApi().invoke('fav:save', tree);
       set({ favorites: tree });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  addFavFolder: async (title: string) => {
+    try {
+      await getApi().invoke('fav:add-folder', title);
+      const favorites = await getApi().invoke('fav:load');
+      set({ favorites });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  addFavSeparator: async () => {
+    try {
+      await getApi().invoke('fav:add-separator');
+      const favorites = await getApi().invoke('fav:load');
+      set({ favorites });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  moveFavToFolder: async (nodeId: string, folderId: string) => {
+    try {
+      await getApi().invoke('fav:move-to-folder', nodeId, folderId);
+      const favorites = await getApi().invoke('fav:load');
+      set({ favorites });
+    } catch {
+      // Silently ignore
+    }
+  },
+
+  reorderFavorite: async (
+    dragNodeId: string,
+    dropNodeId: string,
+    position: 'before' | 'after' | 'inside',
+  ) => {
+    try {
+      await getApi().invoke('fav:reorder', dragNodeId, dropNodeId, position);
+      const favorites = await getApi().invoke('fav:load');
+      set({ favorites });
     } catch {
       // Silently ignore
     }
