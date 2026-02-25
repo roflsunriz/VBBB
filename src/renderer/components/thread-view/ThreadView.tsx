@@ -2342,14 +2342,13 @@ export function ThreadView(): React.JSX.Element {
           >
             <MdiIcon path={mdiViewSequential} size={12} />
           </button>
-          {actionButtons}
         </div>
       )}
 
       {/* Main content column */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {/* Action buttons bar (separate when vertical tabs) */}
-        {isVerticalThreadTabs && actionButtons !== null && (
+        {/* Action buttons bar (always separate row below tabs) */}
+        {actionButtons !== null && (
           <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
             {actionButtons}
           </div>
