@@ -1060,6 +1060,7 @@ export function ThreadView(): React.JSX.Element {
     y: number;
     tabId: string;
     isFavorite: boolean;
+    threadPageUrl: string;
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
@@ -1099,11 +1100,14 @@ export function ThreadView(): React.JSX.Element {
       e.stopPropagation();
       const tab = tabs.find((t) => t.id === tabId);
       const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
+      const threadPageUrl =
+        tab !== undefined ? buildResPermalink(tab.boardUrl, tab.threadId, 1).replace(/1$/, '') : '';
       setTabCtxMenu({
         x: e.clientX,
         y: e.clientY,
         tabId,
         isFavorite: favoriteUrlToId.has(threadUrl),
+        threadPageUrl,
       });
     },
     [tabs, favoriteUrlToId],
@@ -2701,6 +2705,19 @@ export function ThreadView(): React.JSX.Element {
             role="menuitem"
           >
             巡回に追加
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={() => {
+              if (tabCtxMenu.threadPageUrl.length > 0) {
+                void window.electronApi.invoke('shell:open-external', tabCtxMenu.threadPageUrl);
+              }
+              setTabCtxMenu(null);
+            }}
+            role="menuitem"
+          >
+            外部ブラウザで開く
           </button>
           <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
           <button
