@@ -387,6 +387,9 @@ export function FavoriteTree(): React.JSX.Element {
   const [searchFilter, setSearchFilter] = useState('');
   const [ctxMenu, setCtxMenu] = useState<FavCtxMenu | null>(null);
   const [folderSubMenu, setFolderSubMenu] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
 
@@ -473,11 +476,26 @@ export function FavoriteTree(): React.JSX.Element {
   }, [ctxMenu]);
 
   const handleAddFolder = useCallback(() => {
-    const title = window.prompt('フォルダ名を入力してください');
-    if (title !== null && title.trim().length > 0) {
-      void addFavFolder(title.trim());
+    setIsCreatingFolder(true);
+    setNewFolderName('');
+    requestAnimationFrame(() => {
+      folderInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleFolderNameSubmit = useCallback(() => {
+    const trimmed = newFolderName.trim();
+    if (trimmed.length > 0) {
+      void addFavFolder(trimmed);
     }
-  }, [addFavFolder]);
+    setIsCreatingFolder(false);
+    setNewFolderName('');
+  }, [newFolderName, addFavFolder]);
+
+  const handleFolderNameCancel = useCallback(() => {
+    setIsCreatingFolder(false);
+    setNewFolderName('');
+  }, []);
 
   const handleAddSeparator = useCallback(() => {
     void addFavSeparator();
@@ -574,6 +592,31 @@ export function FavoriteTree(): React.JSX.Element {
           <MdiIcon path={mdiMinus} size={14} />
         </button>
       </div>
+
+      {/* Inline folder name input */}
+      {isCreatingFolder && (
+        <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
+          <MdiIcon path={mdiFolderPlus} size={12} className="shrink-0 text-[var(--color-warning)]" />
+          <input
+            ref={folderInputRef}
+            type="text"
+            value={newFolderName}
+            onChange={(e) => { setNewFolderName(e.target.value); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFolderNameSubmit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                handleFolderNameCancel();
+              }
+            }}
+            onBlur={handleFolderNameSubmit}
+            placeholder="フォルダ名を入力..."
+            className="min-w-0 flex-1 rounded border border-[var(--color-accent)] bg-[var(--color-bg-primary)] px-1.5 py-0.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+          />
+        </div>
+      )}
 
       {/* Search */}
       <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
