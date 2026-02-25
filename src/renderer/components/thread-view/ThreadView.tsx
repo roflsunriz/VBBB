@@ -67,7 +67,6 @@ import {
 import {
   findNextThread,
   NEXT_THREAD_RESPONSE_THRESHOLD,
-  NEXT_THREAD_BUTTON_THRESHOLD,
 } from '../../utils/next-thread-detect';
 import { generateNextThreadTemplate } from '../../utils/next-thread-template';
 import { isAsciiArt } from '../../utils/aa-detect';
@@ -2205,35 +2204,30 @@ export function ThreadView(): React.JSX.Element {
             className={refreshing ? 'animate-spin' : ''}
           />
         </button>
-        {/* 次スレ検索ボタン: レス数が NEXT_THREAD_BUTTON_THRESHOLD 以上で表示 */}
-        {activeTabResponseCount >= NEXT_THREAD_BUTTON_THRESHOLD && (
-          <>
-            <button
-              type="button"
-              onClick={handleSearchNextThread}
-              className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-                nextThreadCandidate !== undefined && nextThreadCandidate !== null
-                  ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
-                  : nextThreadCandidate === null
-                    ? 'text-[var(--color-text-muted)]'
-                    : 'text-[var(--color-warning)]'
-              }`}
-              title="次スレを検索"
-            >
-              <MdiIcon path={mdiArrowRightBold} size={12} />
-              次スレ
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateNextThread}
-              className="flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
-              title="現スレの>>1をベースに次スレを立てる"
-            >
-              <MdiIcon path={mdiPencil} size={12} />
-              次スレを立てる
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={handleSearchNextThread}
+          className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            nextThreadCandidate !== undefined && nextThreadCandidate !== null
+              ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+              : nextThreadCandidate === null
+                ? 'text-[var(--color-text-muted)]'
+                : 'text-[var(--color-warning)]'
+          }`}
+          title="次スレを検索"
+        >
+          <MdiIcon path={mdiArrowRightBold} size={12} />
+          次スレ
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateNextThread}
+          className="flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
+          title="現スレの>>1をベースに次スレを立てる"
+        >
+          <MdiIcon path={mdiPencil} size={12} />
+          次スレを立てる
+        </button>
         <button
           type="button"
           onClick={handleToggleInlineMedia}
