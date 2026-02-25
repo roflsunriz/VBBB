@@ -69,6 +69,7 @@ import {
   NEXT_THREAD_RESPONSE_THRESHOLD,
   NEXT_THREAD_BUTTON_THRESHOLD,
 } from '../../utils/next-thread-detect';
+import { generateNextThreadTemplate } from '../../utils/next-thread-template';
 import { isAsciiArt } from '../../utils/aa-detect';
 import type { WatchoiInfo } from '../../utils/thread-analysis';
 import { extractIps, threadHasExposedIps } from '../../utils/ip-detect';
@@ -1025,6 +1026,7 @@ export function ThreadView(): React.JSX.Element {
   const toggleTabAnalysis = useBBSStore((s) => s.toggleTabAnalysis);
   const toggleTabProgPost = useBBSStore((s) => s.toggleTabProgPost);
   const closeTabProgPost = useBBSStore((s) => s.closeTabProgPost);
+  const openNewThreadEditorWithDraft = useBBSStore((s) => s.openNewThreadEditorWithDraft);
 
   const handleTogglePostEditor = useCallback(() => {
     if (activeTabId !== null) toggleTabPostEditor(activeTabId);
@@ -1391,6 +1393,20 @@ export function ThreadView(): React.JSX.Element {
     const found = findNextThread(activeTab.title, `${activeTab.threadId}.dat`, boardTab.subjects);
     setNextThreadCandidate(found ?? null);
   }, [activeTab, boardTabs]);
+
+  const handleCreateNextThread = useCallback(() => {
+    if (activeTab === undefined) return;
+    const firstPost = activeTab.responses[0];
+    if (firstPost === undefined) return;
+
+    const template = generateNextThreadTemplate({
+      firstPostBody: firstPost.body,
+      currentTitle: activeTab.title,
+      boardUrl: activeTab.boardUrl,
+      threadId: activeTab.threadId,
+    });
+    openNewThreadEditorWithDraft(template.subject, template.message);
+  }, [activeTab, openNewThreadEditorWithDraft]);
 
   // Per-tab panel states derived from the active tab
   const postEditorOpen = activeTab?.postEditorOpen ?? false;
@@ -2157,21 +2173,32 @@ export function ThreadView(): React.JSX.Element {
         </button>
         {/* 次スレ検索ボタン: レス数が NEXT_THREAD_BUTTON_THRESHOLD 以上で表示 */}
         {activeTabResponseCount >= NEXT_THREAD_BUTTON_THRESHOLD && (
-          <button
-            type="button"
-            onClick={handleSearchNextThread}
-            className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
-              nextThreadCandidate !== undefined && nextThreadCandidate !== null
-                ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
-                : nextThreadCandidate === null
-                  ? 'text-[var(--color-text-muted)]'
-                  : 'text-[var(--color-warning)]'
-            }`}
-            title="次スレを検索"
-          >
-            <MdiIcon path={mdiArrowRightBold} size={12} />
-            次スレ
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleSearchNextThread}
+              className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+                nextThreadCandidate !== undefined && nextThreadCandidate !== null
+                  ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+                  : nextThreadCandidate === null
+                    ? 'text-[var(--color-text-muted)]'
+                    : 'text-[var(--color-warning)]'
+              }`}
+              title="次スレを検索"
+            >
+              <MdiIcon path={mdiArrowRightBold} size={12} />
+              次スレ
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateNextThread}
+              className="flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
+              title="現スレの>>1をベースに次スレを立てる"
+            >
+              <MdiIcon path={mdiPencil} size={12} />
+              次スレを立てる
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -2404,6 +2431,22 @@ export function ThreadView(): React.JSX.Element {
                 </div>
               )}
 
+              {/* DAT落ちバナー: DAT落ちしたスレッドで次スレ作成を促す */}
+              {activeTab.isDatFallen && activeTabResponseCount < NEXT_THREAD_RESPONSE_THRESHOLD && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-1.5 text-xs">
+                  <span className="flex-1 font-semibold text-[var(--color-text-muted)]">
+                    このスレッドはDAT落ちしています。
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCreateNextThread}
+                    className="shrink-0 rounded bg-[var(--color-accent)] px-2 py-0.5 text-white hover:opacity-90"
+                  >
+                    次スレを立てる
+                  </button>
+                </div>
+              )}
+
               {/* 次スレバナー: スレッドが1000レス超えかつ次スレ検索済みの場合に表示 */}
               {activeTabResponseCount >= NEXT_THREAD_RESPONSE_THRESHOLD &&
                 nextThreadCandidate !== undefined && (
@@ -2444,6 +2487,13 @@ export function ThreadView(): React.JSX.Element {
                           className="shrink-0 rounded border border-[var(--color-border-primary)] px-2 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
                         >
                           再検索
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCreateNextThread}
+                          className="shrink-0 rounded bg-[var(--color-accent)] px-2 py-0.5 text-white hover:opacity-90"
+                        >
+                          次スレを立てる
                         </button>
                       </>
                     )}
@@ -2501,7 +2551,11 @@ export function ThreadView(): React.JSX.Element {
                           inlineMediaEnabled={inlineMediaEnabled}
                           allThreadImageUrls={allThreadImageUrls}
                           idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
-                          idResNumbers={resIdVal !== null ? (idCountMap.get(resIdVal)?.resNumbers ?? EMPTY_RES_NUMBERS) : EMPTY_RES_NUMBERS}
+                          idResNumbers={
+                            resIdVal !== null
+                              ? (idCountMap.get(resIdVal)?.resNumbers ?? EMPTY_RES_NUMBERS)
+                              : EMPTY_RES_NUMBERS
+                          }
                           watchoiCount={
                             resWatchoiVal !== null
                               ? (watchoiCountMap.get(resWatchoiVal.label)?.count ?? 0)
@@ -2509,7 +2563,8 @@ export function ThreadView(): React.JSX.Element {
                           }
                           watchoiResNumbers={
                             resWatchoiVal !== null
-                              ? (watchoiCountMap.get(resWatchoiVal.label)?.resNumbers ?? EMPTY_RES_NUMBERS)
+                              ? (watchoiCountMap.get(resWatchoiVal.label)?.resNumbers ??
+                                EMPTY_RES_NUMBERS)
                               : EMPTY_RES_NUMBERS
                           }
                           kotehanCount={
@@ -2519,7 +2574,8 @@ export function ThreadView(): React.JSX.Element {
                           }
                           kotehanResNumbers={
                             resKotehanVal !== null
-                              ? (kotehanCountMap.get(resKotehanVal)?.resNumbers ?? EMPTY_RES_NUMBERS)
+                              ? (kotehanCountMap.get(resKotehanVal)?.resNumbers ??
+                                EMPTY_RES_NUMBERS)
                               : EMPTY_RES_NUMBERS
                           }
                           replyNumbers={replyMap.get(res.number) ?? []}

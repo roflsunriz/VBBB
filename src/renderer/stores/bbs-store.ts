@@ -183,6 +183,9 @@ interface BBSState {
   newThreadEditorOpen: boolean;
   openNewThreadEditor: () => void;
   closeNewThreadEditor: () => void;
+  /** Pre-filled subject/message for next-thread creation (null = blank editor). */
+  nextThreadDraft: { readonly subject: string; readonly message: string } | null;
+  openNewThreadEditorWithDraft: (subject: string, message: string) => void;
   /** Navigate to the previous or next open thread tab (Slevo: SwitchToPreviousTab / SwitchToNextTab) */
   switchToAdjacentTab: (direction: 'prev' | 'next') => void;
 }
@@ -356,6 +359,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   statusMessage: 'Ready',
 
   newThreadEditorOpen: false,
+  nextThreadDraft: null,
 
   fetchMenu: async () => {
     set({ menuLoading: true, menuError: null, statusMessage: '板一覧を取得中...' });
@@ -1560,7 +1564,14 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   },
 
   closeNewThreadEditor: () => {
-    set({ newThreadEditorOpen: false });
+    set({ newThreadEditorOpen: false, nextThreadDraft: null });
+  },
+
+  openNewThreadEditorWithDraft: (subject: string, message: string) => {
+    set({
+      newThreadEditorOpen: true,
+      nextThreadDraft: { subject, message },
+    });
   },
 
   switchToAdjacentTab: (direction: 'prev' | 'next') => {

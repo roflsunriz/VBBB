@@ -26,7 +26,7 @@ export const NEXT_THREAD_BUTTON_THRESHOLD = 950;
  *
  * Returns null when no positive integer is found.
  */
-function extractRightmostNumber(
+export function extractRightmostNumber(
   title: string,
 ): { before: string; num: number; after: string } | null {
   let lastMatch: RegExpExecArray | null = null;

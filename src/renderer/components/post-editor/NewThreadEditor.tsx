@@ -24,11 +24,12 @@ export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): Re
   const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
   const refreshSelectedBoard = useBBSStore((s) => s.refreshSelectedBoard);
   const openThread = useBBSStore((s) => s.openThread);
+  const nextThreadDraft = useBBSStore((s) => s.nextThreadDraft);
 
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(nextThreadDraft?.subject ?? '');
   const [name, setName] = useState(kotehan.name);
   const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : '');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(nextThreadDraft?.message ?? '');
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const subjectRef = useRef<HTMLInputElement>(null);

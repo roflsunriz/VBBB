@@ -107,7 +107,8 @@ export function ResPopup({
     if (expandReplies) {
       return collectReplyTree(resNumbers, replyMap, MAX_POPUP_RES);
     }
-    const limited = resNumbers.length > MAX_POPUP_RES ? resNumbers.slice(0, MAX_POPUP_RES) : resNumbers;
+    const limited =
+      resNumbers.length > MAX_POPUP_RES ? resNumbers.slice(0, MAX_POPUP_RES) : resNumbers;
     return { numbers: limited, hasMore: resNumbers.length > MAX_POPUP_RES };
   }, [resNumbers, replyMap, expandReplies]);
 
