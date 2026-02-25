@@ -5,6 +5,16 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-02-25
+
+### Changed
+
+- ホバーポップアップの閉じるまでの時間を延長し、プレビューのじっくり閲覧・スクロール操作を改善
+  - 名前別書き込みバッジ・ID別書き込みバッジのトリガー離脱遅延を 150ms → 500ms に拡大
+  - ポップアップにマウスが入った際にクローズタイマーをキャンセルする仕組みを追加
+  - ポップアップ離脱時の即時クローズを 300ms 遅延に変更（再入時キャンセル可能）
+  - `+N` 返信ポップアップおよびアンカーリンクの子ポップアップ離脱遅延を 200ms → 400ms に拡大
+
 ## [1.6.1] - 2026-02-25
 
 ### Added
@@ -190,6 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[1.6.2]: https://github.com/roflsunriz/VBBB/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/roflsunriz/VBBB/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/roflsunriz/VBBB/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/roflsunriz/VBBB/compare/v1.4.0...v1.5.0
