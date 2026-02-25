@@ -1054,6 +1054,8 @@ export function ThreadView(): React.JSX.Element {
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const popupCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const popupEnteredRef = useRef(false);
   const [tabCtxMenu, setTabCtxMenu] = useState<{
     x: number;
     y: number;
@@ -1966,20 +1968,49 @@ export function ThreadView(): React.JSX.Element {
   );
 
   const handleAnchorHover = useCallback((nums: readonly number[], x: number, y: number) => {
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
+    popupEnteredRef.current = false;
     setPopup({ resNumbers: nums, x, y, expandReplies: false });
   }, []);
 
   const handleReplyBadgeHover = useCallback((nums: readonly number[], x: number, y: number) => {
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
+    popupEnteredRef.current = false;
     setPopup({ resNumbers: nums, x, y, expandReplies: true });
   }, []);
 
   const handleAnchorLeave = useCallback(() => {
-    setTimeout(() => {
-      setPopup(null);
-    }, 150);
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+    }
+    popupCloseTimerRef.current = setTimeout(() => {
+      if (!popupEnteredRef.current) {
+        setPopup(null);
+      }
+      popupCloseTimerRef.current = null;
+    }, 500);
+  }, []);
+
+  const handlePopupMouseEnter = useCallback(() => {
+    popupEnteredRef.current = true;
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
   }, []);
 
   const handlePopupClose = useCallback(() => {
+    popupEnteredRef.current = false;
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
     setPopup(null);
   }, []);
 
@@ -2050,6 +2081,9 @@ export function ThreadView(): React.JSX.Element {
     return () => {
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+      if (popupCloseTimerRef.current !== null) {
+        clearTimeout(popupCloseTimerRef.current);
       }
     };
   }, []);
@@ -2695,6 +2729,7 @@ export function ThreadView(): React.JSX.Element {
           position={{ x: popup.x, y: popup.y }}
           expandReplies={popup.expandReplies}
           onClose={handlePopupClose}
+          onMouseEnter={handlePopupMouseEnter}
         />
       )}
     </section>

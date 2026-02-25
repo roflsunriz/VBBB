@@ -36,8 +36,10 @@ const OFFSET_Y = 12;
 const VIEWPORT_MARGIN = 8;
 /** Maximum nesting depth for recursive popups */
 const MAX_POPUP_DEPTH = 10;
+/** Delay before closing this popup when the mouse leaves */
+const POPUP_LEAVE_DELAY_MS = 300;
 /** Delay before closing child popup when leaving a trigger element */
-const TRIGGER_LEAVE_DELAY_MS = 200;
+const TRIGGER_LEAVE_DELAY_MS = 400;
 
 interface ChildPopupState {
   readonly resNumbers: readonly number[];
@@ -93,11 +95,15 @@ export function ResPopup({
   const [childPopup, setChildPopup] = useState<ChildPopupState | null>(null);
   const childEnteredRef = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selfCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (closeTimerRef.current !== null) {
         clearTimeout(closeTimerRef.current);
+      }
+      if (selfCloseTimerRef.current !== null) {
+        clearTimeout(selfCloseTimerRef.current);
       }
     };
   }, []);
@@ -143,8 +149,22 @@ export function ResPopup({
     el.style.top = `${String(top)}px`;
   }, [position]);
 
+  const handleMouseEnterSelf = useCallback(() => {
+    if (selfCloseTimerRef.current !== null) {
+      clearTimeout(selfCloseTimerRef.current);
+      selfCloseTimerRef.current = null;
+    }
+    onMouseEnter?.();
+  }, [onMouseEnter]);
+
   const handleMouseLeave = useCallback(() => {
-    onClose();
+    if (selfCloseTimerRef.current !== null) {
+      clearTimeout(selfCloseTimerRef.current);
+    }
+    selfCloseTimerRef.current = setTimeout(() => {
+      selfCloseTimerRef.current = null;
+      onClose();
+    }, POPUP_LEAVE_DELAY_MS);
   }, [onClose]);
 
   // ── Child popup lifecycle (for >>N anchor hovers) ──────────────────
@@ -250,7 +270,7 @@ export function ResPopup({
         boxShadow: 'var(--shadow-popup)',
       }}
       onMouseLeave={handleMouseLeave}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={handleMouseEnterSelf}
     >
       {matchedResponses.map((res) => {
         const bodyIsAa = isAsciiArt(res.body);
