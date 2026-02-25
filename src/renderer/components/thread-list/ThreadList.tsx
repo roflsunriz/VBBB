@@ -82,32 +82,73 @@ interface CtxMenu {
 }
 
 /** Check if a thread matches a thread-level NG rule */
-function matchesThreadNg(rule: NgRule, title: string, boardId: string, threadId: string): boolean {
+function matchesThreadNg(
+  rule: NgRule,
+  title: string,
+  boardId: string,
+  threadId: string,
+  resCount: number,
+): boolean {
   if (rule.target !== NgTarget.Thread) return false;
   if (!rule.enabled) return false;
   if (rule.boardId !== undefined && rule.boardId !== boardId) return false;
   if (rule.threadId !== undefined) return rule.threadId === threadId;
-  if (rule.condition.type !== 'string') return false;
-  const cond = rule.condition;
-  if (
-    cond.matchMode === NgStringMatchMode.Regexp ||
-    cond.matchMode === NgStringMatchMode.RegexpNoCase
-  ) {
-    const pattern = cond.tokens[0];
-    if (pattern === undefined) return false;
-    try {
-      const regex = new RegExp(
-        pattern,
-        cond.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
-      );
-      const matches = regex.test(title);
-      return cond.negate ? !matches : matches;
-    } catch {
-      return false;
+
+  const { condition } = rule;
+
+  if (condition.type === 'string') {
+    if (
+      condition.matchMode === NgStringMatchMode.Regexp ||
+      condition.matchMode === NgStringMatchMode.RegexpNoCase
+    ) {
+      const pattern = condition.tokens[0];
+      if (pattern === undefined) return false;
+      try {
+        const regex = new RegExp(
+          pattern,
+          condition.matchMode === NgStringMatchMode.RegexpNoCase ? 'i' : '',
+        );
+        const matches = regex.test(title);
+        return condition.negate ? !matches : matches;
+      } catch {
+        return false;
+      }
     }
+    const matches = condition.tokens.every((t: string) => title.includes(t));
+    return condition.negate ? !matches : matches;
   }
-  const matches = cond.tokens.every((t: string) => title.includes(t));
-  return cond.negate ? !matches : matches;
+
+  if (condition.type === 'numeric') {
+    const target = condition.target;
+    if (target !== 'threadResCount') return false;
+    const numVal = resCount;
+    let matches: boolean;
+    switch (condition.op) {
+      case 'eq':
+        matches = numVal === condition.value;
+        break;
+      case 'gte':
+        matches = numVal >= condition.value;
+        break;
+      case 'lte':
+        matches = numVal <= condition.value;
+        break;
+      case 'lt':
+        matches = numVal < condition.value;
+        break;
+      case 'gt':
+        matches = numVal > condition.value;
+        break;
+      case 'between':
+        matches = numVal >= condition.value && numVal <= (condition.value2 ?? condition.value);
+        break;
+      default:
+        matches = false;
+    }
+    return condition.negate ? !matches : matches;
+  }
+
+  return false;
 }
 
 export function ThreadList(): React.JSX.Element {
@@ -242,8 +283,7 @@ export function ThreadList(): React.JSX.Element {
       result = result.filter((s) => {
         const threadId = s.fileName.replace('.dat', '');
         for (const rule of threadNgRules) {
-          if (matchesThreadNg(rule, s.title, currentBoardId, threadId)) {
-            // For transparent abon, completely hide
+          if (matchesThreadNg(rule, s.title, currentBoardId, threadId, s.count)) {
             if (rule.abonType === AbonType.Transparent) return false;
           }
         }
@@ -262,7 +302,7 @@ export function ThreadList(): React.JSX.Element {
       const threadId = s.fileName.replace('.dat', '');
       for (const rule of threadNgRules) {
         if (
-          matchesThreadNg(rule, s.title, currentBoardId, threadId) &&
+          matchesThreadNg(rule, s.title, currentBoardId, threadId, s.count) &&
           rule.abonType === AbonType.Normal
         ) {
           set.add(s.fileName);
