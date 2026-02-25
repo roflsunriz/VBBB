@@ -327,23 +327,28 @@ export function ThreadList(): React.JSX.Element {
     [selectedBoard],
   );
 
-  const handleAddFavorite = useCallback(
+  const handleToggleFavorite = useCallback(
     (e: React.MouseEvent, subject: SubjectRecord) => {
       e.stopPropagation();
       if (selectedBoard === null) return;
       const threadId = subject.fileName.replace('.dat', '');
       const threadUrl = `${selectedBoard.url}dat/${threadId}.dat`;
-      const node: FavItem = {
-        id: `fav-${threadId}-${String(Date.now())}`,
-        kind: 'item',
-        type: 'thread',
-        boardType: selectedBoard.boardType ?? BoardType.Type2ch,
-        url: threadUrl,
-        title: subject.title,
-      };
-      void addFavorite(node);
+      const existingFavId = favoriteUrlToId.get(threadUrl);
+      if (existingFavId !== undefined) {
+        void removeFavorite(existingFavId);
+      } else {
+        const node: FavItem = {
+          id: `fav-${threadId}-${String(Date.now())}`,
+          kind: 'item',
+          type: 'thread',
+          boardType: selectedBoard.boardType ?? BoardType.Type2ch,
+          url: threadUrl,
+          title: subject.title,
+        };
+        void addFavorite(node);
+      }
     },
-    [selectedBoard, addFavorite],
+    [selectedBoard, addFavorite, favoriteUrlToId, removeFavorite],
   );
 
   const handleRemoveFavorite = useCallback(
@@ -410,10 +415,10 @@ export function ThreadList(): React.JSX.Element {
   const handleCtxAddFav = useCallback(() => {
     if (ctxMenu !== null) {
       const fakeEvent = { stopPropagation: () => undefined } as React.MouseEvent;
-      handleAddFavorite(fakeEvent, ctxMenu.subject);
+      handleToggleFavorite(fakeEvent, ctxMenu.subject);
     }
     setCtxMenu(null);
-  }, [ctxMenu, handleAddFavorite]);
+  }, [ctxMenu, handleToggleFavorite]);
 
   const handleCtxRemoveFav = useCallback(() => {
     if (ctxMenu !== null) {
@@ -825,11 +830,11 @@ export function ThreadList(): React.JSX.Element {
                 <span
                   className="w-6 shrink-0 cursor-pointer text-center"
                   onClick={(e) => {
-                    handleAddFavorite(e, subject);
+                    handleToggleFavorite(e, subject);
                   }}
                   role="button"
                   tabIndex={-1}
-                  title={isFavorite ? 'お気に入り済み' : 'お気に入りに追加'}
+                  title={isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
                 >
                   <MdiIcon
                     path={isFavorite ? mdiStar : mdiStarOutline}
