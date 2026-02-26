@@ -303,6 +303,52 @@ function pushStatus(category: StatusLogCategory, level: StatusLogLevel, message:
   useStatusLogStore.getState().pushLog(category, level, message);
 }
 
+function formatSignedDiff(value: number): string {
+  if (value > 0) return `+${String(value)}`;
+  return String(value);
+}
+
+interface SubjectDiffSummary {
+  readonly added: number;
+  readonly removed: number;
+  readonly increased: number;
+  readonly totalResDelta: number;
+}
+
+function summarizeSubjectDiff(
+  previous: readonly SubjectRecord[],
+  next: readonly SubjectRecord[],
+): SubjectDiffSummary {
+  const prevByFileName = new Map<string, SubjectRecord>(previous.map((s) => [s.fileName, s]));
+  const nextByFileName = new Map<string, SubjectRecord>(next.map((s) => [s.fileName, s]));
+
+  let added = 0;
+  let removed = 0;
+  let increased = 0;
+  let totalResDelta = 0;
+
+  for (const [fileName, nextSubject] of nextByFileName.entries()) {
+    const prevSubject = prevByFileName.get(fileName);
+    if (prevSubject === undefined) {
+      added += 1;
+      continue;
+    }
+    const delta = nextSubject.count - prevSubject.count;
+    if (delta > 0) {
+      increased += 1;
+      totalResDelta += delta;
+    }
+  }
+
+  for (const fileName of prevByFileName.keys()) {
+    if (!nextByFileName.has(fileName)) {
+      removed += 1;
+    }
+  }
+
+  return { added, removed, increased, totalResDelta };
+}
+
 function isExternalBoardUrl(boardUrl: string): boolean {
   try {
     const hostname = new URL(boardUrl).hostname.toLowerCase();
@@ -1340,6 +1386,9 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
     const boardTabId = selectedBoard.url;
     const boardTitle = selectedBoard.title;
+    const previousSubjects =
+      get().boardTabs.find((t) => t.id === boardTabId)?.subjects ??
+      (get().activeBoardTabId === boardTabId ? get().subjects : []);
 
     set((state) => ({
       boardTabs: state.boardTabs.map((t) =>
@@ -1359,6 +1408,8 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         getApi().invoke('bbs:get-kotehan', selectedBoard.url),
         getApi().invoke('bbs:get-samba', selectedBoard.url),
       ]);
+
+      const diff = summarizeSubjectDiff(previousSubjects, result.threads);
 
       set((state) => ({
         boardTabs: state.boardTabs.map((t) =>
@@ -1382,12 +1433,12 @@ export const useBBSStore = create<BBSState>((set, get) => ({
               subjectError: null,
             }
           : {}),
-        statusMessage: `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
+        statusMessage: `${boardTitle}: ${String(result.threads.length)} スレッド (差分 +${String(diff.added)} / -${String(diff.removed)} / +${String(diff.totalResDelta)}レス)`,
       }));
       pushStatus(
         'board',
         'success',
-        `${boardTitle}: ${String(result.threads.length)} スレッド (更新済み)`,
+        `${boardTitle}: スレ一覧差分 新規 ${String(diff.added)} / 削除 ${String(diff.removed)} / レス増加 ${String(diff.increased)}件 (+${String(diff.totalResDelta)}レス), 合計 ${String(result.threads.length)} スレッド`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1408,6 +1459,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     const { tabs } = get();
     const targetTab = tabs.find((t) => t.id === tabId);
     if (targetTab === undefined) return;
+    const previousResCount = targetTab.responses.length;
 
     pushStatus('thread', 'info', `${targetTab.title} を更新中...`);
     try {
@@ -1423,16 +1475,18 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
       // DAT落ち (kako から取得成功)
       if (result.status === DatFetchStatus.Archived) {
+        const nextResCount = result.responses.length;
+        const delta = nextResCount - previousResCount;
         set((state) => ({
           tabs: state.tabs.map((t) =>
             t.id === tabId ? { ...t, responses: result.responses, isDatFallen: true } : t,
           ),
-          statusMessage: `${targetTab.title}: DAT落ち / 過去ログ取得 (${String(result.responses.length)} レス)`,
+          statusMessage: `${targetTab.title}: DAT落ち / 過去ログ取得 (${String(nextResCount)} レス, ${formatSignedDiff(delta)}レス)`,
         }));
         pushStatus(
           'thread',
           'warn',
-          `${targetTab.title}: DAT落ちを確認 (過去ログから ${String(result.responses.length)} レス取得)`,
+          `${targetTab.title}: DAT落ちを確認 (過去ログ ${String(previousResCount)}→${String(nextResCount)} / ${formatSignedDiff(delta)}レス)`,
         );
         return;
       }
@@ -1440,28 +1494,32 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       // DAT落ち (kako も見つからず — ローカルキャッシュまたは既存レスを保持)
       if (result.status === DatFetchStatus.DatFallen) {
         const preserved = result.responses.length > 0 ? result.responses : targetTab.responses;
+        const nextResCount = preserved.length;
+        const delta = nextResCount - previousResCount;
         set((state) => ({
           tabs: state.tabs.map((t) =>
             t.id === tabId ? { ...t, responses: preserved, isDatFallen: true } : t,
           ),
-          statusMessage: `${targetTab.title}: DAT落ち (${String(preserved.length)} レス)`,
+          statusMessage: `${targetTab.title}: DAT落ち (${String(nextResCount)} レス, ${formatSignedDiff(delta)}レス)`,
         }));
         pushStatus(
           'thread',
           'warn',
-          `${targetTab.title}: DAT落ちを確認 (過去ログなし・${String(preserved.length)} レス保持)`,
+          `${targetTab.title}: DAT落ちを確認 (レス ${String(previousResCount)}→${String(nextResCount)} / ${formatSignedDiff(delta)}レス)`,
         );
         return;
       }
 
+      const nextResCount = result.responses.length;
+      const delta = nextResCount - previousResCount;
       set((state) => ({
         tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, responses: result.responses } : t)),
-        statusMessage: `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
+        statusMessage: `${targetTab.title}: ${String(nextResCount)} レス (差分 ${formatSignedDiff(delta)})`,
       }));
       pushStatus(
         'thread',
         'success',
-        `${targetTab.title}: ${String(result.responses.length)} レス (更新済み)`,
+        `${targetTab.title}: スレ更新差分 ${String(previousResCount)}→${String(nextResCount)} (${formatSignedDiff(delta)}レス)`,
       );
 
       // Persist lastModified from DAT fetch to Folder.idx and update in-memory threadIndices
