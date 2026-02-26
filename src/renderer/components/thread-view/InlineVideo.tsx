@@ -93,7 +93,6 @@ export function InlineVideo({
           onClick={restoreVideoFocus}
           onPlay={restoreVideoFocus}
           onPause={restoreVideoFocus}
-          onVolumeChange={restoreVideoFocus}
           onKeyDown={handleVideoKeyDown}
           className="rounded border border-[var(--color-border-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
           style={{

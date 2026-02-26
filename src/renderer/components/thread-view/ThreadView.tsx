@@ -1626,6 +1626,9 @@ export function ThreadView(): React.JSX.Element {
     }
   });
   const inlineVideoInitialVolume = inlineVideoInitialVolumePercent / 100;
+  const [inlineVideoInitialVolumeInput, setInlineVideoInitialVolumeInput] = useState(() =>
+    String(inlineVideoInitialVolumePercent),
+  );
   const handleInlineVideoInitialVolumeChange = useCallback((nextValue: number) => {
     if (!Number.isFinite(nextValue)) {
       return;
@@ -1638,6 +1641,23 @@ export function ThreadView(): React.JSX.Element {
       /* ignore */
     }
   }, []);
+  useEffect(() => {
+    setInlineVideoInitialVolumeInput(String(inlineVideoInitialVolumePercent));
+  }, [inlineVideoInitialVolumePercent]);
+  const commitInlineVideoInitialVolumeInput = useCallback((): void => {
+    const parsedValue = Number.parseFloat(inlineVideoInitialVolumeInput);
+    if (!Number.isFinite(parsedValue)) {
+      setInlineVideoInitialVolumeInput(String(inlineVideoInitialVolumePercent));
+      return;
+    }
+    const normalizedValue = Math.min(100, Math.max(0, parsedValue));
+    handleInlineVideoInitialVolumeChange(normalizedValue);
+    setInlineVideoInitialVolumeInput(String(normalizedValue));
+  }, [
+    handleInlineVideoInitialVolumeChange,
+    inlineVideoInitialVolumeInput,
+    inlineVideoInitialVolumePercent,
+  ]);
 
   // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
   const [filterKey, setFilterKey] = useState<{
@@ -2680,9 +2700,21 @@ export function ThreadView(): React.JSX.Element {
             min={0}
             max={100}
             step={0.01}
-            value={inlineVideoInitialVolumePercent}
+            value={inlineVideoInitialVolumeInput}
             onChange={(e) => {
-              handleInlineVideoInitialVolumeChange(Number.parseFloat(e.target.value));
+              setInlineVideoInitialVolumeInput(e.target.value);
+            }}
+            onBlur={commitInlineVideoInitialVolumeInput}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitInlineVideoInitialVolumeInput();
+                e.currentTarget.blur();
+                return;
+              }
+              if (e.key === 'Escape') {
+                setInlineVideoInitialVolumeInput(String(inlineVideoInitialVolumePercent));
+                e.currentTarget.blur();
+              }
             }}
             className="w-11 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1 py-0 text-right text-[10px] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
             aria-label="インライン動画の初期音量（数値）"
