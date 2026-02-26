@@ -5,6 +5,22 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-02-26
+
+### Changed
+
+- レンダラー最適化: ResItem / CountBadge を React.memo 化し bodyHtml・コピーメニューを useMemo/useCallback でキャッシュ
+- レンダラー最適化: ThreadList に @tanstack/react-virtual による仮想スクロールを導入
+- レンダラー最適化: Zustand セレクタの安定化と ThreadView/ThreadList の検索・フィルタに useDeferredValue を適用
+- メインプロセス最適化: file-io.ts の同期 I/O を node:fs/promises に置換
+- メインプロセス最適化: 起動時データ読み込み（閲覧履歴・Cookie・巡回リスト・プロキシ設定・プラグイン）を Promise.all で並列化
+- メインプロセス最適化: HTTP クライアントに keepAlive Agent を導入し gunzipSync を非同期化
+- メインプロセス最適化: dat-replace の while+replace ループを replaceAll に変更
+- メインプロセス最適化: ローカル検索を非同期 I/O に切り替え、複数ボード検索を並列化
+- メインプロセス最適化: subject.txt の条件付き GET（If-Modified-Since）を実装
+- キャッシュ最適化: パース済み DAT の LRU メモリキャッシュを導入しタブ切り替え時の再パースを回避
+- 起動最適化: Electron 起動フローの同期 I/O を排除し起動時間計測ログを追加
+
 ## [2.0.0] - 2026-02-25
 
 ### Added
