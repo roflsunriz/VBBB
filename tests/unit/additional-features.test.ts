@@ -9,9 +9,9 @@
  * Feature 6:  save-tabs-on-close – SessionState includes activeThreadTabId
  * Feature 7:  category-tabs – BoardTab shape can be constructed
  * Feature 8:  window-size-persist – see window-state.test.ts
- * Feature 9:  remote-search-replace – buildRemoteSearchUrl for ff5ch.syoboi.jp
+ * Feature 9:  remote-search-replace – ff5ch scraping and integrated list UI
  * Feature 10: add-board-dialog – see url-parser.test.ts (parseExternalBoardUrl)
- * Feature 11: webview-thread-open – see url-parser.test.ts (parseThreadUrl)
+ * Feature 11: remote-thread-open – open thread from scraped result list
  * Feature 12: modal-resize – Modal supports resizable props
  * Feature 13: console-log-save – diag:save-logs IPC channel exists
  */
@@ -252,7 +252,7 @@ describe('feature 9: remote-search-replace', () => {
     expect(url).toBe('https://ff5ch.syoboi.jp/?q=');
   });
 
-  it('search:remote-url IPC channel replaced dig.2ch.net', () => {
+  it('search:remote IPC channel replaced dig.2ch.net', () => {
     const src = readFileSync(resolve(PROJECT_ROOT, 'src/main/services/remote-search.ts'), 'utf-8');
     // dig.2ch.net should only appear in comments, not in actual code
     const codeLines = src
@@ -263,32 +263,31 @@ describe('feature 9: remote-search-replace', () => {
     expect(src).toContain('ff5ch.syoboi.jp');
   });
 
-  it('CSP allows ff5ch.syoboi.jp in frame-src', () => {
+  it('CSP no longer requires frame-src for ff5ch.syoboi.jp', () => {
     const html = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/index.html'), 'utf-8');
-    expect(html).toContain('frame-src https://ff5ch.syoboi.jp');
+    expect(html).not.toContain('frame-src https://ff5ch.syoboi.jp');
   });
 
-  it('SearchPanel renders webview for remote mode', () => {
+  it('SearchPanel renders scraped remote result list', () => {
     const src = readFileSync(
       resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'),
       'utf-8',
     );
-    expect(src).toContain('<webview');
-    expect(src).toContain('remoteUrl');
+    expect(src).toContain("invoke('search:remote'");
+    expect(src).toContain('remoteResults.items.map');
   });
 });
 
 // ---------------------------------------------------------------------------
-// Feature 11: ff5ch.syoboi.jp webview thread link interception
+// Feature 11: ff5ch.syoboi.jp scraped result thread open
 // ---------------------------------------------------------------------------
-describe('feature 11: webview-thread-open', () => {
-  it('SearchPanel intercepts will-navigate on webview', () => {
+describe('feature 11: remote-thread-open', () => {
+  it('SearchPanel opens parsed thread URL from remote result item', () => {
     const src = readFileSync(
       resolve(PROJECT_ROOT, 'src/renderer/components/search/SearchPanel.tsx'),
       'utf-8',
     );
-    expect(src).toContain('will-navigate');
-    expect(src).toContain('new-window');
+    expect(src).toContain('handleRemoteResultClick');
     expect(src).toContain('parseAnyThreadUrl');
   });
 

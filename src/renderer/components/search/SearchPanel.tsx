@@ -1,12 +1,13 @@
 /**
  * Search panel component.
  * Supports local DAT search and remote ff5ch.syoboi.jp search.
- * Remote search renders results in a webview.
+ * Remote search results are scraped in main process and rendered in-app.
  */
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { mdiMagnify, mdiClose, mdiShieldCheck, mdiHome } from '@mdi/js';
+import { useState, useCallback, useRef } from 'react';
+import { mdiMagnify, mdiClose } from '@mdi/js';
 import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import type { LocalSearchAllResult, SearchTarget } from '@shared/search';
+import type { RemoteSearchItem, RemoteSearchResult } from '@shared/remote-search';
 import { LocalSearchScope } from '@shared/search';
 import { parseAnyThreadUrl } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
@@ -14,90 +15,6 @@ import { MdiIcon } from '../common/MdiIcon';
 import { useScrollKeyboard } from '../../hooks/use-scroll-keyboard';
 
 type SearchMode = 'local' | 'remote';
-
-const FF5CH_TOP_URL = 'https://ff5ch.syoboi.jp/';
-
-/** F6: Default ad block CSS rules for ff5ch.syoboi.jp and 5ch.net pages.
- * Lines starting with '!' are treated as comments (AdBlock filter list convention).
- */
-const AD_BLOCK_KEY = 'vbbb-adblock-enabled';
-const AD_BLOCK_RULES_KEY = 'vbbb-adblock-rules';
-const DEFAULT_AD_RULES = [
-  // --- ff5ch.syoboi.jp specific ---
-  '! === ff5ch.syoboi.jp ===',
-  '#ad_5ch_inline',
-  '#ad_5ch_header',
-  '.inlineAd',
-  'aside',
-  // --- 5ch.net thread pages ---
-  '! === 5ch.net ===',
-  '#fixedDivLeft',
-  '#fixedDivRight',
-  '#topright',
-  '#upliftsquare',
-  '.vm-placement',
-  '#vm-av',
-  'div[data-format="isvideo"]',
-  '.upliftcontrol',
-  // --- Google Ads ---
-  '! === Google Ads ===',
-  'ins.adsbygoogle',
-  '[data-ad-slot]',
-  '[data-ad-client]',
-  'iframe[src*="doubleclick"]',
-  'iframe[src*="googlesyndication"]',
-  'iframe[src*="googleads"]',
-  // --- Ad-Stir (used by ff5ch) ---
-  '! === Ad-Stir ===',
-  'div[id*="adstir"]',
-  'div[class*="adstir"]',
-  'iframe[src*="ad-stir"]',
-  'iframe[src*="adstir"]',
-  // --- Amazon Ads ---
-  '! === Amazon Ads ===',
-  'iframe[src*="amazon-adsystem"]',
-  // --- Browsi (used by 5ch) ---
-  '! === Browsi ===',
-  'div[id*="browsi"]',
-  'div[class*="browsi"]',
-  // --- Generic ad patterns ---
-  '! === Generic ===',
-  '.advertisement',
-  '.ad-banner',
-  '[data-ad]',
-  '[aria-label="Advertisement"]',
-  'div[class*="sponsor"]',
-  'div[class*="promo"]',
-  'div[class*="ad-container"]',
-  'div[class*="ad-wrapper"]',
-  'div[class*="ad-slot"]',
-  'div[class*="ad_unit"]',
-  'div[id*="ad-container"]',
-  'div[id*="ad-wrapper"]',
-  'div[id*="ad_box"]',
-  'div[id*="ad_unit"]',
-  // --- Generic ad iframes ---
-  '! === iframes ===',
-  'iframe[src*="ad."]',
-  'iframe[src*="/ads/"]',
-  'iframe[src*="banner"]',
-].join('\n');
-
-function loadAdBlockEnabled(): boolean {
-  try {
-    return localStorage.getItem(AD_BLOCK_KEY) !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-function loadAdBlockRules(): string {
-  try {
-    return localStorage.getItem(AD_BLOCK_RULES_KEY) ?? DEFAULT_AD_RULES;
-  } catch {
-    return DEFAULT_AD_RULES;
-  }
-}
 
 export function SearchPanel(): React.JSX.Element {
   const [mode, setMode] = useState<SearchMode>('local');
@@ -108,99 +25,15 @@ export function SearchPanel(): React.JSX.Element {
   const [localResults, setLocalResults] = useState<readonly LocalSearchAllResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [remoteResults, setRemoteResults] = useState<RemoteSearchResult | null>(null);
 
   const selectBoard = useBBSStore((s) => s.selectBoard);
   const openThread = useBBSStore((s) => s.openThread);
-  const webviewRef = useRef<HTMLElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const handleScrollKeyboard = useScrollKeyboard(scrollContainerRef);
-  const [adBlockEnabled, setAdBlockEnabled] = useState(loadAdBlockEnabled);
-  const [adBlockRules, setAdBlockRules] = useState(loadAdBlockRules);
-  const [adBlockEditorOpen, setAdBlockEditorOpen] = useState(false);
-
-  // F6: Build CSS from ad block rules (lines starting with '!' are comments)
-  const adBlockCss = useMemo(() => {
-    if (!adBlockEnabled) return '';
-    return adBlockRules
-      .split('\n')
-      .map((r) => r.trim())
-      .filter((r) => r.length > 0 && !r.startsWith('!'))
-      .map((r) => `${r} { display: none !important; }`)
-      .join('\n');
-  }, [adBlockEnabled, adBlockRules]);
-
-  // F6: Inject ad block CSS into webview
-  useEffect(() => {
-    const wv = webviewRef.current;
-    if (wv === null || remoteUrl === null || adBlockCss.length === 0) return;
-
-    const handleDomReady = (): void => {
-      const webviewEl = wv as unknown as { executeJavaScript: (code: string) => void };
-      if (typeof webviewEl.executeJavaScript === 'function') {
-        const escaped = adBlockCss
-          .replace(/\\/g, '\\\\')
-          .replace(/'/g, "\\'")
-          .replace(/\n/g, '\\n');
-        webviewEl.executeJavaScript(
-          `(() => { const s = document.createElement('style'); s.textContent = '${escaped}'; document.head.appendChild(s); })()`,
-        );
-      }
-    };
-    wv.addEventListener('dom-ready', handleDomReady);
-    return () => {
-      wv.removeEventListener('dom-ready', handleDomReady);
-    };
-  }, [remoteUrl, adBlockCss]);
-
-  // F7: Intercept navigation in webview to open 5ch/external threads natively
-  useEffect(() => {
-    const wv = webviewRef.current;
-    if (wv === null || remoteUrl === null) return;
-
-    const tryOpenThread = (url: string): boolean => {
-      const parsed = parseAnyThreadUrl(url);
-      if (parsed !== null) {
-        void (async () => {
-          await selectBoard(parsed.board);
-          await openThread(parsed.board.url, parsed.threadId, parsed.titleHint);
-        })();
-        // Navigate webview back to search top page after opening a thread
-        const webviewEl = wv as unknown as { src: string };
-        if ('src' in webviewEl) {
-          webviewEl.src = FF5CH_TOP_URL;
-        }
-        return true;
-      }
-      return false;
-    };
-
-    const handleNavigation = (e: Event): void => {
-      const navEvent = e as CustomEvent & { url: string };
-      if (tryOpenThread(navEvent.url)) {
-        e.preventDefault();
-      }
-    };
-
-    const handleNewWindow = (e: Event): void => {
-      e.preventDefault();
-      const newWinEvent = e as CustomEvent & { url: string };
-      if (!tryOpenThread(newWinEvent.url)) {
-        // Open non-thread URLs externally
-        void window.electronApi.invoke('shell:open-external', newWinEvent.url);
-      }
-    };
-
-    wv.addEventListener('will-navigate', handleNavigation);
-    wv.addEventListener('new-window', handleNewWindow);
-    return () => {
-      wv.removeEventListener('will-navigate', handleNavigation);
-      wv.removeEventListener('new-window', handleNewWindow);
-    };
-  }, [remoteUrl, openThread, selectBoard]);
 
   const runSearch = useCallback(
-    async (query: string) => {
+    async (query: string, start?: number) => {
       if (query.trim().length === 0) return;
       setSearching(true);
       setError(null);
@@ -213,10 +46,13 @@ export function SearchPanel(): React.JSX.Element {
             caseSensitive,
           });
           setLocalResults(results);
-          setRemoteUrl(null);
+          setRemoteResults(null);
         } else {
-          const url = await window.electronApi.invoke('search:remote-url', query.trim());
-          setRemoteUrl(url);
+          const result = await window.electronApi.invoke('search:remote', {
+            keywords: query.trim(),
+            ...(start !== undefined && start > 0 ? { start } : {}),
+          });
+          setRemoteResults(result);
           setLocalResults([]);
         }
       } catch (err) {
@@ -231,6 +67,12 @@ export function SearchPanel(): React.JSX.Element {
   const handleSearch = useCallback(() => {
     void runSearch(pattern);
   }, [runSearch, pattern]);
+
+  const handleRemoteNext = useCallback(() => {
+    if (mode !== 'remote') return;
+    if (remoteResults?.nextStart === null || remoteResults?.nextStart === undefined) return;
+    void runSearch(pattern, remoteResults.nextStart);
+  }, [mode, pattern, remoteResults?.nextStart, runSearch]);
 
   const handleSearchFromInput = useCallback(
     (query: string) => {
@@ -267,6 +109,21 @@ export function SearchPanel(): React.JSX.Element {
     [openThread, selectBoard],
   );
 
+  const handleRemoteResultClick = useCallback(
+    (result: RemoteSearchItem) => {
+      const parsed = parseAnyThreadUrl(result.threadUrl);
+      if (parsed !== null) {
+        void (async () => {
+          await selectBoard(parsed.board);
+          await openThread(parsed.board.url, parsed.threadId, parsed.titleHint);
+        })();
+        return;
+      }
+      void window.electronApi.invoke('shell:open-external', result.threadUrl);
+    },
+    [openThread, selectBoard],
+  );
+
   return (
     <div className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
       {/* Mode toggle */}
@@ -290,75 +147,6 @@ export function SearchPanel(): React.JSX.Element {
           リモート検索
         </button>
       </div>
-
-      {/* F6: Ad block toggle (remote mode only) */}
-      {mode === 'remote' && (
-        <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-2 py-1">
-          <label className="flex cursor-pointer items-center gap-1 text-xs text-[var(--color-text-secondary)]">
-            <input
-              type="checkbox"
-              checked={adBlockEnabled}
-              onChange={(e) => {
-                setAdBlockEnabled(e.target.checked);
-                try {
-                  localStorage.setItem(AD_BLOCK_KEY, String(e.target.checked));
-                } catch {
-                  /* ignore */
-                }
-              }}
-              className="accent-[var(--color-accent)]"
-            />
-            <MdiIcon path={mdiShieldCheck} size={11} />
-            広告ブロック
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              setAdBlockEditorOpen((p) => !p);
-            }}
-            className="rounded px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
-          >
-            ルール編集
-          </button>
-        </div>
-      )}
-
-      {/* F6: Ad block rules editor */}
-      {adBlockEditorOpen && mode === 'remote' && (
-        <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] p-2">
-          <p className="mb-1 text-[10px] text-[var(--color-text-muted)]">
-            CSSセレクタを1行に1つ入力してください。マッチした要素が非表示になります。
-            「!」で始まる行はコメントとして無視されます。
-          </p>
-          <textarea
-            value={adBlockRules}
-            onChange={(e) => {
-              setAdBlockRules(e.target.value);
-              try {
-                localStorage.setItem(AD_BLOCK_RULES_KEY, e.target.value);
-              } catch {
-                /* ignore */
-              }
-            }}
-            rows={12}
-            className="w-full resize-none rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 font-mono text-[10px] leading-relaxed text-[var(--color-text-primary)] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setAdBlockRules(DEFAULT_AD_RULES);
-              try {
-                localStorage.setItem(AD_BLOCK_RULES_KEY, DEFAULT_AD_RULES);
-              } catch {
-                /* ignore */
-              }
-            }}
-            className="mt-1 rounded px-2 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
-          >
-            デフォルトに戻す
-          </button>
-        </div>
-      )}
 
       {/* Search input */}
       <div className="border-b border-[var(--color-border-secondary)] p-2">
@@ -488,34 +276,57 @@ export function SearchPanel(): React.JSX.Element {
           </button>
         ))}
 
-        {/* Remote results (webview) */}
-        {remoteUrl !== null && mode === 'remote' && (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-2 py-0.5">
+        {/* Remote results */}
+        {mode === 'remote' && remoteResults !== null && (
+          <>
+            <div className="border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/50 px-2 py-1 text-[10px] text-[var(--color-text-muted)]">
+              {remoteResults.totalCount !== null &&
+              remoteResults.rangeStart !== null &&
+              remoteResults.rangeEnd !== null
+                ? `${remoteResults.totalCount.toLocaleString()} 件 (${remoteResults.rangeStart} - ${remoteResults.rangeEnd})`
+                : `${remoteResults.items.length} 件`}
+            </div>
+            {remoteResults.items.map((item) => (
               <button
+                key={`${item.threadUrl}-${item.responseCount}`}
                 type="button"
                 onClick={() => {
-                  const wv = webviewRef.current as unknown as { src: string } | null;
-                  if (wv !== null && 'src' in wv) {
-                    wv.src = FF5CH_TOP_URL;
-                  }
+                  handleRemoteResultClick(item);
                 }}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-                title="検索トップページに戻る"
+                className="w-full border-b border-[var(--color-border-secondary)] px-2 py-1 text-left text-xs hover:bg-[var(--color-bg-hover)]"
               >
-                <MdiIcon path={mdiHome} size={12} />
-                検索トップ
+                <div className="font-medium text-[var(--color-text-primary)]">
+                  {item.threadTitle}{' '}
+                  <span className="text-[var(--color-text-muted)]">({item.responseCount})</span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                  <span>{item.boardTitle}</span>
+                  <span>{item.lastUpdated}</span>
+                  {item.responsesPerHour !== null && <span>({item.responsesPerHour} res/h)</span>}
+                </div>
               </button>
-            </div>
-            <webview
-              ref={webviewRef as React.Ref<HTMLElement>}
-              src={remoteUrl}
-              className="flex-1"
-            />
-          </div>
+            ))}
+            {remoteResults.items.length === 0 && (
+              <div className="px-2 py-3 text-xs text-[var(--color-text-muted)]">
+                リモート検索結果なし
+              </div>
+            )}
+            {remoteResults.nextStart !== null && (
+              <div className="flex justify-center px-2 py-2">
+                <button
+                  type="button"
+                  onClick={handleRemoteNext}
+                  disabled={searching}
+                  className="rounded border border-[var(--color-border-secondary)] px-3 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] disabled:opacity-50"
+                >
+                  次の50件
+                </button>
+              </div>
+            )}
+          </>
         )}
 
-        {!searching && localResults.length === 0 && remoteUrl === null && (
+        {!searching && localResults.length === 0 && remoteResults === null && (
           <div className="flex items-center justify-center py-4 text-xs text-[var(--color-text-muted)]">
             検索結果なし
           </div>

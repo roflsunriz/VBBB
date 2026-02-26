@@ -30,6 +30,7 @@ import type {
   SearchResult,
 } from './search';
 import type { UpdateCheckResult } from './update';
+import type { RemoteSearchResult } from './remote-search';
 
 export interface IpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -272,10 +273,10 @@ export interface IpcChannelMap {
     args: [query: LocalSearchAllQuery];
     result: readonly LocalSearchAllResult[];
   };
-  /** Build remote search URL for ff5ch.syoboi.jp */
-  'search:remote-url': {
-    args: [keywords: string];
-    result: string;
+  /** Remote search by scraping ff5ch.syoboi.jp */
+  'search:remote': {
+    args: [query: { keywords: string; start?: number }];
+    result: RemoteSearchResult;
   };
   /** Get round board list */
   'round:get-boards': {

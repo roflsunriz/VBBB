@@ -74,7 +74,7 @@ import {
   startRoundTimer,
   stopRoundTimer,
 } from '../services/round-list';
-import { buildRemoteSearchUrl } from '../services/remote-search';
+import { searchRemoteThreads } from '../services/remote-search';
 import type { SavedTab, SessionState } from '@shared/history';
 import {
   loadSavedTabs,
@@ -465,8 +465,11 @@ export async function registerIpcHandlers(): Promise<void> {
     return searchLocalAll(query, dataDir);
   });
 
-  handle('search:remote-url', (keywords: string) => {
-    return Promise.resolve(buildRemoteSearchUrl(keywords));
+  handle('search:remote', async (query) => {
+    return searchRemoteThreads(
+      query.keywords,
+      query.start !== undefined ? { start: query.start } : undefined,
+    );
   });
 
   // Round list (loaded async in parallel below)
