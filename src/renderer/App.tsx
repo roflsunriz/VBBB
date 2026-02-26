@@ -116,6 +116,8 @@ export function App(): React.JSX.Element {
   const restoreTabs = useBBSStore((s) => s.restoreTabs);
   const restoreSession = useBBSStore((s) => s.restoreSession);
   const loadPostHistory = useBBSStore((s) => s.loadPostHistory);
+  const relatedThreadSimilarity = useBBSStore((s) => s.relatedThreadSimilarity);
+  const setRelatedThreadSimilarity = useBBSStore((s) => s.setRelatedThreadSimilarity);
 
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
@@ -286,6 +288,9 @@ export function App(): React.JSX.Element {
               break;
             case 'toggle-ng':
               setActiveModalRef.current((prev) => (prev === 'ng' ? null : 'ng'));
+              break;
+            case 'set-related-thread-similarity':
+              useBBSStore.getState().setRelatedThreadSimilarity(action.value);
               break;
           }
         } catch {
@@ -487,6 +492,35 @@ export function App(): React.JSX.Element {
           <MdiIcon path={mdiScriptText} size={14} />
           DSL
         </button>
+
+        <div className="mx-1 h-4 w-px bg-[var(--color-border-primary)]" />
+
+        <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
+          関連閾値
+          <select
+            value={String(relatedThreadSimilarity)}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (!Number.isFinite(value)) return;
+              setRelatedThreadSimilarity(value);
+            }}
+            className="rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1 py-0.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
+            title="関連スレッド類似度の閾値 (%)"
+          >
+            <option value="40">40%</option>
+            <option value="45">45%</option>
+            <option value="50">50%</option>
+            <option value="55">55%</option>
+            <option value="60">60%</option>
+            <option value="65">65%</option>
+            <option value="70">70%</option>
+            <option value="75">75%</option>
+            <option value="80">80%</option>
+            <option value="85">85%</option>
+            <option value="90">90%</option>
+            <option value="95">95%</option>
+          </select>
+        </label>
 
         <div className="flex-1" />
 

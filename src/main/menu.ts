@@ -102,6 +102,83 @@ export function buildAppMenu(): void {
             dispatchAction({ type: 'open-modal', modal: 'dsl-editor' });
           },
         },
+        {
+          label: '関連スレッド類似度',
+          submenu: [
+            {
+              label: '40%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 40 });
+              },
+            },
+            {
+              label: '45%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 45 });
+              },
+            },
+            {
+              label: '50%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 50 });
+              },
+            },
+            {
+              label: '55%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 55 });
+              },
+            },
+            {
+              label: '60%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 60 });
+              },
+            },
+            {
+              label: '65%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 65 });
+              },
+            },
+            {
+              label: '70%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 70 });
+              },
+            },
+            {
+              label: '75%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 75 });
+              },
+            },
+            {
+              label: '80%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 80 });
+              },
+            },
+            {
+              label: '85%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 85 });
+              },
+            },
+            {
+              label: '90%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 90 });
+              },
+            },
+            {
+              label: '95%',
+              click: () => {
+                dispatchAction({ type: 'set-related-thread-similarity', value: 95 });
+              },
+            },
+          ],
+        },
         { type: 'separator' },
         {
           label: 'NG管理',

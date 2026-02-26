@@ -104,6 +104,15 @@ const BE_PATTERN = /BE:(\d+)-(\d+)/;
 
 /** Parse a Japanese datetime like "2024/01/01(月) 12:34:56.78" into a Date */
 const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2}):(\d{2})/;
+const RELATED_THREAD_MAX_ITEMS = 12;
+
+interface RelatedThreadCandidate {
+  readonly threadId: string;
+  readonly title: string;
+  readonly similarity: number;
+}
+
+type BBSStoreState = ReturnType<typeof useBBSStore.getState>;
 
 function parseResDateTime(dateTime: string): Date | null {
   const m = DATE_PATTERN.exec(dateTime);
@@ -115,6 +124,82 @@ function parseResDateTime(dateTime: string): Date | null {
   const mi = Number(m[5]);
   const s = Number(m[6]);
   return new Date(y, mo, d, h, mi, s);
+}
+
+function normalizeForSimilarity(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '');
+}
+
+function boundedLevenshteinDistance(a: string, b: string, maxDistance: number): number | null {
+  const aLen = a.length;
+  const bLen = b.length;
+  if (Math.abs(aLen - bLen) > maxDistance) return null;
+  if (aLen === 0) return bLen <= maxDistance ? bLen : null;
+  if (bLen === 0) return aLen <= maxDistance ? aLen : null;
+
+  const prev = new Array<number>(bLen + 1);
+  const curr = new Array<number>(bLen + 1);
+  for (let j = 0; j <= bLen; j += 1) {
+    prev[j] = j;
+  }
+
+  for (let i = 1; i <= aLen; i += 1) {
+    curr[0] = i;
+    let rowMin = curr[0];
+    const aChar = a.charCodeAt(i - 1);
+    for (let j = 1; j <= bLen; j += 1) {
+      const cost = aChar === b.charCodeAt(j - 1) ? 0 : 1;
+      const deletion = (prev[j] ?? Number.POSITIVE_INFINITY) + 1;
+      const insertion = (curr[j - 1] ?? Number.POSITIVE_INFINITY) + 1;
+      const substitution = (prev[j - 1] ?? Number.POSITIVE_INFINITY) + cost;
+      const value = Math.min(deletion, insertion, substitution);
+      curr[j] = value;
+      if (value < rowMin) {
+        rowMin = value;
+      }
+    }
+    if (rowMin > maxDistance) return null;
+    for (let j = 0; j <= bLen; j += 1) {
+      prev[j] = curr[j] ?? Number.POSITIVE_INFINITY;
+    }
+  }
+  const distance = prev[bLen] ?? Number.POSITIVE_INFINITY;
+  return distance <= maxDistance ? distance : null;
+}
+
+function computeRelatedThreadCandidates(
+  baseTitle: string,
+  baseThreadId: string,
+  subjects: readonly SubjectRecord[],
+  similarityThreshold: number,
+): readonly RelatedThreadCandidate[] {
+  const normalizedBase = normalizeForSimilarity(baseTitle);
+  if (normalizedBase.length === 0) return [];
+
+  const candidates: RelatedThreadCandidate[] = [];
+  for (const subject of subjects) {
+    const threadId = subject.fileName.replace('.dat', '');
+    if (threadId === baseThreadId) continue;
+    const normalizedTitle = normalizeForSimilarity(subject.title);
+    if (normalizedTitle.length === 0) continue;
+
+    const maxLen = Math.max(normalizedBase.length, normalizedTitle.length);
+    const maxDistance = Math.floor(maxLen * (1 - similarityThreshold));
+    if (Math.abs(normalizedBase.length - normalizedTitle.length) > maxDistance) continue;
+
+    const distance = boundedLevenshteinDistance(normalizedBase, normalizedTitle, maxDistance);
+    if (distance === null) continue;
+    const similarity = 1 - distance / maxLen;
+    if (similarity < similarityThreshold) continue;
+
+    candidates.push({ threadId, title: subject.title, similarity });
+  }
+
+  candidates.sort((a, b) => {
+    if (b.similarity !== a.similarity) return b.similarity - a.similarity;
+    return a.title.localeCompare(b.title);
+  });
+  return candidates.slice(0, RELATED_THREAD_MAX_ITEMS);
 }
 
 function formatRelativeTime(date: Date): string {
@@ -1059,6 +1144,9 @@ export function ThreadView(): React.JSX.Element {
   const switchToAdjacentTab = useBBSStore((s) => s.switchToAdjacentTab);
   const boardTabs = useBBSStore((s) => s.boardTabs);
   const openThread = useBBSStore((s) => s.openThread);
+  const relatedThreadSimilarity = useBBSStore(
+    (s: BBSStoreState): number => s.relatedThreadSimilarity,
+  );
   const updateTabScroll = useBBSStore((s) => s.updateTabScroll);
   const updateTabKokomade = useBBSStore((s) => s.updateTabKokomade);
   const toggleTabPostEditor = useBBSStore((s) => s.toggleTabPostEditor);
@@ -1107,6 +1195,10 @@ export function ThreadView(): React.JSX.Element {
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
+  const [relatedSubMenuOpen, setRelatedSubMenuOpen] = useState(false);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedError, setRelatedError] = useState<string | null>(null);
+  const [relatedThreads, setRelatedThreads] = useState<readonly RelatedThreadCandidate[]>([]);
 
   // Build favorite lookup for thread URLs
   const favoriteUrlToId = useMemo(() => {
@@ -1130,6 +1222,7 @@ export function ThreadView(): React.JSX.Element {
     if (tabCtxMenu === null) return;
     const handler = (): void => {
       setTabCtxMenu(null);
+      setRelatedSubMenuOpen(false);
     };
     document.addEventListener('click', handler);
     return () => {
@@ -1256,6 +1349,51 @@ export function ThreadView(): React.JSX.Element {
       setTabCtxMenu(null);
     }
   }, [tabCtxMenu, refreshing, refreshThreadTab]);
+
+  const handleOpenRelatedSubMenu = useCallback(() => {
+    if (tabCtxMenu === null) return;
+    const tab = tabs.find((t) => t.id === tabCtxMenu.tabId);
+    if (tab === undefined) return;
+
+    setRelatedSubMenuOpen(true);
+    setRelatedLoading(true);
+    setRelatedError(null);
+    setRelatedThreads([]);
+
+    void (async () => {
+      try {
+        const result = await window.electronApi.invoke('bbs:fetch-subject', tab.boardUrl);
+        const candidates = computeRelatedThreadCandidates(
+          tab.title,
+          tab.threadId,
+          result.threads,
+          relatedThreadSimilarity / 100,
+        );
+        setRelatedThreads(candidates);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setRelatedError(message);
+      } finally {
+        setRelatedLoading(false);
+      }
+    })();
+  }, [tabCtxMenu, tabs, relatedThreadSimilarity]);
+
+  const handleRelatedSubMenuClose = useCallback(() => {
+    setRelatedSubMenuOpen(false);
+  }, []);
+
+  const handleOpenRelatedThread = useCallback(
+    (threadId: string, title: string) => {
+      if (tabCtxMenu === null) return;
+      const tab = tabs.find((t) => t.id === tabCtxMenu.tabId);
+      if (tab === undefined) return;
+      void openThread(tab.boardUrl, threadId, title);
+      setTabCtxMenu(null);
+      setRelatedSubMenuOpen(false);
+    },
+    [tabCtxMenu, tabs, openThread],
+  );
 
   const RELATIVE_TIME_KEY = 'vbbb-relative-time';
   const [showRelativeTime, setShowRelativeTime] = useState(() => {
@@ -2779,6 +2917,58 @@ export function ThreadView(): React.JSX.Element {
           >
             {tabCtxMenu.isRoundItem ? '巡回から削除' : '巡回に追加'}
           </button>
+          <div className="relative" onMouseLeave={handleRelatedSubMenuClose}>
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onMouseEnter={handleOpenRelatedSubMenu}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenRelatedSubMenu();
+              }}
+              role="menuitem"
+            >
+              関連スレッド &raquo;
+            </button>
+            {relatedSubMenuOpen && (
+              <div className="absolute left-full top-0 z-50 min-w-56 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
+                {relatedLoading && (
+                  <div className="px-3 py-1.5 text-xs text-[var(--color-text-muted)]">
+                    読み込み中...
+                  </div>
+                )}
+                {!relatedLoading && relatedError !== null && (
+                  <div className="px-3 py-1.5 text-xs text-[var(--color-error)]">
+                    取得失敗: {relatedError}
+                  </div>
+                )}
+                {!relatedLoading && relatedError === null && relatedThreads.length === 0 && (
+                  <div className="px-3 py-1.5 text-xs text-[var(--color-text-muted)]">
+                    一致する関連スレッドなし
+                  </div>
+                )}
+                {!relatedLoading &&
+                  relatedError === null &&
+                  relatedThreads.map((related) => (
+                    <button
+                      key={related.threadId}
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                      onClick={() => {
+                        handleOpenRelatedThread(related.threadId, related.title);
+                      }}
+                      role="menuitem"
+                      title={related.title}
+                    >
+                      <span className="max-w-44 truncate">{related.title}</span>
+                      <span className="shrink-0 text-[10px] text-[var(--color-text-muted)]">
+                        {Math.round(related.similarity * 100)}%
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"

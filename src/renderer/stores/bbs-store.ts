@@ -121,6 +121,7 @@ interface BBSState {
 
   // Status
   statusMessage: string;
+  relatedThreadSimilarity: number;
 
   // Actions
   fetchMenu: () => Promise<void>;
@@ -188,6 +189,7 @@ interface BBSState {
   reorderBoardTabs: (fromIndex: number, toIndex: number) => void;
   reorderThreadTabs: (fromIndex: number, toIndex: number) => void;
   setStatusMessage: (message: string) => void;
+  setRelatedThreadSimilarity: (value: number) => void;
   /** Whether the new thread creation editor is open (board-level, in ThreadList) */
   newThreadEditorOpen: boolean;
   openNewThreadEditor: () => void;
@@ -201,6 +203,10 @@ interface BBSState {
 
 const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
 const BOARD_SORT_SETTINGS_KEY = 'vbbb-board-sort-settings';
+const RELATED_THREAD_SIMILARITY_KEY = 'vbbb-related-thread-similarity';
+const RELATED_THREAD_SIMILARITY_MIN = 40;
+const RELATED_THREAD_SIMILARITY_MAX = 95;
+const RELATED_THREAD_SIMILARITY_DEFAULT = 80;
 
 const VALID_SORT_KEYS: ReadonlySet<string> = new Set([
   'index',
@@ -216,6 +222,28 @@ type BoardSortRecord = Record<
   string,
   { readonly sortKey: BoardSortKey; readonly sortDir: BoardSortDir }
 >;
+
+function clampRelatedThreadSimilarity(value: number): number {
+  return Math.max(
+    RELATED_THREAD_SIMILARITY_MIN,
+    Math.min(RELATED_THREAD_SIMILARITY_MAX, Math.round(value)),
+  );
+}
+
+function loadRelatedThreadSimilarity(): number {
+  try {
+    const raw = localStorage.getItem(RELATED_THREAD_SIMILARITY_KEY);
+    if (raw !== null) {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed)) {
+        return clampRelatedThreadSimilarity(parsed);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return RELATED_THREAD_SIMILARITY_DEFAULT;
+}
 
 function loadBoardSortSettings(): BoardSortRecord {
   try {
@@ -412,6 +440,7 @@ export const useBBSStore = create<BBSState>((set, get) => ({
   highlightSettings: loadHighlightSettings(),
 
   statusMessage: 'Ready',
+  relatedThreadSimilarity: loadRelatedThreadSimilarity(),
 
   newThreadEditorOpen: false,
   nextThreadDraft: null,
@@ -1677,6 +1706,16 @@ export const useBBSStore = create<BBSState>((set, get) => ({
 
   setStatusMessage: (message: string) => {
     set({ statusMessage: message });
+  },
+
+  setRelatedThreadSimilarity: (value: number) => {
+    const next = clampRelatedThreadSimilarity(value);
+    set({ relatedThreadSimilarity: next });
+    try {
+      localStorage.setItem(RELATED_THREAD_SIMILARITY_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
   },
 
   openNewThreadEditor: () => {
