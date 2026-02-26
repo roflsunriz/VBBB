@@ -96,17 +96,10 @@ export function applyDatReplace(content: string, rules: readonly ReplaceRule[]):
     if (rule.search.length === 0) continue;
 
     if (rule.replacement.length === 0) {
-      // Replace with same-length spaces
-      const parts = result.split(rule.search);
-      if (parts.length > 1) {
-        const spaces = ' '.repeat(rule.search.length);
-        result = parts.join(spaces);
-      }
+      const spaces = ' '.repeat(rule.search.length);
+      result = result.replaceAll(rule.search, spaces);
     } else {
-      // Standard replacement
-      while (result.includes(rule.search)) {
-        result = result.replace(rule.search, rule.replacement);
-      }
+      result = result.replaceAll(rule.search, rule.replacement);
     }
   }
   return result;

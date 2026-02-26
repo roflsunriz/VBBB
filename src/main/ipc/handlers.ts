@@ -11,13 +11,17 @@ import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
 import { clearLogBuffer, createLogger, getLogBuffer, pushEntry } from '../logger';
 import { menuEmitter } from '../menu';
-import { fetchBBSMenu, loadBBSMenuCache, saveBBSMenuCache } from '../services/bbs-menu';
+import {
+  fetchBBSMenu,
+  loadBBSMenuCacheAsync,
+  saveBBSMenuCache,
+} from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
 import { resolveBoardTitle } from '../services/board-title';
 import { fetchDat } from '../services/dat';
 import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
-import { getBoardDir, ensureDir } from '../services/file-io';
+import { getBoardDir, ensureDirAsync } from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { httpFetch } from '../services/http-client';
 import { searchLocal, searchLocalAll } from '../services/local-search';
@@ -28,7 +32,7 @@ import {
   addHistoryEntry,
   clearBrowsingHistory,
   getBrowsingHistory,
-  loadBrowsingHistory,
+  loadBrowsingHistoryAsync,
   saveBrowsingHistory,
 } from '../services/browsing-history';
 import {
@@ -48,18 +52,18 @@ import {
   setCookie,
   removeCookie,
   saveCookies,
-  loadCookies,
+  loadCookiesAsync,
 } from '../services/cookie-store';
 import { getDonguriState, loginDonguri, refreshDonguriState } from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
-import { getProxyConfig, loadProxyConfig, saveProxyConfig } from '../services/proxy-manager';
+import { getProxyConfig, loadProxyConfigAsync, saveProxyConfig } from '../services/proxy-manager';
 import {
   addRoundBoard,
   addRoundItem,
   getRoundBoards,
   getRoundItems,
   getTimerConfig,
-  loadRoundLists,
+  loadRoundListsAsync,
   removeRoundBoard,
   removeRoundItem,
   saveRoundBoard,
@@ -146,7 +150,6 @@ function lookupBoard(boardUrl: string): Board {
  */
 export async function registerIpcHandlers(): Promise<void> {
   const dataDir = getDataDir();
-  ensureDir(dataDir);
 
   handle('app:get-data-dir', () => {
     return Promise.resolve(dataDir);
@@ -207,8 +210,8 @@ export async function registerIpcHandlers(): Promise<void> {
       oldBoards.push(b);
     }
 
-    // Cache-first: return cached menu immediately and refresh in background
-    const cached = loadBBSMenuCache(dataDir);
+    // Cache-first: return cached menu and refresh in background
+    const cached = await loadBBSMenuCacheAsync(dataDir);
     if (cached !== null) {
       populateBoardCache(cached);
       // Background refresh — do not block the renderer
@@ -218,7 +221,7 @@ export async function registerIpcHandlers(): Promise<void> {
       return cached;
     }
 
-    // No cache — must fetch from network (blocking)
+    // No cache — must fetch from network
     try {
       return await fetchAndUpdateMenu(oldBoards);
     } catch (err) {
@@ -282,7 +285,7 @@ export async function registerIpcHandlers(): Promise<void> {
   handle('bbs:update-thread-index', async (boardUrl: string, threadId: string, updates) => {
     const board = lookupBoard(boardUrl);
     const boardDir = getBoardDir(dataDir, board.url);
-    ensureDir(boardDir);
+    await ensureDirAsync(boardDir);
     const indices = loadFolderIdx(boardDir);
     const datFileName = `${threadId}.dat`;
     const existing = indices.find((idx) => idx.fileName === datFileName);
@@ -433,8 +436,8 @@ export async function registerIpcHandlers(): Promise<void> {
     event.returnValue = null;
   });
 
-  // Browsing history
-  loadBrowsingHistory(dataDir);
+  // Browsing history (loaded async in parallel below)
+  // loadBrowsingHistoryAsync is awaited as part of the parallel startup.
 
   handle('history:load', () => {
     return Promise.resolve(getBrowsingHistory());
@@ -451,9 +454,9 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   // Search handlers
-  handle('search:local', (query) => {
+  handle('search:local', async (query) => {
     const board = lookupBoard(query.boardUrl);
-    return Promise.resolve(searchLocal(query, dataDir, board.boardType));
+    return searchLocal(query, dataDir, board.boardType);
   });
 
   handle('search:local-all', async (query) => {
@@ -464,8 +467,7 @@ export async function registerIpcHandlers(): Promise<void> {
     return Promise.resolve(buildRemoteSearchUrl(keywords));
   });
 
-  // Round list
-  loadRoundLists(dataDir);
+  // Round list (loaded async in parallel below)
 
   handle('round:get-boards', () => {
     return Promise.resolve(getRoundBoards());
@@ -550,12 +552,7 @@ export async function registerIpcHandlers(): Promise<void> {
     await executeRound();
   });
 
-  // Register round callback so setTimerConfig can restart the timer
-  const timerConfig = getTimerConfig();
-  startRoundTimer(timerConfig.intervalMinutes, executeRound);
-  if (!timerConfig.enabled) {
-    stopRoundTimer();
-  }
+  // Round timer is initialized after parallel startup load (see below).
 
   // Post history
   handle('post:save-history', async (entry) => {
@@ -575,9 +572,7 @@ export async function registerIpcHandlers(): Promise<void> {
     });
   });
 
-  // Load cookie store and proxy config before the plugin dynamic-import so
-  // all cookie/proxy/auth handlers are available as early as possible.
-  loadCookies(dataDir);
+  // Cookie store and proxy config loaded async in parallel below.
 
   handle('cookie:get-for-url', (url: string) => {
     return Promise.resolve(getCookiesForUrl(url));
@@ -601,7 +596,7 @@ export async function registerIpcHandlers(): Promise<void> {
     return Promise.resolve(getAllCookies());
   });
 
-  loadProxyConfig(dataDir);
+  // Proxy config loaded async in parallel below.
 
   handle('proxy:get-config', () => {
     return Promise.resolve(getProxyConfig());
@@ -843,9 +838,24 @@ export async function registerIpcHandlers(): Promise<void> {
     });
   });
 
-  // Ensure board plugins are ready before any JBBS/Machi IPC can be handled.
-  // All handle() registrations above are synchronous and already active.
-  await initializeBoardPlugins();
+  // Ensure data directory exists before loading startup data
+  await ensureDirAsync(dataDir);
+
+  // Load startup data and plugins in parallel (non-blocking I/O)
+  await Promise.all([
+    loadBrowsingHistoryAsync(dataDir),
+    loadRoundListsAsync(dataDir),
+    loadCookiesAsync(dataDir),
+    loadProxyConfigAsync(dataDir),
+    initializeBoardPlugins(),
+  ]);
+
+  // Initialize round timer after round lists are loaded
+  const timerConfig = getTimerConfig();
+  startRoundTimer(timerConfig.intervalMinutes, executeRound);
+  if (!timerConfig.enabled) {
+    stopRoundTimer();
+  }
 
   logger.info('IPC handlers registered');
 }

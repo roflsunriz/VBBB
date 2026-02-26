@@ -4,7 +4,17 @@
  * Shows age/sage badges per thread.
  * Supports right-click context menu for favorites and NG.
  */
-import { useCallback, useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useDeferredValue,
+  lazy,
+  Suspense,
+} from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   mdiArrowUp,
   mdiArrowDown,
@@ -175,11 +185,17 @@ export function ThreadList(): React.JSX.Element {
   const openNewThreadEditor = useBBSStore((s) => s.openNewThreadEditor);
   const closeNewThreadEditor = useBBSStore((s) => s.closeNewThreadEditor);
 
-  // Per-tab filter/sort: read from active board tab
-  const activeBoardTab = useBBSStore((s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId));
-  const filter = activeBoardTab?.filter ?? '';
-  const sortKey: BoardSortKey = activeBoardTab?.sortKey ?? 'index';
-  const sortDir: BoardSortDir = activeBoardTab?.sortDir ?? 'asc';
+  // Per-tab filter/sort: select primitive values to avoid new-reference re-renders
+  const filter = useBBSStore(
+    (s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId)?.filter ?? '',
+  );
+  const sortKey: BoardSortKey = useBBSStore(
+    (s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId)?.sortKey ?? 'index',
+  );
+  const sortDir: BoardSortDir = useBBSStore(
+    (s) => s.boardTabs.find((t) => t.id === s.activeBoardTabId)?.sortDir ?? 'asc',
+  );
+  const deferredFilter = useDeferredValue(filter);
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [boardTabCtxMenu, setBoardTabCtxMenu] = useState<{
     x: number;
@@ -191,6 +207,8 @@ export function ThreadList(): React.JSX.Element {
   const handleScrollKeyboard = useScrollKeyboard(listScrollRef);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
+
+  const THREAD_ROW_HEIGHT = 28;
 
   // Close board tab context menu on click
   useEffect(() => {
@@ -272,9 +290,9 @@ export function ThreadList(): React.JSX.Element {
   const filteredSubjects = useMemo(() => {
     let result = uniqueSubjects;
 
-    // Text filter
-    if (filter.trim().length > 0) {
-      const lower = filter.toLowerCase();
+    // Text filter (uses deferred value to avoid re-filtering on every keystroke)
+    if (deferredFilter.trim().length > 0) {
+      const lower = deferredFilter.toLowerCase();
       result = result.filter((s) => s.title.toLowerCase().includes(lower));
     }
 
@@ -292,7 +310,7 @@ export function ThreadList(): React.JSX.Element {
     }
 
     return result;
-  }, [uniqueSubjects, filter, threadNgRules, currentBoardId]);
+  }, [uniqueSubjects, deferredFilter, threadNgRules, currentBoardId]);
 
   // Check if a thread is NG'd (normal abon - show as placeholder)
   const normalAbonThreads = useMemo(() => {
@@ -347,6 +365,14 @@ export function ThreadList(): React.JSX.Element {
     });
     return items;
   }, [filteredSubjects, sortKey, sortDir]);
+
+  const listVirtualizer = useVirtualizer({
+    count: sortedSubjects.length,
+    getScrollElement: () => listScrollRef.current,
+    estimateSize: () => THREAD_ROW_HEIGHT,
+    overscan: 10,
+    getItemKey: (index) => sortedSubjects[index]?.fileName ?? index,
+  });
 
   const handleSort = useCallback(
     (key: BoardSortKey) => {
@@ -828,88 +854,121 @@ export function ThreadList(): React.JSX.Element {
               板を選択してください
             </p>
           )}
-          {sortedSubjects.map((subject, i) => {
-            const threadId = subject.fileName.replace('.dat', '');
-            const threadUrl =
-              selectedBoard !== null ? `${selectedBoard.url}dat/${threadId}.dat` : '';
-            const isFavorite = favoriteUrlToId.has(threadUrl);
-            const isNormalAbon = normalAbonThreads.has(subject.fileName);
+          <div
+            style={{
+              height: `${String(listVirtualizer.getTotalSize())}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {listVirtualizer.getVirtualItems().map((virtualRow) => {
+              const subject = sortedSubjects[virtualRow.index];
+              if (subject === undefined) return null;
+              const i = virtualRow.index;
+              const threadId = subject.fileName.replace('.dat', '');
+              const threadUrl =
+                selectedBoard !== null ? `${selectedBoard.url}dat/${threadId}.dat` : '';
+              const isFavorite = favoriteUrlToId.has(threadUrl);
+              const isNormalAbon = normalAbonThreads.has(subject.fileName);
 
-            if (isNormalAbon) {
+              if (isNormalAbon) {
+                return (
+                  <div
+                    key={subject.fileName}
+                    className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${String(virtualRow.size)}px`,
+                      transform: `translateY(${String(virtualRow.start)}px)`,
+                    }}
+                    onContextMenu={(e) => {
+                      handleContextMenu(e, subject);
+                    }}
+                  >
+                    <span className="w-8 shrink-0 text-[var(--color-text-muted)]">
+                      {String(i + 1)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[var(--color-res-abon)]">
+                      あぼーん
+                    </span>
+                  </div>
+                );
+              }
+
               return (
-                <div
+                <button
                   key={subject.fileName}
-                  className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
+                  type="button"
+                  onClick={() => {
+                    handleOpenThread(subject);
+                  }}
                   onContextMenu={(e) => {
                     handleContextMenu(e, subject);
+                  }}
+                  className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${String(virtualRow.size)}px`,
+                    transform: `translateY(${String(virtualRow.start)}px)`,
                   }}
                 >
                   <span className="w-8 shrink-0 text-[var(--color-text-muted)]">
                     {String(i + 1)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[var(--color-res-abon)]">
-                    あぼーん
+                  <span className="w-5 shrink-0">
+                    {ageSageBadge(indexMap.get(subject.fileName))}
                   </span>
-                </div>
+                  <span
+                    className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]"
+                    title={subject.title}
+                  >
+                    {subject.title}
+                  </span>
+                  <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                    {subject.ikioi >= 1
+                      ? String(Math.round(subject.ikioi))
+                      : subject.ikioi.toFixed(1)}
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
+                    {subject.completionRate >= 100
+                      ? '100%'
+                      : `${subject.completionRate.toFixed(0)}%`}
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
+                    {formatTimestamp(subject.firstPostTs)}
+                  </span>
+                  <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                    {subject.count}
+                  </span>
+                  <span
+                    className="w-6 shrink-0 cursor-pointer text-center"
+                    onClick={(e) => {
+                      handleToggleFavorite(e, subject);
+                    }}
+                    role="button"
+                    tabIndex={-1}
+                    title={isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
+                  >
+                    <MdiIcon
+                      path={isFavorite ? mdiStar : mdiStarOutline}
+                      size={12}
+                      className={
+                        isFavorite
+                          ? 'text-[var(--color-warning)]'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-warning)]'
+                      }
+                    />
+                  </span>
+                </button>
               );
-            }
-
-            return (
-              <button
-                key={subject.fileName}
-                type="button"
-                onClick={() => {
-                  handleOpenThread(subject);
-                }}
-                onContextMenu={(e) => {
-                  handleContextMenu(e, subject);
-                }}
-                className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-left text-xs hover:bg-[var(--color-bg-secondary)]"
-              >
-                <span className="w-8 shrink-0 text-[var(--color-text-muted)]">{String(i + 1)}</span>
-                <span className="w-5 shrink-0">{ageSageBadge(indexMap.get(subject.fileName))}</span>
-                <span
-                  className="min-w-0 flex-1 truncate text-[var(--color-text-secondary)]"
-                  title={subject.title}
-                >
-                  {subject.title}
-                </span>
-                <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
-                  {subject.ikioi >= 1
-                    ? String(Math.round(subject.ikioi))
-                    : subject.ikioi.toFixed(1)}
-                </span>
-                <span className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
-                  {subject.completionRate >= 100 ? '100%' : `${subject.completionRate.toFixed(0)}%`}
-                </span>
-                <span className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
-                  {formatTimestamp(subject.firstPostTs)}
-                </span>
-                <span className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
-                  {subject.count}
-                </span>
-                <span
-                  className="w-6 shrink-0 cursor-pointer text-center"
-                  onClick={(e) => {
-                    handleToggleFavorite(e, subject);
-                  }}
-                  role="button"
-                  tabIndex={-1}
-                  title={isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
-                >
-                  <MdiIcon
-                    path={isFavorite ? mdiStar : mdiStarOutline}
-                    size={12}
-                    className={
-                      isFavorite
-                        ? 'text-[var(--color-warning)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-warning)]'
-                    }
-                  />
-                </span>
-              </button>
-            );
-          })}
+            })}
+          </div>
         </div>
 
         {edgeRefreshing && <RefreshOverlay />}

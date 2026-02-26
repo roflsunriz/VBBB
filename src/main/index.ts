@@ -1,11 +1,13 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, session, shell } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { performance } from 'node:perf_hooks';
 import { registerIpcHandlers } from './ipc/handlers';
 import { buildAppMenu } from './menu';
 import { createLogger } from './logger';
 import { loadWindowState, saveWindowState } from './services/window-state';
 
+const startupLogger = createLogger('startup');
 const rendererLogger = createLogger('renderer');
 
 function getDataDir(): string {
@@ -93,6 +95,7 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(async () => {
+  const t0 = performance.now();
   electronApp.setAppUserModelId('com.vbbb.app');
 
   app.on('browser-window-created', (_, window) => {
@@ -117,10 +120,18 @@ void app.whenReady().then(async () => {
   // createWindow() is called in parallel so the renderer begins loading while
   // the async parts of handler registration (plugin dynamic-imports) run.
   const ipcReady = registerIpcHandlers();
+  const tHandlesRegistered = performance.now();
+  startupLogger.info(`IPC handles registered in ${(tHandlesRegistered - t0).toFixed(1)}ms`);
+
   createWindow();
   buildAppMenu();
+  const tWindowCreated = performance.now();
+  startupLogger.info(`Window created in ${(tWindowCreated - tHandlesRegistered).toFixed(1)}ms`);
+
   // Await completion so any unhandled rejection surfaces here.
   await ipcReady;
+  const tReady = performance.now();
+  startupLogger.info(`Startup complete in ${(tReady - t0).toFixed(1)}ms`);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

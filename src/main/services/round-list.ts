@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from '@shared/round';
 import { ROUND_FILE_VERSION, ROUND_SEPARATOR, DEFAULT_ROUND_TIMER } from '@shared/round';
 import { createLogger } from '../logger';
-import { atomicWriteFile, readFileSafe } from './file-io';
+import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 
 const logger = createLogger('round-list');
 
@@ -112,7 +112,28 @@ export function loadRoundLists(dataDir: string): void {
     logger.info(`Loaded ${String(itemEntries.length)} round item entries`);
   }
 
-  const timerContent = readFileSafe(join(dataDir, ROUND_TIMER_FILE));
+  parseTimerContent(readFileSafe(join(dataDir, ROUND_TIMER_FILE)));
+}
+
+export async function loadRoundListsAsync(dataDir: string): Promise<void> {
+  const [boardContent, itemContent, timerContent] = await Promise.all([
+    readFileSafeAsync(join(dataDir, ROUND_BOARD_FILE)),
+    readFileSafeAsync(join(dataDir, ROUND_ITEM_FILE)),
+    readFileSafeAsync(join(dataDir, ROUND_TIMER_FILE)),
+  ]);
+
+  if (boardContent !== null) {
+    boardEntries = parseRoundBoard(boardContent.toString('utf-8'));
+    logger.info(`Loaded ${String(boardEntries.length)} round board entries`);
+  }
+  if (itemContent !== null) {
+    itemEntries = parseRoundItem(itemContent.toString('utf-8'));
+    logger.info(`Loaded ${String(itemEntries.length)} round item entries`);
+  }
+  parseTimerContent(timerContent);
+}
+
+function parseTimerContent(timerContent: Buffer | null): void {
   if (timerContent !== null) {
     try {
       const parsed: unknown = JSON.parse(timerContent.toString('utf-8'));

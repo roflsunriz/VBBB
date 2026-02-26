@@ -8,7 +8,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { ProxyConfig, ProxyEndpointConfig, ProxyMode } from '@shared/proxy';
 import { DEFAULT_PROXY_CONFIG } from '@shared/proxy';
 import { createLogger } from '../logger';
-import { atomicWriteFile, readFileSafe } from './file-io';
+import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 
 const logger = createLogger('proxy-manager');
 
@@ -138,11 +138,26 @@ function rebuildAgents(): void {
 }
 
 /**
- * Load proxy configuration from disk.
+ * Load proxy configuration from disk (sync).
  */
 export function loadProxyConfig(dataDir: string): ProxyConfig {
   const filePath = join(dataDir, PROXY_INI_FILE);
   const content = readFileSafe(filePath);
+  if (content === null) {
+    currentConfig = DEFAULT_PROXY_CONFIG;
+  } else {
+    currentConfig = parseProxyIni(content.toString('utf-8'));
+  }
+  rebuildAgents();
+  return currentConfig;
+}
+
+/**
+ * Load proxy configuration from disk (async, non-blocking).
+ */
+export async function loadProxyConfigAsync(dataDir: string): Promise<ProxyConfig> {
+  const filePath = join(dataDir, PROXY_INI_FILE);
+  const content = await readFileSafeAsync(filePath);
   if (content === null) {
     currentConfig = DEFAULT_PROXY_CONFIG;
   } else {

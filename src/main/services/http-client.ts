@@ -1,10 +1,11 @@
 /**
  * HTTP client with User-Agent, timeout, conditional GET, and exponential backoff.
  */
-import { type IncomingHttpHeaders, request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import { type IncomingHttpHeaders, Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
-import { gunzipSync } from 'node:zlib';
+import { gunzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import { type HttpRequestConfig, type HttpResponse, type RetryConfig } from '@shared/api';
 import { DEFAULT_USER_AGENT } from '@shared/file-format';
 import { createLogger } from '../logger';
@@ -21,6 +22,11 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 
 const DEFAULT_CONNECT_TIMEOUT = 10_000;
 const DEFAULT_READ_TIMEOUT = 30_000;
+
+const gunzipAsync = promisify(gunzip);
+
+const httpKeepAliveAgent = new HttpAgent({ keepAlive: true, maxSockets: 10 });
+const httpsKeepAliveAgent = new HttpsAgent({ keepAlive: true, maxSockets: 10 });
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -95,9 +101,11 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
       timeout: config.connectTimeout ?? DEFAULT_CONNECT_TIMEOUT,
     };
 
-    // Inject proxy agent if provided
+    // Use keepAlive agents by default; override with proxy agent if provided
     if (config.agent !== undefined) {
       requestOptions['agent'] = config.agent;
+    } else {
+      requestOptions['agent'] = isHttps ? httpsKeepAliveAgent : httpKeepAliveAgent;
     }
 
     const req = requestFn(config.url, requestOptions, (res) => {
@@ -113,55 +121,48 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
 
       res.on('end', () => {
         clearTimeout(timer);
-        let body = Buffer.concat(chunks);
+        void (async () => {
+          let body = Buffer.concat(chunks);
 
-        // Decompress gzip if Content-Encoding indicates it
-        const contentEncoding = res.headers['content-encoding'];
-        if (contentEncoding === 'gzip' && config.range === undefined) {
-          try {
-            body = gunzipSync(body);
-          } catch {
-            // If decompression fails, use raw body
-          }
-        }
-
-        const responseHeaders = headersToRecord(res.headers);
-
-        // Diagnostic: log response summary
-        logger.info(
-          `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
-        );
-
-        // Diagnostic: log raw header names when Set-Cookie is present or
-        // for POST requests, to detect headers lost in processing
-        const hasSetCookie = responseHeaders['set-cookie'] !== undefined;
-        if (config.method === 'POST' || hasSetCookie) {
-          const rawNames: string[] = [];
-          for (let i = 0; i < res.rawHeaders.length; i += 2) {
-            const name = res.rawHeaders[i];
-            if (name !== undefined) {
-              rawNames.push(name);
+          const contentEncoding = res.headers['content-encoding'];
+          if (contentEncoding === 'gzip' && config.range === undefined) {
+            try {
+              body = await gunzipAsync(body);
+            } catch {
+              // If decompression fails, use raw body
             }
           }
-          logger.info(`[DIAG] ${config.method} rawHeaders names: ${rawNames.join(', ')}`);
-        }
 
-        // Automatically parse Set-Cookie headers from ALL responses
-        // (GET, POST, etc.) to match real browser behaviour.
-        // Browsers store cookies from every HTTP response; previously
-        // VBBB only parsed Set-Cookie from POST responses, missing
-        // cookies set during GET requests (subject.txt, dat, etc.).
-        if (hasSetCookie) {
-          logger.info(`[DIAG] Set-Cookie found in ${config.method} ${config.url} — parsing`);
-          parseSetCookieHeaders(responseHeaders, config.url);
-        }
+          const responseHeaders = headersToRecord(res.headers);
 
-        resolve({
-          status: res.statusCode ?? 0,
-          headers: responseHeaders,
-          body,
-          lastModified: responseHeaders['last-modified'],
-        });
+          logger.info(
+            `[DIAG] Response ${String(res.statusCode ?? 0)} from ${config.url} body=${String(body.length)} bytes`,
+          );
+
+          const hasSetCookie = responseHeaders['set-cookie'] !== undefined;
+          if (config.method === 'POST' || hasSetCookie) {
+            const rawNames: string[] = [];
+            for (let i = 0; i < res.rawHeaders.length; i += 2) {
+              const name = res.rawHeaders[i];
+              if (name !== undefined) {
+                rawNames.push(name);
+              }
+            }
+            logger.info(`[DIAG] ${config.method} rawHeaders names: ${rawNames.join(', ')}`);
+          }
+
+          if (hasSetCookie) {
+            logger.info(`[DIAG] Set-Cookie found in ${config.method} ${config.url} — parsing`);
+            parseSetCookieHeaders(responseHeaders, config.url);
+          }
+
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: responseHeaders,
+            body,
+            lastModified: responseHeaders['last-modified'],
+          });
+        })();
       });
 
       res.on('error', (err: Error) => {

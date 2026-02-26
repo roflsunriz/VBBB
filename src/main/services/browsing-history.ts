@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { BrowsingHistoryEntry } from '@shared/history';
 import { MAX_HISTORY_ENTRIES } from '@shared/history';
 import { createLogger } from '../logger';
-import { atomicWriteFile, readFileSafe } from './file-io';
+import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 
 const logger = createLogger('browsing-history');
 
@@ -16,11 +16,26 @@ const HISTORY_FILE = 'history.json';
 let history: BrowsingHistoryEntry[] = [];
 
 /**
- * Load browsing history from disk.
+ * Load browsing history from disk (sync).
  */
 export function loadBrowsingHistory(dataDir: string): readonly BrowsingHistoryEntry[] {
   const filePath = join(dataDir, HISTORY_FILE);
   const content = readFileSafe(filePath);
+  return parseHistoryContent(content);
+}
+
+/**
+ * Load browsing history from disk (async, non-blocking).
+ */
+export async function loadBrowsingHistoryAsync(
+  dataDir: string,
+): Promise<readonly BrowsingHistoryEntry[]> {
+  const filePath = join(dataDir, HISTORY_FILE);
+  const content = await readFileSafeAsync(filePath);
+  return parseHistoryContent(content);
+}
+
+function parseHistoryContent(content: Buffer | null): readonly BrowsingHistoryEntry[] {
   if (content === null) {
     history = [];
     return history;

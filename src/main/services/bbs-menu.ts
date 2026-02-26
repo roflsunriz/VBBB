@@ -7,7 +7,7 @@ import { BBS_MENU_URL, IGNORED_CATEGORIES } from '@shared/file-format';
 import { BBSMenuSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { decodeBuffer } from './encoding';
-import { atomicWriteFile, readFileSafe } from './file-io';
+import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 import { httpFetch } from './http-client';
 
 const logger = createLogger('bbs-menu');
@@ -163,20 +163,11 @@ export async function saveBBSMenuCache(dataDir: string, menu: BBSMenu): Promise<
   await atomicWriteFile(cachePath, data);
 }
 
-/**
- * Load BBS menu from local cache.
- */
-export function loadBBSMenuCache(dataDir: string): BBSMenu | null {
-  const cachePath = `${dataDir}/bbs-menu-cache.json`;
-  const content = readFileSafe(cachePath);
-  if (content === null) {
-    return null;
-  }
+function parseCachedMenu(content: Buffer): BBSMenu | null {
   try {
     const parsed: unknown = JSON.parse(content.toString('utf-8'));
     const validated = BBSMenuSchema.safeParse(parsed);
     if (validated.success) {
-      // Re-enrich with derived fields
       const categories: Category[] = validated.data.categories.map((cat) => ({
         name: cat.name,
         boards: cat.boards.map((b) => {
@@ -200,4 +191,24 @@ export function loadBBSMenuCache(dataDir: string): BBSMenu | null {
     logger.warn('Failed to parse BBS menu cache');
     return null;
   }
+}
+
+/**
+ * Load BBS menu from local cache (synchronous).
+ */
+export function loadBBSMenuCache(dataDir: string): BBSMenu | null {
+  const cachePath = `${dataDir}/bbs-menu-cache.json`;
+  const content = readFileSafe(cachePath);
+  if (content === null) return null;
+  return parseCachedMenu(content);
+}
+
+/**
+ * Load BBS menu from local cache (async, non-blocking).
+ */
+export async function loadBBSMenuCacheAsync(dataDir: string): Promise<BBSMenu | null> {
+  const cachePath = `${dataDir}/bbs-menu-cache.json`;
+  const content = await readFileSafeAsync(cachePath);
+  if (content === null) return null;
+  return parseCachedMenu(content);
 }

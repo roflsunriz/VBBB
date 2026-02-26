@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { StoredCookie } from '@shared/cookie';
 import { SESSION_ONLY_COOKIES } from '@shared/cookie';
 import { createLogger } from '../logger';
-import { atomicWriteFile, readFileSafe } from './file-io';
+import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 
 const logger = createLogger('cookie-store');
 
@@ -316,11 +316,23 @@ export function deserializeCookies(content: string): void {
 }
 
 /**
- * Load cookies from disk.
+ * Load cookies from disk (sync).
  */
 export function loadCookies(dataDir: string): void {
   const filePath = join(dataDir, COOKIE_FILE);
   const content = readFileSafe(filePath);
+  if (content !== null) {
+    deserializeCookies(content.toString('utf-8'));
+    logger.info('Cookies loaded from disk');
+  }
+}
+
+/**
+ * Load cookies from disk (async, non-blocking).
+ */
+export async function loadCookiesAsync(dataDir: string): Promise<void> {
+  const filePath = join(dataDir, COOKIE_FILE);
+  const content = await readFileSafeAsync(filePath);
   if (content !== null) {
     deserializeCookies(content.toString('utf-8'));
     logger.info('Cookies loaded from disk');

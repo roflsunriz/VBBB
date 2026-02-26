@@ -15,7 +15,7 @@ import { decodeHtmlEntities } from '@shared/html-entities';
 import { SubjectLineSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { decodeBuffer, encodeString, sanitizeForIdx, unsanitizeFromIdx } from './encoding';
-import { atomicWriteFile, getBoardDir, readFileSafe } from './file-io';
+import { atomicWriteFile, getBoardDir, readFileSafe, readFileSafeAsync } from './file-io';
 import { httpFetch } from './http-client';
 
 const logger = createLogger('subject');
@@ -143,28 +143,29 @@ export function determineAgeSage(
 /**
  * Fetch subject.txt for a board.
  */
+const SUBJECT_LASTMOD_FILE = 'subject-lastmod.txt';
+
 export async function fetchSubject(board: Board, dataDir: string): Promise<SubjectFetchResult> {
   const subjectUrl = `${board.url}subject.txt`;
   const boardDir = getBoardDir(dataDir, board.url);
   const localPath = join(boardDir, 'subject.txt');
 
-  // Check for cached Last-Modified
-  const localContent = readFileSafe(localPath);
-  let ifModifiedSince: string | undefined;
-  if (localContent !== null) {
-    // Try to read the stored last-modified from index
-    const idxContent = readFileSafe(join(boardDir, 'Folder.idx'));
-    if (idxContent !== null) {
-      // TODO: extract last-modified from meta; for now skip conditional GET on first run
-    }
-  }
+  // Read saved Last-Modified for conditional GET
+  const [localContent, lastModBuf] = await Promise.all([
+    readFileSafeAsync(localPath),
+    readFileSafeAsync(join(boardDir, SUBJECT_LASTMOD_FILE)),
+  ]);
+  const ifModifiedSince =
+    lastModBuf !== null && localContent !== null
+      ? lastModBuf.toString('utf-8').trim()
+      : undefined;
 
   const encoding =
     board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
       ? 'Shift_JIS'
       : 'EUC-JP';
 
-  logger.info(`Fetching ${subjectUrl}`);
+  logger.info(`Fetching ${subjectUrl}${ifModifiedSince !== undefined ? ` (If-Modified-Since: ${ifModifiedSince})` : ''}`);
 
   const response = await httpFetch({
     url: subjectUrl,
@@ -173,9 +174,9 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
   });
 
   if (response.status === 304) {
-    // Not modified — use local cache
     if (localContent !== null) {
       const text = decodeBuffer(localContent, encoding);
+      logger.info(`subject.txt not modified, using cache (${String(parseSubjectTxt(text).length)} threads)`);
       return { threads: parseSubjectTxt(text), notModified: true };
     }
     return { threads: [], notModified: true };
@@ -185,8 +186,14 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
     throw new Error(`Failed to fetch subject.txt: HTTP ${String(response.status)}`);
   }
 
-  // Save raw response
-  await atomicWriteFile(localPath, response.body);
+  // Save raw response and Last-Modified header in parallel
+  const savePromises: Promise<void>[] = [atomicWriteFile(localPath, response.body)];
+  if (response.lastModified !== undefined) {
+    savePromises.push(
+      atomicWriteFile(join(boardDir, SUBJECT_LASTMOD_FILE), response.lastModified),
+    );
+  }
+  await Promise.all(savePromises);
 
   const text = decodeBuffer(response.body, encoding);
   const threads = parseSubjectTxt(text);

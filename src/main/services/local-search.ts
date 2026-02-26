@@ -3,7 +3,6 @@
  * Searches DAT files under a board directory by regex pattern.
  * Also provides cross-board search across all cached boards / subjects / DATs.
  */
-import { readdirSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type BBSMenu, BoardType } from '@shared/domain';
@@ -19,10 +18,10 @@ import type {
 import { LocalSearchScope, SearchTarget } from '@shared/search';
 import { detectBoardTypeByHost } from '@shared/url-parser';
 import { createLogger } from '../logger';
-import { loadBBSMenuCache } from './bbs-menu';
+import { loadBBSMenuCacheAsync } from './bbs-menu';
 import { parseDat } from './dat';
 import { decodeBuffer } from './encoding';
-import { getBoardDir, readFileSafe } from './file-io';
+import { getBoardDir, readFileSafeAsync } from './file-io';
 import { parseSubjectLine } from './subject';
 
 const logger = createLogger('local-search');
@@ -30,13 +29,13 @@ const logger = createLogger('local-search');
 const MAX_RESULTS = 500;
 
 /**
- * Search local DAT files for the given query.
+ * Search local DAT files for the given query (async, non-blocking).
  */
-export function searchLocal(
+export async function searchLocal(
   query: LocalSearchQuery,
   dataDir: string,
   boardType: BoardType,
-): SearchResult[] {
+): Promise<SearchResult[]> {
   const boardDir = getBoardDir(dataDir, query.boardUrl);
   const results: SearchResult[] = [];
   const encoding =
@@ -44,7 +43,7 @@ export function searchLocal(
 
   let datFiles: string[];
   try {
-    datFiles = readdirSync(boardDir).filter((f) => f.endsWith('.dat'));
+    datFiles = (await readdir(boardDir)).filter((f) => f.endsWith('.dat'));
   } catch {
     logger.warn(`No DAT files found in ${boardDir}`);
     return [];
@@ -62,13 +61,12 @@ export function searchLocal(
   for (const datFile of datFiles) {
     if (results.length >= MAX_RESULTS) break;
 
-    const content = readFileSafe(`${boardDir}/${datFile}`);
+    const content = await readFileSafeAsync(`${boardDir}/${datFile}`);
     if (content === null) continue;
 
     const text = decodeBuffer(content, encoding);
     const responses = parseDat(text);
 
-    // Extract thread ID and title
     const threadId = datFile.replace('.dat', '');
     const firstRes = responses[0];
     const threadTitle =
@@ -425,7 +423,7 @@ export async function searchLocalAll(
     return [];
   }
 
-  const menu = loadBBSMenuCache(dataDir);
+  const menu = await loadBBSMenuCacheAsync(dataDir);
   const categories = menu ?? { categories: [] };
 
   const scope = query.scope;

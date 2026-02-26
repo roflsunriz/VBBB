@@ -3,7 +3,17 @@
  * Displays thread responses with tabs for multiple threads.
  * Supports anchor links (>>N) with hover popups and NG filtering.
  */
-import { useCallback, useRef, useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import {
+  useCallback,
+  useRef,
+  useEffect,
+  useState,
+  useMemo,
+  useDeferredValue,
+  memo,
+  lazy,
+  Suspense,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -239,7 +249,7 @@ function applyNgFilter(
 type HighlightType = 'none' | 'own' | 'reply';
 
 /** F31: Count badge component */
-function CountBadge({
+const CountBadge = memo(function CountBadge({
   count,
   resNumbers,
   onClick,
@@ -276,7 +286,7 @@ function CountBadge({
       ({count})
     </button>
   );
-}
+});
 
 /** F29: ワッチョイ estimation popup */
 function WatchoiPopup({
@@ -482,7 +492,7 @@ function IpPopup({
   );
 }
 
-function ResItem({
+const ResItem = memo(function ResItem({
   res,
   boardUrl,
   threadId,
@@ -540,25 +550,6 @@ function ResItem({
   readonly aaOverride: boolean | undefined;
   readonly onToggleAaFont: (resNumber: number, forceAa: boolean) => void;
 }): React.JSX.Element | null {
-  // Transparent abon: completely hidden
-  if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
-
-  // Normal abon: show placeholder
-  if (ngResult === NgFilterResultEnum.NormalAbon) {
-    return (
-      <div
-        className="border-b border-[var(--color-border-secondary)] px-4 py-2 opacity-40"
-        id={`res-${String(res.number)}`}
-      >
-        <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
-          <span className="font-bold text-[var(--color-res-abon)]">{res.number}</span>
-          <span className="text-[var(--color-res-abon)]">あぼーん</span>
-        </div>
-        <div className="text-sm text-[var(--color-res-abon)]">あぼーん</div>
-      </div>
-    );
-  }
-
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [watchoiPopup, setWatchoiPopup] = useState<{
     info: WatchoiInfo;
@@ -614,6 +605,25 @@ function ResItem({
     setContextMenu(null);
   }, [selectedText, onAddNgWord]);
 
+  const copyMenuOptions = useMemo(() => {
+    const plainName = res.name.replace(/<[^>]+>/g, '');
+    const plainBody = res.body
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&gt;/g, '>')
+      .replace(/&lt;/g, '<')
+      .replace(/&amp;/g, '&');
+    const permalink = buildResPermalink(boardUrl, threadId, res.number);
+    const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
+    return [
+      { label: '名前をコピー', value: header },
+      { label: '本文をコピー', value: plainBody },
+      { label: 'URLをコピー', value: permalink },
+      { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
+      { label: '本文+URL', value: `${plainBody}\n${permalink}` },
+    ] as const;
+  }, [res.name, res.body, res.mail, res.dateTime, res.number, boardUrl, threadId]);
+
   // Close context menu on click outside
   useEffect(() => {
     if (contextMenu === null) return;
@@ -626,11 +636,27 @@ function ResItem({
     };
   }, [contextMenu]);
 
-  const bodyHtml = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
+  const bodyHtml = useMemo(
+    () => linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body))),
+    [res.body],
+  );
 
   // ASCII art detection and manual override
   const isAutoAa = useMemo(() => isAsciiArt(res.body), [res.body]);
   const isAaFinal = aaOverride ?? isAutoAa;
+
+  // Stable callbacks for CountBadge (avoid inline closures to preserve memo)
+  const handleFilterByKotehanBadge = useCallback(() => {
+    if (resKotehan !== null) onFilterByKotehan(resKotehan);
+  }, [resKotehan, onFilterByKotehan]);
+
+  const handleFilterByWatchoiBadge = useCallback(() => {
+    if (resWatchoi !== null) onFilterByWatchoi(resWatchoi.label);
+  }, [resWatchoi, onFilterByWatchoi]);
+
+  const handleFilterByIdBadge = useCallback(() => {
+    if (resId !== null) onFilterById(resId);
+  }, [resId, onFilterById]);
 
   // Detect image URLs in the body for inline thumbnails
   const images = useMemo(() => detectImageUrls(res.body), [res.body]);
@@ -687,6 +713,25 @@ function ResItem({
     [onScrollToResNumber],
   );
 
+  // Transparent abon: completely hidden
+  if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
+
+  // Normal abon: show placeholder
+  if (ngResult === NgFilterResultEnum.NormalAbon) {
+    return (
+      <div
+        className="border-b border-[var(--color-border-secondary)] px-4 py-2 opacity-40"
+        id={`res-${String(res.number)}`}
+      >
+        <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
+          <span className="font-bold text-[var(--color-res-abon)]">{res.number}</span>
+          <span className="text-[var(--color-res-abon)]">あぼーん</span>
+        </div>
+        <div className="text-sm text-[var(--color-res-abon)]">あぼーん</div>
+      </div>
+    );
+  }
+
   const highlightClass =
     highlightType === 'own'
       ? 'border-l-2 border-l-[var(--color-highlight-own-border)] bg-[var(--color-highlight-own)]'
@@ -737,9 +782,7 @@ function ResItem({
             <CountBadge
               count={kotehanCount}
               resNumbers={kotehanResNumbers}
-              onClick={() => {
-                onFilterByKotehan(resKotehan);
-              }}
+              onClick={handleFilterByKotehanBadge}
               onHover={onAnchorHover}
               onLeave={onAnchorLeave}
             />
@@ -757,9 +800,7 @@ function ResItem({
               <CountBadge
                 count={watchoiCount}
                 resNumbers={watchoiResNumbers}
-                onClick={() => {
-                  onFilterByWatchoi(resWatchoi.label);
-                }}
+                onClick={handleFilterByWatchoiBadge}
                 onHover={onAnchorHover}
                 onLeave={onAnchorLeave}
               />
@@ -774,9 +815,7 @@ function ResItem({
             <CountBadge
               count={idCount}
               resNumbers={idResNumbers}
-              onClick={() => {
-                onFilterById(resId);
-              }}
+              onClick={handleFilterByIdBadge}
               onHover={onAnchorHover}
               onLeave={onAnchorLeave}
             />
@@ -855,24 +894,7 @@ function ResItem({
             </button>
             <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
             {/* F18: Copy options */}
-            {(() => {
-              const plainName = res.name.replace(/<[^>]+>/g, '');
-              const plainBody = res.body
-                .replace(/<br\s*\/?>/gi, '\n')
-                .replace(/<[^>]+>/g, '')
-                .replace(/&gt;/g, '>')
-                .replace(/&lt;/g, '<')
-                .replace(/&amp;/g, '&');
-              const permalink = buildResPermalink(boardUrl, threadId, res.number);
-              const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
-              return [
-                { label: '名前をコピー', value: header },
-                { label: '本文をコピー', value: plainBody },
-                { label: 'URLをコピー', value: permalink },
-                { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
-                { label: '本文+URL', value: `${plainBody}\n${permalink}` },
-              ] as const;
-            })().map((opt) => (
+            {copyMenuOptions.map((opt) => (
               <button
                 key={opt.label}
                 type="button"
@@ -945,7 +967,7 @@ function ResItem({
         )}
     </div>
   );
-}
+});
 
 /**
  * Extract boardId from a board URL.
@@ -1264,8 +1286,9 @@ export function ThreadView(): React.JSX.Element {
     value: string;
   } | null>(null);
 
-  // Thread search bar state
+  // Thread search bar state (deferred to avoid re-computation on every keystroke)
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [searchField, setSearchField] = useState<SearchField>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1523,9 +1546,10 @@ export function ThreadView(): React.JSX.Element {
     return set;
   }, [filterKey, activeTab]);
 
-  // Search bar filtering: compute matching res numbers
+  // Search bar filtering: compute matching res numbers (uses deferred query to avoid
+  // re-computation on every keystroke while the input field remains responsive)
   const searchFilteredResNumbers = useMemo<ReadonlySet<number> | null>(() => {
-    const trimmed = searchQuery.trim();
+    const trimmed = deferredSearchQuery.trim();
     if (trimmed === '' || activeTab === undefined) return null;
     const lowerQuery = trimmed.toLowerCase();
     const set = new Set<number>();
@@ -1562,7 +1586,7 @@ export function ThreadView(): React.JSX.Element {
       if (matched) set.add(res.number);
     }
     return set;
-  }, [searchQuery, searchField, activeTab]);
+  }, [deferredSearchQuery, searchField, activeTab]);
 
   // Build the display-ready response list (filtered or full)
   const displayResponses = useMemo(() => {
@@ -2637,7 +2661,7 @@ export function ThreadView(): React.JSX.Element {
                                 EMPTY_RES_NUMBERS)
                               : EMPTY_RES_NUMBERS
                           }
-                          replyNumbers={replyMap.get(res.number) ?? []}
+                          replyNumbers={replyMap.get(res.number) ?? EMPTY_RES_NUMBERS}
                           onAnchorHover={handleAnchorHover}
                           onReplyBadgeHover={handleReplyBadgeHover}
                           onAnchorLeave={handleAnchorLeave}

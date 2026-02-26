@@ -1,14 +1,15 @@
 /**
  * Atomic file I/O with locking and backup support.
  */
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+  mkdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createLogger } from '../logger';
 
@@ -47,6 +48,15 @@ function releaseLock(filePath: string): void {
   lockedFiles.delete(filePath);
 }
 
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Write content to a file atomically via a temporary file.
  * Creates parent directories if needed.
@@ -54,25 +64,23 @@ function releaseLock(filePath: string): void {
  */
 export async function atomicWriteFile(filePath: string, content: Buffer | string): Promise<void> {
   const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+  if (!(await fileExists(dir))) {
+    await mkdir(dir, { recursive: true });
   }
 
   await acquireLock(filePath);
   try {
     const tmpPath = `${filePath}.tmp.${String(Date.now())}`;
 
-    // Write to temp file
-    writeFileSync(tmpPath, content);
+    await writeFile(tmpPath, content);
 
-    // Backup existing file
-    if (existsSync(filePath)) {
+    if (await fileExists(filePath)) {
       const bakPath = `${filePath}.bak`;
       try {
-        if (existsSync(bakPath)) {
-          unlinkSync(bakPath);
+        if (await fileExists(bakPath)) {
+          await unlink(bakPath);
         }
-        renameSync(filePath, bakPath);
+        await rename(filePath, bakPath);
       } catch (err) {
         logger.warn(
           `Failed to create backup for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
@@ -80,8 +88,7 @@ export async function atomicWriteFile(filePath: string, content: Buffer | string
       }
     }
 
-    // Atomic rename
-    renameSync(tmpPath, filePath);
+    await rename(tmpPath, filePath);
   } finally {
     releaseLock(filePath);
   }
@@ -95,41 +102,52 @@ export async function atomicAppendFile(filePath: string, content: Buffer): Promi
   await acquireLock(filePath);
   try {
     let existing = Buffer.alloc(0);
-    if (existsSync(filePath)) {
-      existing = readFileSync(filePath);
+    if (await fileExists(filePath)) {
+      existing = await readFile(filePath);
     }
     const combined = Buffer.concat([existing, content]);
     const tmpPath = `${filePath}.tmp.${String(Date.now())}`;
     const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+    if (!(await fileExists(dir))) {
+      await mkdir(dir, { recursive: true });
     }
-    writeFileSync(tmpPath, combined);
-    if (existsSync(filePath)) {
+    await writeFile(tmpPath, combined);
+    if (await fileExists(filePath)) {
       const bakPath = `${filePath}.bak`;
       try {
-        if (existsSync(bakPath)) {
-          unlinkSync(bakPath);
+        if (await fileExists(bakPath)) {
+          await unlink(bakPath);
         }
-        renameSync(filePath, bakPath);
+        await rename(filePath, bakPath);
       } catch {
         // Continue even if backup fails
       }
     }
-    renameSync(tmpPath, filePath);
+    await rename(tmpPath, filePath);
   } finally {
     releaseLock(filePath);
   }
 }
 
 /**
- * Read a file's contents. Returns null if the file doesn't exist.
+ * Read a file's contents synchronously. Returns null if the file doesn't exist.
+ * Prefer readFileSafeAsync for non-blocking reads.
  */
 export function readFileSafe(filePath: string): Buffer | null {
   if (!existsSync(filePath)) {
     return null;
   }
   return readFileSync(filePath);
+}
+
+/**
+ * Read a file's contents asynchronously. Returns null if the file doesn't exist.
+ */
+export async function readFileSafeAsync(filePath: string): Promise<Buffer | null> {
+  if (!(await fileExists(filePath))) {
+    return null;
+  }
+  return readFile(filePath);
 }
 
 /**
@@ -147,12 +165,59 @@ export function readFileLastBytes(filePath: string, n: number): Buffer | null {
 }
 
 /**
- * Ensure a directory exists.
+ * Read the last N bytes of a file asynchronously. Returns null if file doesn't exist.
+ */
+export async function readFileLastBytesAsync(filePath: string, n: number): Promise<Buffer | null> {
+  const content = await readFileSafeAsync(filePath);
+  if (content === null) {
+    return null;
+  }
+  if (content.length <= n) {
+    return content;
+  }
+  return content.subarray(content.length - n);
+}
+
+/**
+ * Ensure a directory exists (synchronous, for startup).
  */
 export function ensureDir(dirPath: string): void {
   if (!existsSync(dirPath)) {
     mkdirSync(dirPath, { recursive: true });
   }
+}
+
+/**
+ * Ensure a directory exists (async).
+ */
+export async function ensureDirAsync(dirPath: string): Promise<void> {
+  if (!(await fileExists(dirPath))) {
+    await mkdir(dirPath, { recursive: true });
+  }
+}
+
+/**
+ * Synchronous atomic write for use in beforeunload handlers only.
+ */
+export function atomicWriteFileSync(filePath: string, content: Buffer | string): void {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const tmpPath = `${filePath}.tmp.${String(Date.now())}`;
+  writeFileSync(tmpPath, content);
+  if (existsSync(filePath)) {
+    const bakPath = `${filePath}.bak`;
+    try {
+      if (existsSync(bakPath)) {
+        unlinkSync(bakPath);
+      }
+      renameSync(filePath, bakPath);
+    } catch {
+      // Continue even if backup fails
+    }
+  }
+  renameSync(tmpPath, filePath);
 }
 
 /**

@@ -22,9 +22,31 @@ import {
   readFileSafe,
 } from './file-io';
 import { httpFetch } from './http-client';
+import { LruCache } from './lru-cache';
 import { getUpliftSid } from './uplift-auth';
 
 const logger = createLogger('dat');
+
+const DAT_CACHE_CAPACITY = 80;
+const parsedDatCache = new LruCache<string, readonly Res[]>(DAT_CACHE_CAPACITY);
+
+function datCacheKey(boardUrl: string, threadId: string, size: number): string {
+  return `${boardUrl}\0${threadId}\0${String(size)}`;
+}
+
+function cachedParseDat(
+  content: string,
+  boardUrl: string,
+  threadId: string,
+  rawSize: number,
+): Res[] {
+  const key = datCacheKey(boardUrl, threadId, rawSize);
+  const cached = parsedDatCache.get(key);
+  if (cached !== undefined) return cached as Res[];
+  const parsed = parseDat(content);
+  parsedDatCache.set(key, parsed);
+  return parsed;
+}
 
 function isLikelyMachiDateTime(value: string): boolean {
   return /^\d{4}\/\d{2}\/\d{2}\([^)]*\)\s+\d{2}:\d{2}:\d{2}/.test(value);
@@ -251,7 +273,7 @@ export async function fetchDat(
           const text = applyDatReplace(decodeBuffer(fullContent, encoding), replaceRules);
           return {
             status: DatFetchStatus.Partial,
-            responses: parseDat(text),
+            responses: cachedParseDat(text, board.url, threadId, fullContent.length),
             lastModified: response.lastModified ?? null,
             size: fullContent.length,
           };
@@ -264,13 +286,12 @@ export async function fetchDat(
     }
 
     if (response.status === 304) {
-      // Not modified
       const fullContent = readFileSafe(localPath);
       if (fullContent !== null) {
         const text = decodeBuffer(fullContent, encoding);
         return {
           status: DatFetchStatus.NotModified,
-          responses: parseDat(text),
+          responses: cachedParseDat(text, board.url, threadId, fullContent.length),
           lastModified: null,
           size: fullContent.length,
         };
@@ -288,13 +309,12 @@ export async function fetchDat(
       return fetchDatKako(board, threadId, dataDir, encoding);
     }
 
-    // If differential didn't work, try full fetch
     if (response.status === 200) {
       await atomicWriteFile(localPath, response.body);
       const text = decodeBuffer(response.body, encoding);
       return {
         status: DatFetchStatus.Full,
-        responses: parseDat(text),
+        responses: cachedParseDat(text, board.url, threadId, response.body.length),
         lastModified: response.lastModified ?? null,
         size: response.body.length,
       };
@@ -343,7 +363,7 @@ async function fetchDatFull(
   const text = applyDatReplace(decodeBuffer(response.body, encoding), replaceRules);
   return {
     status: DatFetchStatus.Full,
-    responses: parseDat(text),
+    responses: cachedParseDat(text, board.url, threadId, response.body.length),
     lastModified: response.lastModified ?? null,
     size: response.body.length,
   };
@@ -368,7 +388,7 @@ async function fetchDatKako(
         const text = decodeBuffer(response.body, encoding);
         return {
           status: DatFetchStatus.Archived,
-          responses: parseDat(text),
+          responses: cachedParseDat(text, board.url, threadId, response.body.length),
           lastModified: response.lastModified ?? null,
           size: response.body.length,
         };
@@ -378,14 +398,13 @@ async function fetchDatKako(
     }
   }
 
-  // DAT落ち確定・過去ログなし — ローカルキャッシュから読み込みを試みる
   const localContent = readFileSafe(localPath);
   if (localContent !== null) {
     logger.info(`DAT fallen, serving from local cache: ${localPath}`);
     const text = decodeBuffer(localContent, encoding);
     return {
       status: DatFetchStatus.DatFallen,
-      responses: parseDat(text),
+      responses: cachedParseDat(text, board.url, threadId, localContent.length),
       lastModified: null,
       size: localContent.length,
     };

@@ -118,14 +118,28 @@ export function ResPopup({
     return { numbers: limited, hasMore: resNumbers.length > MAX_POPUP_RES };
   }, [resNumbers, replyMap, expandReplies]);
 
-  // Find matching responses
-  const matchedResponses: Res[] = [];
-  for (const num of displayNumbers) {
-    const res = responses.find((r) => r.number === num);
-    if (res !== undefined) {
-      matchedResponses.push(res);
+  // Find matching responses (memoized to avoid recomputation on re-render)
+  const matchedResponses = useMemo(() => {
+    const result: Res[] = [];
+    for (const num of displayNumbers) {
+      const res = responses.find((r) => r.number === num);
+      if (res !== undefined) {
+        result.push(res);
+      }
     }
-  }
+    return result;
+  }, [displayNumbers, responses]);
+
+  const processedResponses = useMemo(
+    () =>
+      matchedResponses.map((res) => ({
+        res,
+        bodyIsAa: isAsciiArt(res.body),
+        bodyHtml: linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body))),
+        replyCount: replyMap.get(res.number)?.length ?? 0,
+      })),
+    [matchedResponses, replyMap],
+  );
 
   // Position adjustment to keep popup within viewport
   useLayoutEffect(() => {
@@ -256,7 +270,7 @@ export function ResPopup({
     }
   }, []);
 
-  if (matchedResponses.length === 0) return null;
+  if (processedResponses.length === 0) return null;
 
   return (
     <div
@@ -272,42 +286,36 @@ export function ResPopup({
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnterSelf}
     >
-      {matchedResponses.map((res) => {
-        const bodyIsAa = isAsciiArt(res.body);
-        const bodyHtml = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
-        const replyNums = replyMap.get(res.number);
-        const replyCount = replyNums !== undefined ? replyNums.length : 0;
-        return (
-          <div
-            key={res.number}
-            className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0"
-          >
-            <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5 text-xs">
-              {replyCount > 0 && (
-                <span className="text-[10px] font-semibold text-[var(--color-link)]">
-                  +{replyCount}
-                </span>
-              )}
-              <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
-              <span
-                className="text-[var(--color-res-name)]"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
-              />
-              {res.mail.length > 0 && (
-                <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
-              )}
-              <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
-            </div>
-            <div
-              className={`${bodyIsAa ? 'aa-font' : 'text-xs leading-relaxed'} text-[var(--color-res-body)]`}
-              dangerouslySetInnerHTML={{ __html: bodyHtml }}
-              onMouseOver={canNest ? handleBodyMouseOver : undefined}
-              onMouseOut={canNest ? handleBodyMouseOut : undefined}
-              onClick={handleBodyClick}
+      {processedResponses.map(({ res, bodyIsAa, bodyHtml, replyCount }) => (
+        <div
+          key={res.number}
+          className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0"
+        >
+          <div className="mb-0.5 flex flex-wrap items-baseline gap-1.5 text-xs">
+            {replyCount > 0 && (
+              <span className="text-[10px] font-semibold text-[var(--color-link)]">
+                +{replyCount}
+              </span>
+            )}
+            <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
+            <span
+              className="text-[var(--color-res-name)]"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
             />
+            {res.mail.length > 0 && (
+              <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>
+            )}
+            <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
           </div>
-        );
-      })}
+          <div
+            className={`${bodyIsAa ? 'aa-font' : 'text-xs leading-relaxed'} text-[var(--color-res-body)]`}
+            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            onMouseOver={canNest ? handleBodyMouseOver : undefined}
+            onMouseOut={canNest ? handleBodyMouseOut : undefined}
+            onClick={handleBodyClick}
+          />
+        </div>
+      ))}
 
       {hasMore && (
         <div className="px-3 py-1 text-center text-[10px] text-[var(--color-res-datetime)]">
