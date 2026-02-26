@@ -373,6 +373,16 @@ export interface IpcChannelMap {
     args: [userAgent: string];
     result: void;
   };
+  /** Get BBS menu source URLs */
+  'config:get-bbs-menu-urls': {
+    args: [];
+    result: readonly string[];
+  };
+  /** Set BBS menu source URLs */
+  'config:set-bbs-menu-urls': {
+    args: [urls: readonly string[]];
+    result: void;
+  };
   /** Add a single entry to the diagnostic log buffer (from renderer) */
   'diag:add-log': {
     args: [level: DiagLogLevel, tag: string, message: string];

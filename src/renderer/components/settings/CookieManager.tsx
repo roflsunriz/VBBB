@@ -3,7 +3,7 @@
  * Provides UI to view/delete cookies and change user agent.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { mdiClose, mdiDelete, mdiCookie, mdiWeb } from '@mdi/js';
+import { mdiClose, mdiDelete, mdiCookie, mdiWeb, mdiFormatListBulleted } from '@mdi/js';
 import type { StoredCookie } from '@shared/cookie';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -11,26 +11,32 @@ interface CookieManagerProps {
   readonly onClose: () => void;
 }
 
-type CookieTab = 'cookies' | 'useragent';
+type CookieTab = 'cookies' | 'useragent' | 'bbsmenu';
 
 export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<CookieTab>('cookies');
   const [cookies, setCookies] = useState<readonly StoredCookie[]>([]);
   const [userAgent, setUserAgent] = useState('');
   const [originalUserAgent, setOriginalUserAgent] = useState('');
+  const [bbsMenuUrlsText, setBbsMenuUrlsText] = useState('');
+  const [originalBbsMenuUrlsText, setOriginalBbsMenuUrlsText] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
 
   // Load data on mount
   useEffect(() => {
     void (async () => {
       try {
-        const [allCookies, currentUA] = await Promise.all([
+        const [allCookies, currentUA, bbsMenuUrls] = await Promise.all([
           window.electronApi.invoke('cookie:get-all'),
           window.electronApi.invoke('config:get-user-agent'),
+          window.electronApi.invoke('config:get-bbs-menu-urls'),
         ]);
+        const urlsText = bbsMenuUrls.join('\n');
         setCookies(allCookies);
         setUserAgent(currentUA);
         setOriginalUserAgent(currentUA);
+        setBbsMenuUrlsText(urlsText);
+        setOriginalBbsMenuUrlsText(urlsText);
       } catch {
         setStatusMessage('Failed to load settings');
       }
@@ -60,6 +66,31 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
   const handleResetUserAgent = useCallback(() => {
     setUserAgent(originalUserAgent);
   }, [originalUserAgent]);
+
+  const handleSaveBbsMenuUrls = useCallback(async () => {
+    const normalized = Array.from(
+      new Set(
+        bbsMenuUrlsText
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0),
+      ),
+    );
+    try {
+      await window.electronApi.invoke('config:set-bbs-menu-urls', normalized);
+      const saved = await window.electronApi.invoke('config:get-bbs-menu-urls');
+      const savedText = saved.join('\n');
+      setBbsMenuUrlsText(savedText);
+      setOriginalBbsMenuUrlsText(savedText);
+      setStatusMessage('BBS メニュー URL を保存しました');
+    } catch {
+      setStatusMessage('BBS メニュー URL の保存に失敗しました');
+    }
+  }, [bbsMenuUrlsText]);
+
+  const handleResetBbsMenuUrls = useCallback(() => {
+    setBbsMenuUrlsText(originalBbsMenuUrlsText);
+  }, [originalBbsMenuUrlsText]);
 
   // Group cookies by domain
   const groupedCookies = cookies.reduce<Record<string, StoredCookie[]>>((acc, cookie) => {
@@ -116,6 +147,20 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         >
           <MdiIcon path={mdiWeb} size={14} />
           User-Agent
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('bbsmenu');
+          }}
+          className={`flex items-center gap-1 px-4 py-2 text-xs ${
+            activeTab === 'bbsmenu'
+              ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
+              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+          }`}
+        >
+          <MdiIcon path={mdiFormatListBulleted} size={14} />
+          BBSメニューURL
         </button>
       </div>
 
@@ -216,6 +261,50 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
               <button
                 type="button"
                 onClick={handleResetUserAgent}
+                className="rounded border border-[var(--color-border-primary)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+              >
+                リセット
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'bbsmenu' && (
+          <div className="space-y-3">
+            <div>
+              <label
+                className="mb-1 block text-xs text-[var(--color-text-secondary)]"
+                htmlFor="bbs-menu-urls-input"
+              >
+                BBSメニューURL（1行に1つ）
+              </label>
+              <textarea
+                id="bbs-menu-urls-input"
+                value={bbsMenuUrlsText}
+                onChange={(e) => {
+                  setBbsMenuUrlsText(e.target.value);
+                }}
+                rows={8}
+                className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-3 py-2 font-mono text-xs text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
+                placeholder="https://menu.5ch.net/bbsmenu.html"
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                空行は無視されます。無効なURLのみの場合はデフォルトURLに戻ります。
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSaveBbsMenuUrls();
+                }}
+                className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-xs text-white hover:opacity-90"
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                onClick={handleResetBbsMenuUrls}
                 className="rounded border border-[var(--color-border-primary)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
               >
                 リセット

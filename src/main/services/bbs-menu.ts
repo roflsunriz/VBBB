@@ -3,7 +3,7 @@
  * Parses bbsmenu.html -> categories/boards -> saves as local cache.
  */
 import { type BBSMenu, type Board, BoardType, type Category } from '@shared/domain';
-import { BBS_MENU_URL, IGNORED_CATEGORIES } from '@shared/file-format';
+import { DEFAULT_BBS_MENU_URLS, IGNORED_CATEGORIES } from '@shared/file-format';
 import { BBSMenuSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { decodeBuffer } from './encoding';
@@ -11,6 +11,38 @@ import { atomicWriteFile, readFileSafe, readFileSafeAsync } from './file-io';
 import { httpFetch } from './http-client';
 
 const logger = createLogger('bbs-menu');
+
+/**
+ * Normalize BBS menu source URLs:
+ * - trim whitespace
+ * - allow only http/https
+ * - deduplicate while preserving order
+ * - fallback to default when empty/invalid
+ */
+export function normalizeBBSMenuSourceUrls(urls: readonly string[]): readonly string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of urls) {
+    const candidate = raw.trim();
+    if (candidate.length === 0) continue;
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        continue;
+      }
+      const serialized = parsed.toString();
+      if (!seen.has(serialized)) {
+        seen.add(serialized);
+        normalized.push(serialized);
+      }
+    } catch {
+      // Ignore invalid URL candidates.
+    }
+  }
+
+  return normalized.length > 0 ? normalized : [...DEFAULT_BBS_MENU_URLS];
+}
 
 /**
  * Detect board type from URL.
@@ -134,23 +166,60 @@ export function parseBBSMenuHtml(html: string): BBSMenu {
 /**
  * Fetch BBS menu from server.
  */
-export async function fetchBBSMenu(): Promise<BBSMenu> {
-  logger.info(`Fetching BBS menu from ${BBS_MENU_URL}`);
+export async function fetchBBSMenu(
+  sourceUrls: readonly string[] = DEFAULT_BBS_MENU_URLS,
+): Promise<BBSMenu> {
+  const menuUrls = normalizeBBSMenuSourceUrls(sourceUrls);
+  logger.info(`Fetching BBS menu from ${String(menuUrls.length)} source(s)`);
 
-  const response = await httpFetch({
-    url: BBS_MENU_URL,
-    method: 'GET',
-  });
+  const mergedCategories = new Map<string, Map<string, Board>>();
+  const errors: string[] = [];
 
-  if (response.status !== 200) {
-    throw new Error(`Failed to fetch BBS menu: HTTP ${String(response.status)}`);
+  for (const menuUrl of menuUrls) {
+    try {
+      const response = await httpFetch({
+        url: menuUrl,
+        method: 'GET',
+      });
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${String(response.status)}`);
+      }
+
+      // BBS menu is Shift_JIS encoded
+      const html = decodeBuffer(response.body, 'Shift_JIS');
+      const menu = parseBBSMenuHtml(html);
+
+      for (const category of menu.categories) {
+        const categoryBoards = mergedCategories.get(category.name) ?? new Map<string, Board>();
+        for (const board of category.boards) {
+          categoryBoards.set(board.url, board);
+        }
+        mergedCategories.set(category.name, categoryBoards);
+      }
+      logger.info(
+        `Fetched BBS menu source: ${menuUrl} (${String(menu.categories.length)} categories parsed)`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${menuUrl}: ${message}`);
+      logger.warn(`Failed to fetch BBS menu source: ${menuUrl} (${message})`);
+    }
   }
 
-  // BBS menu is Shift_JIS encoded
-  const html = decodeBuffer(response.body, 'Shift_JIS');
-  const menu = parseBBSMenuHtml(html);
+  if (mergedCategories.size === 0) {
+    throw new Error(`Failed to fetch all BBS menu sources: ${errors.join(' | ')}`);
+  }
 
-  logger.info(`Parsed ${String(menu.categories.length)} categories`);
+  const categories: Category[] = [];
+  for (const [name, boardsByUrl] of mergedCategories.entries()) {
+    categories.push({
+      name,
+      boards: Array.from(boardsByUrl.values()),
+    });
+  }
+
+  const menu: BBSMenu = { categories };
+  logger.info(`Parsed ${String(menu.categories.length)} categories from merged menu sources`);
   return menu;
 }
 

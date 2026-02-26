@@ -11,13 +11,23 @@ import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
 import { clearLogBuffer, createLogger, getLogBuffer, pushEntry } from '../logger';
 import { menuEmitter } from '../menu';
-import { fetchBBSMenu, loadBBSMenuCacheAsync, saveBBSMenuCache } from '../services/bbs-menu';
+import {
+  fetchBBSMenu,
+  loadBBSMenuCacheAsync,
+  normalizeBBSMenuSourceUrls,
+  saveBBSMenuCache,
+} from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
 import { resolveBoardTitle } from '../services/board-title';
 import { fetchDat } from '../services/dat';
 import { postResponse } from '../services/post';
 import { fetchSubject, loadFolderIdx, saveFolderIdx } from '../services/subject';
-import { getBoardDir, ensureDirAsync } from '../services/file-io';
+import {
+  atomicWriteFile,
+  getBoardDir,
+  ensureDirAsync,
+  readFileSafeAsync,
+} from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { httpFetch } from '../services/http-client';
 import { searchLocal, searchLocalAll } from '../services/local-search';
@@ -85,13 +95,27 @@ import {
   saveTabsSync,
 } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
-import { DEFAULT_USER_AGENT } from '@shared/file-format';
+import { DEFAULT_BBS_MENU_URLS, DEFAULT_USER_AGENT } from '@shared/file-format';
 import { checkForUpdate, downloadAndInstall } from '../services/updater';
 
 const logger = createLogger('ipc');
+const BBS_MENU_URLS_FILE = 'bbs-menu-urls.json';
 
 function getDataDir(): string {
   return join(app.getPath('userData'), 'vbbb-data');
+}
+
+function parseBbsMenuUrlsConfig(raw: string): readonly string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [...DEFAULT_BBS_MENU_URLS];
+    }
+    const candidates = parsed.filter((item): item is string => typeof item === 'string');
+    return normalizeBBSMenuSourceUrls(candidates);
+  } catch {
+    return [...DEFAULT_BBS_MENU_URLS];
+  }
 }
 
 /**
@@ -108,6 +132,7 @@ function handle<K extends keyof IpcChannelMap>(
 
 /** Board URL -> Board object cache (populated from BBS menu) */
 const boardCache = new Map<string, Board>();
+let bbsMenuUrls: readonly string[] = [...DEFAULT_BBS_MENU_URLS];
 
 function lookupBoard(boardUrl: string): Board {
   const cached = boardCache.get(boardUrl);
@@ -152,6 +177,22 @@ function lookupBoard(boardUrl: string): Board {
  */
 export async function registerIpcHandlers(): Promise<void> {
   const dataDir = getDataDir();
+  const bbsMenuUrlsPath = join(dataDir, BBS_MENU_URLS_FILE);
+
+  const loadBbsMenuUrlsAsync = async (): Promise<void> => {
+    const content = await readFileSafeAsync(bbsMenuUrlsPath);
+    if (content === null) {
+      bbsMenuUrls = [...DEFAULT_BBS_MENU_URLS];
+      return;
+    }
+    bbsMenuUrls = parseBbsMenuUrlsConfig(content.toString('utf-8'));
+  };
+
+  const saveBbsMenuUrlsAsync = async (urls: readonly string[]): Promise<void> => {
+    const normalized = normalizeBBSMenuSourceUrls(urls);
+    bbsMenuUrls = normalized;
+    await atomicWriteFile(bbsMenuUrlsPath, JSON.stringify(normalized, null, 2));
+  };
 
   handle('app:get-data-dir', () => {
     return Promise.resolve(dataDir);
@@ -182,7 +223,7 @@ export async function registerIpcHandlers(): Promise<void> {
    * cache already exists, the cache and in-memory boardCache are left untouched.
    */
   const fetchAndUpdateMenu = async (oldBoards: Board[]): Promise<BBSMenu> => {
-    const menu = await fetchBBSMenu();
+    const menu = await fetchBBSMenu(bbsMenuUrls);
 
     // Guard: do not overwrite a good cache with an empty menu.
     // This protects against 5ch returning non-standard HTML (CAPTCHA, error page)
@@ -755,6 +796,14 @@ export async function registerIpcHandlers(): Promise<void> {
     return Promise.resolve();
   });
 
+  handle('config:get-bbs-menu-urls', () => {
+    return Promise.resolve(bbsMenuUrls);
+  });
+
+  handle('config:set-bbs-menu-urls', async (urls: readonly string[]) => {
+    await saveBbsMenuUrlsAsync(urls);
+  });
+
   // Diagnostic log handlers
   handle('diag:add-log', (level, tag, message) => {
     pushEntry(level, tag, message);
@@ -863,6 +912,7 @@ export async function registerIpcHandlers(): Promise<void> {
     loadRoundListsAsync(dataDir),
     loadCookiesAsync(dataDir),
     loadProxyConfigAsync(dataDir),
+    loadBbsMenuUrlsAsync(),
     initializeBoardPlugins(),
   ]);
 
