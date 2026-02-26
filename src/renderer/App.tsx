@@ -443,7 +443,11 @@ export function App(): React.JSX.Element {
           type="button"
           onClick={openRound}
           className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${roundTimerEnabled ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]`}
-          title={roundTimerEnabled ? '巡回リスト (自動巡回 ON) (Ctrl+Shift+R)' : '巡回リスト (Ctrl+Shift+R)'}
+          title={
+            roundTimerEnabled
+              ? '巡回リスト (自動巡回 ON) (Ctrl+Shift+R)'
+              : '巡回リスト (Ctrl+Shift+R)'
+          }
         >
           <MdiIcon path={mdiSync} size={14} />
           巡回{roundTimerEnabled ? ' ON' : ''}

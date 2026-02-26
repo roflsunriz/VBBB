@@ -54,6 +54,7 @@ import {
 } from '@shared/ng-field-extractor';
 import { matchNgCondition } from '@shared/ng-matcher';
 import type { PostHistoryEntry } from '@shared/post-history';
+import type { RoundItemEntry } from '@shared/round';
 import { detectBoardTypeByHost, buildResPermalink } from '@shared/url-parser';
 import { useBBSStore } from '../../stores/bbs-store';
 import { MdiIcon } from '../common/MdiIcon';
@@ -1101,6 +1102,7 @@ export function ThreadView(): React.JSX.Element {
     y: number;
     tabId: string;
     isFavorite: boolean;
+    isRoundItem: boolean;
     threadPageUrl: string;
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1143,13 +1145,28 @@ export function ThreadView(): React.JSX.Element {
       const threadUrl = tab !== undefined ? `${tab.boardUrl}dat/${tab.threadId}.dat` : '';
       const threadPageUrl =
         tab !== undefined ? buildResPermalink(tab.boardUrl, tab.threadId, 1).replace(/1$/, '') : '';
-      setTabCtxMenu({
-        x: e.clientX,
-        y: e.clientY,
-        tabId,
-        isFavorite: favoriteUrlToId.has(threadUrl),
-        threadPageUrl,
-      });
+      void (async () => {
+        let isRoundItem = false;
+        if (tab !== undefined) {
+          try {
+            const roundItems = await window.electronApi.invoke('round:get-items');
+            const fileName = `${tab.threadId}.dat`;
+            isRoundItem = roundItems.some(
+              (item: RoundItemEntry) => item.url === tab.boardUrl && item.fileName === fileName,
+            );
+          } catch {
+            isRoundItem = false;
+          }
+        }
+        setTabCtxMenu({
+          x: e.clientX,
+          y: e.clientY,
+          tabId,
+          isFavorite: favoriteUrlToId.has(threadUrl),
+          isRoundItem,
+          threadPageUrl,
+        });
+      })();
     },
     [tabs, favoriteUrlToId],
   );
@@ -1200,17 +1217,22 @@ export function ThreadView(): React.JSX.Element {
     setTabCtxMenu(null);
   }, [tabCtxMenu, tabs, favoriteUrlToId, addFavorite, removeFavorite]);
 
-  const handleAddTabToRound = useCallback(() => {
+  const handleToggleTabRound = useCallback(() => {
     if (tabCtxMenu === null) return;
     const tab = tabs.find((t) => t.id === tabCtxMenu.tabId);
     if (tab === undefined) return;
-    void window.electronApi.invoke('round:add-item', {
-      url: tab.boardUrl,
-      boardTitle: '',
-      fileName: `${tab.threadId}.dat`,
-      threadTitle: tab.title,
-      roundName: '',
-    });
+    const fileName = `${tab.threadId}.dat`;
+    if (tabCtxMenu.isRoundItem) {
+      void window.electronApi.invoke('round:remove-item', tab.boardUrl, fileName);
+    } else {
+      void window.electronApi.invoke('round:add-item', {
+        url: tab.boardUrl,
+        boardTitle: '',
+        fileName,
+        threadTitle: tab.title,
+        roundName: '',
+      });
+    }
     setTabCtxMenu(null);
   }, [tabCtxMenu, tabs]);
 
@@ -2752,10 +2774,10 @@ export function ThreadView(): React.JSX.Element {
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleAddTabToRound}
+            onClick={handleToggleTabRound}
             role="menuitem"
           >
-            巡回に追加
+            {tabCtxMenu.isRoundItem ? '巡回から削除' : '巡回に追加'}
           </button>
           <button
             type="button"

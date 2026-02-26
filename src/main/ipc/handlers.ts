@@ -11,11 +11,7 @@ import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
 import { clearLogBuffer, createLogger, getLogBuffer, pushEntry } from '../logger';
 import { menuEmitter } from '../menu';
-import {
-  fetchBBSMenu,
-  loadBBSMenuCacheAsync,
-  saveBBSMenuCache,
-} from '../services/bbs-menu';
+import { fetchBBSMenu, loadBBSMenuCacheAsync, saveBBSMenuCache } from '../services/bbs-menu';
 import { applyBoardTransfers, detectTransfers } from '../services/board-transfer';
 import { resolveBoardTitle } from '../services/board-title';
 import { fetchDat } from '../services/dat';

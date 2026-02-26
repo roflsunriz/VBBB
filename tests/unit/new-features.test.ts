@@ -12,7 +12,10 @@ const PROJECT_ROOT = resolve(__dirname, '../..');
 // F4: 次スレ作成支援ボタンの表示条件撤廃
 // ---------------------------------------------------------------------------
 describe('F4: 次スレ作成支援ボタンの表示条件撤廃', () => {
-  const threadViewPath = resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx');
+  const threadViewPath = resolve(
+    PROJECT_ROOT,
+    'src/renderer/components/thread-view/ThreadView.tsx',
+  );
 
   it('ThreadView.tsx does not contain NEXT_THREAD_BUTTON_THRESHOLD (import removed)', () => {
     const src = readFileSync(threadViewPath, 'utf-8');
@@ -34,7 +37,10 @@ describe('F4: 次スレ作成支援ボタンの表示条件撤廃', () => {
 // F2: ★クリックでお気に入りトグル
 // ---------------------------------------------------------------------------
 describe('F2: ★クリックでお気に入りトグル', () => {
-  const threadListPath = resolve(PROJECT_ROOT, 'src/renderer/components/thread-list/ThreadList.tsx');
+  const threadListPath = resolve(
+    PROJECT_ROOT,
+    'src/renderer/components/thread-list/ThreadList.tsx',
+  );
 
   it('ThreadList.tsx contains handleToggleFavorite (renamed handler)', () => {
     const src = readFileSync(threadListPath, 'utf-8');
@@ -56,7 +62,10 @@ describe('F2: ★クリックでお気に入りトグル', () => {
 // F6: 外部ブラウザで開く
 // ---------------------------------------------------------------------------
 describe('F6: 外部ブラウザで開く', () => {
-  const threadViewPath = resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx');
+  const threadViewPath = resolve(
+    PROJECT_ROOT,
+    'src/renderer/components/thread-view/ThreadView.tsx',
+  );
 
   it('ThreadView.tsx contains threadPageUrl (in tabCtxMenu state)', () => {
     const src = readFileSync(threadViewPath, 'utf-8');
@@ -78,7 +87,10 @@ describe('F6: 外部ブラウザで開く', () => {
 // F5: ボタン群の移動
 // ---------------------------------------------------------------------------
 describe('F5: ボタン群の移動', () => {
-  const threadViewPath = resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx');
+  const threadViewPath = resolve(
+    PROJECT_ROOT,
+    'src/renderer/components/thread-view/ThreadView.tsx',
+  );
 
   it('ThreadView.tsx contains actionButtons !== null (always shown in separate row)', () => {
     const src = readFileSync(threadViewPath, 'utf-8');
@@ -193,7 +205,10 @@ describe('NG機能強化', () => {
   const zodSchemasPath = resolve(PROJECT_ROOT, 'src/types/zod-schemas.ts');
   const ngEditorPath = resolve(PROJECT_ROOT, 'src/renderer/components/ng-editor/NgEditor.tsx');
   const ngAbonPath = resolve(PROJECT_ROOT, 'src/main/services/ng-abon.ts');
-  const threadViewPath = resolve(PROJECT_ROOT, 'src/renderer/components/thread-view/ThreadView.tsx');
+  const threadViewPath = resolve(
+    PROJECT_ROOT,
+    'src/renderer/components/thread-view/ThreadView.tsx',
+  );
 
   it('ng.ts contains NgStringCondition, NgNumericCondition, NgTimeCondition (new types)', () => {
     const src = readFileSync(ngPath, 'utf-8');

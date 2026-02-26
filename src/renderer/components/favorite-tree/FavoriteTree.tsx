@@ -596,12 +596,18 @@ export function FavoriteTree(): React.JSX.Element {
       {/* Inline folder name input */}
       {isCreatingFolder && (
         <div className="flex items-center gap-1 border-b border-[var(--color-border-secondary)] px-2 py-1">
-          <MdiIcon path={mdiFolderPlus} size={12} className="shrink-0 text-[var(--color-warning)]" />
+          <MdiIcon
+            path={mdiFolderPlus}
+            size={12}
+            className="shrink-0 text-[var(--color-warning)]"
+          />
           <input
             ref={folderInputRef}
             type="text"
             value={newFolderName}
-            onChange={(e) => { setNewFolderName(e.target.value); }}
+            onChange={(e) => {
+              setNewFolderName(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();

@@ -57,9 +57,7 @@ function summarizeRule(rule: NgRule): string {
     const neg = c.negate ? '否定 ' : '';
     const opLabel = numericOpLabel(c.op);
     const val2 =
-      c.op === NgNumericOpEnum.Between && c.value2 !== undefined
-        ? `～${String(c.value2)}`
-        : '';
+      c.op === NgNumericOpEnum.Between && c.value2 !== undefined ? `～${String(c.value2)}` : '';
     return `[数値] ${neg}${numericTargetLabel(c.target)} ${opLabel} ${String(c.value)}${val2}`;
   }
   const neg = c.negate ? '否定 ' : '';
@@ -513,10 +511,7 @@ function TimeConditionForm({
     onAdd(condition);
   }, [target, negate, weekdays, hourFrom, hourTo, relativeMinutes, datetimeFrom, datetimeTo]);
 
-  const hourOptions = useMemo(
-    () => Array.from({ length: 24 }, (_, i) => i),
-    [],
-  );
+  const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
   return (
     <div className="flex flex-col gap-1.5 text-xs">
@@ -821,10 +816,7 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
 
             {/* Tab-specific form */}
             {activeTab === 'string' && (
-              <StringConditionForm
-                onAdd={handleAddCondition}
-                initialToken={ngEditorInitialToken}
-              />
+              <StringConditionForm onAdd={handleAddCondition} initialToken={ngEditorInitialToken} />
             )}
             {activeTab === 'numeric' && <NumericConditionForm onAdd={handleAddCondition} />}
             {activeTab === 'time' && <TimeConditionForm onAdd={handleAddCondition} />}

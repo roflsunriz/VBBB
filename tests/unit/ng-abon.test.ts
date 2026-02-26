@@ -912,12 +912,10 @@ describe('matchStringCondition field-specific', () => {
       condition: { tokens: ['荒らし'], fields: [NgStringField.ThreadTitle] },
     });
     const res = makeRes({ body: 'normal', title: '' });
-    expect(
-      matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '荒らしスレッド' }),
-    ).toBe(true);
-    expect(
-      matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '普通のスレ' }),
-    ).toBe(false);
+    expect(matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '荒らしスレッド' })).toBe(
+      true,
+    );
+    expect(matchesNgRule(rule, res, 'board', 'thread', { threadTitle: '普通のスレ' })).toBe(false);
   });
 
   it('matches against multiple fields (name + body)', () => {

@@ -34,6 +34,7 @@ import { SearchInputWithHistory } from '../common/SearchInputWithHistory';
 import { ContextMenuContainer } from '../common/ContextMenuContainer';
 import { AgeSage, type SubjectRecord, type BoardSortKey, type BoardSortDir } from '@shared/domain';
 import type { FavItem, FavNode } from '@shared/favorite';
+import type { RoundBoardEntry } from '@shared/round';
 import { BoardType } from '@shared/domain';
 import { AbonType, NgStringField, NgStringMatchMode, NgTarget } from '@shared/ng';
 import type { NgRule } from '@shared/ng';
@@ -201,6 +202,7 @@ export function ThreadList(): React.JSX.Element {
     x: number;
     y: number;
     tabId: string;
+    isRoundBoard: boolean;
   } | null>(null);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
@@ -576,21 +578,40 @@ export function ThreadList(): React.JSX.Element {
     [closeBoardTab],
   );
 
-  const handleBoardTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setBoardTabCtxMenu({ x: e.clientX, y: e.clientY, tabId });
-  }, []);
+  const handleBoardTabContextMenu = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const bt = boardTabs.find((t) => t.id === tabId);
+      void (async () => {
+        let isRoundBoard = false;
+        if (bt !== undefined) {
+          try {
+            const roundBoards = await window.electronApi.invoke('round:get-boards');
+            isRoundBoard = roundBoards.some((board: RoundBoardEntry) => board.url === bt.board.url);
+          } catch {
+            isRoundBoard = false;
+          }
+        }
+        setBoardTabCtxMenu({ x: e.clientX, y: e.clientY, tabId, isRoundBoard });
+      })();
+    },
+    [boardTabs],
+  );
 
-  const handleAddBoardToRound = useCallback(() => {
+  const handleToggleBoardRound = useCallback(() => {
     if (boardTabCtxMenu === null) return;
     const bt = boardTabs.find((t) => t.id === boardTabCtxMenu.tabId);
     if (bt === undefined) return;
-    void window.electronApi.invoke('round:add-board', {
-      url: bt.board.url,
-      boardTitle: bt.board.title,
-      roundName: '',
-    });
+    if (boardTabCtxMenu.isRoundBoard) {
+      void window.electronApi.invoke('round:remove-board', bt.board.url);
+    } else {
+      void window.electronApi.invoke('round:add-board', {
+        url: bt.board.url,
+        boardTitle: bt.board.title,
+        roundName: '',
+      });
+    }
     setBoardTabCtxMenu(null);
   }, [boardTabCtxMenu, boardTabs]);
 
@@ -1009,10 +1030,10 @@ export function ThreadList(): React.JSX.Element {
           <button
             type="button"
             className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleAddBoardToRound}
+            onClick={handleToggleBoardRound}
             role="menuitem"
           >
-            巡回に追加
+            {boardTabCtxMenu.isRoundBoard ? '巡回から削除' : '巡回に追加'}
           </button>
         </ContextMenuContainer>
       )}

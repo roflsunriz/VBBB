@@ -156,16 +156,16 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
     readFileSafeAsync(join(boardDir, SUBJECT_LASTMOD_FILE)),
   ]);
   const ifModifiedSince =
-    lastModBuf !== null && localContent !== null
-      ? lastModBuf.toString('utf-8').trim()
-      : undefined;
+    lastModBuf !== null && localContent !== null ? lastModBuf.toString('utf-8').trim() : undefined;
 
   const encoding =
     board.boardType === BoardType.Type2ch || board.boardType === BoardType.MachiBBS
       ? 'Shift_JIS'
       : 'EUC-JP';
 
-  logger.info(`Fetching ${subjectUrl}${ifModifiedSince !== undefined ? ` (If-Modified-Since: ${ifModifiedSince})` : ''}`);
+  logger.info(
+    `Fetching ${subjectUrl}${ifModifiedSince !== undefined ? ` (If-Modified-Since: ${ifModifiedSince})` : ''}`,
+  );
 
   const response = await httpFetch({
     url: subjectUrl,
@@ -176,7 +176,9 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
   if (response.status === 304) {
     if (localContent !== null) {
       const text = decodeBuffer(localContent, encoding);
-      logger.info(`subject.txt not modified, using cache (${String(parseSubjectTxt(text).length)} threads)`);
+      logger.info(
+        `subject.txt not modified, using cache (${String(parseSubjectTxt(text).length)} threads)`,
+      );
       return { threads: parseSubjectTxt(text), notModified: true };
     }
     return { threads: [], notModified: true };
@@ -189,9 +191,7 @@ export async function fetchSubject(board: Board, dataDir: string): Promise<Subje
   // Save raw response and Last-Modified header in parallel
   const savePromises: Promise<void>[] = [atomicWriteFile(localPath, response.body)];
   if (response.lastModified !== undefined) {
-    savePromises.push(
-      atomicWriteFile(join(boardDir, SUBJECT_LASTMOD_FILE), response.lastModified),
-    );
+    savePromises.push(atomicWriteFile(join(boardDir, SUBJECT_LASTMOD_FILE), response.lastModified));
   }
   await Promise.all(savePromises);
 
