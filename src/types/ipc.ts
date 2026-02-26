@@ -327,6 +327,11 @@ export interface IpcChannelMap {
     args: [entry: PostHistoryEntry];
     result: void;
   };
+  /** Clear cookies/auth state used by post retry recovery */
+  'post:clear-related-data': {
+    args: [];
+    result: { clearedCookies: number };
+  };
   /** Load post history */
   'post:load-history': {
     args: [];

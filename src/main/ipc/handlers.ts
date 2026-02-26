@@ -43,6 +43,7 @@ import {
 } from '../services/favorite';
 import { beLogin, beLogout, getBeSession } from '../services/be-auth';
 import {
+  clearAllCookies,
   getAllCookies,
   getCookiesForUrl,
   setCookie,
@@ -50,7 +51,12 @@ import {
   saveCookies,
   loadCookiesAsync,
 } from '../services/cookie-store';
-import { getDonguriState, loginDonguri, refreshDonguriState } from '../services/donguri';
+import {
+  getDonguriState,
+  loginDonguri,
+  refreshDonguriState,
+  resetDonguriState,
+} from '../services/donguri';
 import { getBoardPlugin, initializeBoardPlugins } from '../services/plugins/board-plugin';
 import { getProxyConfig, loadProxyConfigAsync, saveProxyConfig } from '../services/proxy-manager';
 import {
@@ -553,6 +559,17 @@ export async function registerIpcHandlers(): Promise<void> {
   // Post history
   handle('post:save-history', async (entry) => {
     await savePostHistory(dataDir, entry);
+  });
+
+  handle('post:clear-related-data', async () => {
+    const clearedCookies = getAllCookies().length;
+    clearAllCookies();
+    upliftLogout();
+    beLogout();
+    resetDonguriState();
+    await saveCookies(dataDir);
+    logger.info(`Cleared post-related data for retry recovery (${String(clearedCookies)} cookies)`);
+    return { clearedCookies };
   });
 
   handle('post:load-history', () => {

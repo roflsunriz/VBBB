@@ -34,6 +34,15 @@ interface BatchEntry {
 }
 
 type PanelMode = 'manual' | 'dsl';
+const AUTO_RETRY_ON_FAILURE_KEY = 'vbbb-programmatic-auto-retry-on-failure';
+
+function loadAutoRetryOnFailure(): boolean {
+  try {
+    return localStorage.getItem(AUTO_RETRY_ON_FAILURE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 export function ProgrammaticPost({
   boardUrl,
@@ -71,6 +80,7 @@ export function ProgrammaticPost({
   // --- Shared execution state ---
   const [running, setRunning] = useState(false);
   const [logLines, setLogLines] = useState<readonly string[]>([]);
+  const [autoRetryOnFailure, setAutoRetryOnFailure] = useState(loadAutoRetryOnFailure);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef(false);
@@ -108,13 +118,20 @@ export function ProgrammaticPost({
   const doPost = useCallback(
     async (n: string, m: string, msg: string): Promise<boolean> => {
       try {
-        const result = await window.electronApi.invoke('bbs:post', {
+        const postParams = {
           boardUrl,
           threadId,
           name: n,
           mail: m,
           message: msg,
-        });
+        } as const;
+        let result = await window.electronApi.invoke('bbs:post', postParams);
+        if (!result.success && autoRetryOnFailure) {
+          addLog(`投稿失敗を検出 (${result.resultType})。関連データ削除 + 自動再投稿を試行`);
+          const cleanup = await window.electronApi.invoke('post:clear-related-data');
+          addLog(`関連データ削除完了: ${String(cleanup.clearedCookies)} 件`);
+          result = await window.electronApi.invoke('bbs:post', postParams);
+        }
         if (result.success) {
           addLog(`投稿成功: "${msg.slice(0, 30)}${msg.length > 30 ? '…' : ''}"`);
           return true;
@@ -127,7 +144,7 @@ export function ProgrammaticPost({
         return false;
       }
     },
-    [boardUrl, threadId, addLog],
+    [boardUrl, threadId, addLog, autoRetryOnFailure],
   );
 
   const handleStop = useCallback(() => {
@@ -714,6 +731,22 @@ export function ProgrammaticPost({
                 停止
               </button>
             )}
+            <label className="ml-auto flex cursor-pointer items-center gap-1 text-xs text-[var(--color-text-muted)]">
+              <input
+                type="checkbox"
+                checked={autoRetryOnFailure}
+                onChange={(e) => {
+                  setAutoRetryOnFailure(e.target.checked);
+                  try {
+                    localStorage.setItem(AUTO_RETRY_ON_FAILURE_KEY, String(e.target.checked));
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="accent-[var(--color-accent)]"
+              />
+              投稿失敗時に関連データ削除 + 自動再投稿
+            </label>
           </div>
 
           {/* Log output (shared) */}
