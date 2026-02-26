@@ -18,6 +18,14 @@ export interface DetectedVideo {
   readonly originalUrl: string;
 }
 
+/** A detected audio URL in thread body */
+export interface DetectedAudio {
+  /** Audio source URL for the <audio> element */
+  readonly url: string;
+  /** Original URL as found in the text (may differ from url if cleaned) */
+  readonly originalUrl: string;
+}
+
 /** An external preview rule from extpreview.ini */
 export interface ExtPreviewRule {
   /** URL match pattern (regex) */

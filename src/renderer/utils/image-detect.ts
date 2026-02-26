@@ -1,7 +1,7 @@
 /**
  * Client-side media URL detection for inline thumbnails and video players.
  */
-import type { DetectedImage, DetectedVideo } from '@shared/preview';
+import type { DetectedAudio, DetectedImage, DetectedVideo } from '@shared/preview';
 
 const IMAGE_EXTENSIONS =
   /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
@@ -25,6 +25,8 @@ const TWIMG_PBS_MEDIA_PATTERN = /^https?:\/\/pbs\.twimg\.com\/media\/([A-Za-z0-9
 const VIDEO_EXTENSIONS = /\.(mp4|webm|mov)(?:\?[^\s"'<>]*)?$/i;
 /** video.twimg.com host pattern */
 const VIDEO_TWIMG_HOST = /^https?:\/\/video\.twimg\.com\//;
+/** Audio file extension pattern */
+const AUDIO_EXTENSIONS = /\.(mp3|m4a|aac|wav|ogg|flac|opus)(?:\?[^\s"'<>]*)?$/i;
 
 function isVideoUrl(url: string): boolean {
   if (VIDEO_TWIMG_HOST.test(url)) return true;
@@ -43,6 +45,16 @@ function isImageUrl(url: string): boolean {
     if (IMAGE_EXTENSIONS.test(urlObj.pathname)) return true;
     if (IMAGE_QUERY_FORMAT.test(urlObj.search)) return true;
     return false;
+  } catch {
+    return false;
+  }
+}
+
+function isAudioUrl(url: string): boolean {
+  if (isVideoUrl(url)) return false;
+  try {
+    const urlObj = new URL(url);
+    return AUDIO_EXTENSIONS.test(urlObj.pathname);
   } catch {
     return false;
   }
@@ -143,6 +155,30 @@ export function detectVideoUrls(bodyHtml: string): DetectedVideo[] {
     if (seen.has(cleaned)) continue;
 
     if (isVideoUrl(cleaned)) {
+      seen.add(cleaned);
+      results.push({ url: cleaned, originalUrl: cleaned });
+    }
+  }
+  return results;
+}
+
+/**
+ * Detect audio URLs in body HTML string.
+ * Matches direct audio files (.mp3, .m4a, .aac, .wav, .ogg, .flac, .opus).
+ */
+export function detectAudioUrls(bodyHtml: string): DetectedAudio[] {
+  const results: DetectedAudio[] = [];
+  const seen = new Set<string>();
+
+  URL_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = URL_PATTERN.exec(bodyHtml)) !== null) {
+    const url = match[0];
+    if (url === undefined) continue;
+    const cleaned = url.replace(/[.,;:!?)]+$/, '');
+    if (seen.has(cleaned)) continue;
+
+    if (isAudioUrl(cleaned)) {
       seen.add(cleaned);
       results.push({ url: cleaned, originalUrl: cleaned });
     }
