@@ -16,8 +16,15 @@ const SHINMOTSU_PATTERN = /発信元:([^\s]+)/;
 /** Extract trip (◆xxx) from name */
 const TRIP_PATTERN = /◆([^\s]+)/;
 
-/** Extract ﾜｯﾁｮｲ/ワッチョイ family from name or dateTime */
-const WATCHOI_PATTERN = /(ﾜｯﾁｮｲ|ワッチョイ)[^)]*\)/;
+/**
+ * Extract ﾜｯﾁｮｲ/ワッチョイ family label from name/dateTime.
+ * Supports mixed name formats like:
+ * - 名無しさん (ﾜｯﾁｮｲ ABCD-EFGH)
+ * - 名無しさん ﾜｯﾁｮｲ ABCD-EFGH [2400:...:*]
+ * - 警備員[Lv.0][新芽] ﾜｯﾁｮｲ A+/1-bC9/
+ */
+const WATCHOI_PATTERN =
+  /(?:^|[\s(])(([^\s()[\]]+)\s+([A-Za-z0-9+/]{4})-([A-Za-z0-9+/]{4})(?:\s+\[[^\]]+\])?)(?=$|[\s)])/u;
 
 /** IPv4 and IPv6 in name or dateTime */
 const IPV4_PATTERN =
@@ -81,7 +88,7 @@ export function extractStringFields(res: Res, threadTitle: string): Record<NgStr
   const trip = TRIP_PATTERN.exec(res.name)?.[1] ?? '';
 
   const watchoiMatch = WATCHOI_PATTERN.exec(res.name) ?? WATCHOI_PATTERN.exec(res.dateTime);
-  const watchoi = watchoiMatch?.[0] ?? '';
+  const watchoi = watchoiMatch?.[1] ?? '';
 
   let ip = IPV4_PATTERN.exec(res.name)?.[0] ?? IPV4_PATTERN.exec(res.dateTime)?.[0] ?? '';
   if (ip === '')

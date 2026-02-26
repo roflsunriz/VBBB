@@ -22,17 +22,14 @@ const SHINMOTSU_PATTERN = /発信元:([^\s]+)/;
 
 /**
  * Extract ワッチョイ-family from name field.
- * Hash parts are alphanumeric (not limited to hex).
- * Optional trailing content like [IP] is allowed before closing paren.
- * Examples:
- *   (ﾜｯﾁｮｲ 1778-VJ5d)
- *   (ﾜｯﾁｮｲ 1778-VJ5d [2400:4153:2b21:e400:*])
- *   (ｽｯｯﾌﾟ Sd12-Ab3c)
+ * Supports:
+ * - 名無しさん (ﾜｯﾁｮｲ 1778-VJ5d)
+ * - 名無しさん ﾜｯﾁｮｲ 1778-VJ5d [2400:4153:2b21:e400:*]
+ * - 警備員[Lv.0][新芽] ｽｯｯﾌﾟ Sd12-Ab3c
+ * Hash parts may include + and / on some boards.
  */
-const WATCHOI_PATTERN = /\(([^\s)]+)\s+([A-Za-z0-9]{4})-([A-Za-z0-9]{4})(?:\s+\[[^\]]*\])?\)/;
-
-/** Extract full ワッチョイ label (prefix + hash) for display */
-const WATCHOI_FULL_PATTERN = /\(([^)]+)\)/;
+const WATCHOI_PATTERN =
+  /(?:^|[\s(])(([^\s()[\]]+)\s+([A-Za-z0-9+/]{4})-([A-Za-z0-9+/]{4})(?:\s+\[[^\]]+\])?)(?=$|[\s)])/u;
 
 /** Default anonymous names that do NOT count as コテハン */
 const DEFAULT_NAMES = new Set([
@@ -76,13 +73,20 @@ export interface WatchoiInfo {
 /** Extract ワッチョイ info from a response's name field */
 export function extractWatchoi(res: Res): WatchoiInfo | null {
   const m = WATCHOI_PATTERN.exec(res.name);
-  if (m === null || m[1] === undefined || m[2] === undefined || m[3] === undefined) return null;
-  const fullM = WATCHOI_FULL_PATTERN.exec(res.name);
+  if (
+    m === null ||
+    m[1] === undefined ||
+    m[2] === undefined ||
+    m[3] === undefined ||
+    m[4] === undefined
+  ) {
+    return null;
+  }
   return {
-    label: fullM?.[1] ?? `${m[1]} ${m[2]}-${m[3]}`,
-    prefix: m[1],
-    ipHash: m[2],
-    uaHash: m[3],
+    label: m[1],
+    prefix: m[2],
+    ipHash: m[3],
+    uaHash: m[4],
   };
 }
 

@@ -543,7 +543,21 @@ describe('ng-field-extractor', () => {
   it('extracts watchoi from name', () => {
     const res = makeRes({ name: '名無しさん (ﾜｯﾁｮｲ ABCD-1234)' });
     const fields = extractStringFields(res, '');
-    expect(fields.watchoi).toContain('ﾜｯﾁｮｲ');
+    expect(fields.watchoi).toBe('ﾜｯﾁｮｲ ABCD-1234');
+  });
+
+  it('extracts watchoi without trailing close parenthesis', () => {
+    const res = makeRes({ name: '名無しさん (ﾜｯﾁｮｲ WXYZ-9+/A)' });
+    const fields = extractStringFields(res, '');
+    expect(fields.watchoi).toBe('ﾜｯﾁｮｲ WXYZ-9+/A');
+  });
+
+  it('extracts watchoi from complex name with donguri and IP', () => {
+    const res = makeRes({
+      name: '名無しさん 警備員[Lv.0][新芽] ﾜｯﾁｮｲ A+/1-bC9/ [2400:4153:2b21:e400:*]',
+    });
+    const fields = extractStringFields(res, '');
+    expect(fields.watchoi).toBe('ﾜｯﾁｮｲ A+/1-bC9/ [2400:4153:2b21:e400:*]');
   });
 
   it('extracts IP from name or dateTime', () => {
