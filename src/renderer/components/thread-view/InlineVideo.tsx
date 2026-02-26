@@ -18,13 +18,16 @@ import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
 interface InlineVideoProps {
   readonly url: string;
   readonly originalUrl: string;
+  readonly initialVolume: number;
 }
 
 const VIDEO_MAX_WIDTH = 320;
 const VIDEO_MAX_HEIGHT = 240;
-const INITIAL_VOLUME = 0.1;
-
-export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.Element {
+export function InlineVideo({
+  url,
+  originalUrl,
+  initialVolume,
+}: InlineVideoProps): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
   const videoElRef = useRef<HTMLVideoElement | null>(null);
@@ -36,12 +39,15 @@ export function InlineVideo({ url, originalUrl }: InlineVideoProps): React.JSX.E
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
   }, [url, originalUrl]);
 
-  const videoRef = useCallback((el: HTMLVideoElement | null) => {
-    videoElRef.current = el;
-    if (el) {
-      el.volume = INITIAL_VOLUME;
-    }
-  }, []);
+  const videoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      videoElRef.current = el;
+      if (el) {
+        el.volume = Math.min(1, Math.max(0, initialVolume));
+      }
+    },
+    [initialVolume],
+  );
 
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);

@@ -33,6 +33,7 @@ import {
   mdiChevronLeft,
   mdiChevronRight,
   mdiArrowRightBold,
+  mdiVolumeHigh,
 } from '@mdi/js';
 import type { Res, SubjectRecord } from '@shared/domain';
 import { BoardType } from '@shared/domain';
@@ -105,6 +106,8 @@ const BE_PATTERN = /BE:(\d+)-(\d+)/;
 /** Parse a Japanese datetime like "2024/01/01(月) 12:34:56.78" into a Date */
 const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2}):(\d{2})/;
 const RELATED_THREAD_MAX_ITEMS = 12;
+const INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY = 'vbbb-inline-video-initial-volume-percent';
+const DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT = 10;
 
 interface RelatedThreadCandidate {
   readonly threadId: string;
@@ -586,6 +589,7 @@ const ResItem = memo(function ResItem({
   highlightType,
   showRelativeTime,
   inlineMediaEnabled,
+  inlineVideoInitialVolume,
   allThreadImageUrls,
   idCount,
   idResNumbers,
@@ -614,6 +618,7 @@ const ResItem = memo(function ResItem({
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
   readonly inlineMediaEnabled: boolean;
+  readonly inlineVideoInitialVolume: number;
   readonly allThreadImageUrls: readonly string[];
   readonly idCount: number;
   readonly idResNumbers: readonly number[];
@@ -947,7 +952,12 @@ const ResItem = memo(function ResItem({
       {inlineMediaEnabled && videos.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">
           {videos.map((vid) => (
-            <InlineVideo key={vid.url} url={vid.url} originalUrl={vid.originalUrl} />
+            <InlineVideo
+              key={vid.url}
+              url={vid.url}
+              originalUrl={vid.originalUrl}
+              initialVolume={inlineVideoInitialVolume}
+            />
           ))}
         </div>
       )}
@@ -1438,6 +1448,34 @@ export function ThreadView(): React.JSX.Element {
       }
       return next;
     });
+  }, []);
+  const [inlineVideoInitialVolumePercent, setInlineVideoInitialVolumePercent] = useState(() => {
+    try {
+      const rawValue = localStorage.getItem(INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY);
+      const parsedValue =
+        rawValue !== null
+          ? Number.parseFloat(rawValue)
+          : DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT;
+      if (!Number.isFinite(parsedValue)) {
+        return DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT;
+      }
+      return Math.min(100, Math.max(0, parsedValue));
+    } catch {
+      return DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT;
+    }
+  });
+  const inlineVideoInitialVolume = inlineVideoInitialVolumePercent / 100;
+  const handleInlineVideoInitialVolumeChange = useCallback((nextValue: number) => {
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+    const normalizedValue = Math.min(100, Math.max(0, nextValue));
+    setInlineVideoInitialVolumePercent(normalizedValue);
+    try {
+      localStorage.setItem(INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY, String(normalizedValue));
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // F31: Filter state (when user clicks an ID/ワッチョイ/コテハン count badge)
@@ -2454,6 +2492,25 @@ export function ThreadView(): React.JSX.Element {
         >
           <MdiIcon path={mdiImage} size={14} />
         </button>
+        <label
+          className="ml-0.5 flex items-center gap-1 rounded px-1 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)]"
+          title="インライン動画の初期音量"
+        >
+          <MdiIcon path={mdiVolumeHigh} size={13} />
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={0.01}
+            value={inlineVideoInitialVolumePercent}
+            onChange={(e) => {
+              handleInlineVideoInitialVolumeChange(Number.parseFloat(e.target.value));
+            }}
+            className="w-11 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-1 py-0 text-right text-[10px] text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
+            aria-label="インライン動画の初期音量（数値）"
+          />
+          <span>%</span>
+        </label>
         <button
           type="button"
           onClick={handleToggleRelativeTime}
@@ -2792,6 +2849,7 @@ export function ThreadView(): React.JSX.Element {
                           highlightType={getHighlightType(res.number)}
                           showRelativeTime={showRelativeTime}
                           inlineMediaEnabled={inlineMediaEnabled}
+                          inlineVideoInitialVolume={inlineVideoInitialVolume}
                           allThreadImageUrls={allThreadImageUrls}
                           idCount={resIdVal !== null ? (idCountMap.get(resIdVal)?.count ?? 0) : 0}
                           idResNumbers={
