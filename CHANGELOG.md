@@ -5,6 +5,21 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-02-27
+
+### Added
+
+- レス本文中の音声ファイルURL（`.mp3`/`.m4a`/`.aac`/`.wav`/`.ogg`/`.flac`/`.opus`）を検出し、インライン再生に対応
+- インライン音声コンポーネント `InlineAudio` を追加し、読み込み失敗時のエラーフォールバック（外部ブラウザで開く）を実装
+
+### Changed
+
+- インライン動画の初期音量入力を改善し、編集中の全消し・再入力がしやすい挙動へ変更
+  - 入力中は文字列状態を保持し、`Enter`/フォーカスアウトで数値確定、`Escape`で確定値へ復元
+- インライン動画のフォーカス復帰処理を調整し、音量変更時に入力フォーカスを奪わないよう改善
+- インライン音声の初期音量を、既存の「インライン動画の初期音量（%）」設定に共通化
+- リポジトリ運用ドキュメントを更新し、`CHANGELOG.md` の記述方針と更新手順を明確化
+
 ## [2.1.0] - 2026-02-27
 
 ### Added

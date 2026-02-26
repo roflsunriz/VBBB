@@ -24,7 +24,7 @@ export const DAT_ADJUST_MARGIN = 16 as const;
 export const MAX_POPUP_RES = 10 as const;
 
 /** Default User-Agent template — matches Monazilla convention: "Monazilla/1.00 (AppName/Version)" */
-export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.1.0)' as const;
+export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.1.1)' as const;
 
 /** Default BBS Menu URLs */
 export const DEFAULT_BBS_MENU_URLS: readonly string[] = [
