@@ -102,6 +102,7 @@ import { ContextMenuContainer } from '../common/ContextMenuContainer';
 
 /** Search field selector for the thread search bar */
 type SearchField = 'all' | 'name' | 'id' | 'body' | 'watchoi';
+type ThreadDisplayMode = 'standard' | 'hierarchy' | 'bubble';
 
 /** Be ID regex for matching "BE:ID-Level" in datetime field */
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
@@ -111,6 +112,7 @@ const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2})
 const RELATED_THREAD_MAX_ITEMS = 12;
 const INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY = 'vbbb-inline-video-initial-volume-percent';
 const DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT = 10;
+const THREAD_DISPLAY_MODE_KEY = 'vbbb-thread-display-mode';
 
 interface RelatedThreadCandidate {
   readonly threadId: string;
@@ -591,6 +593,7 @@ const ResItem = memo(function ResItem({
   ngResult,
   highlightType,
   showRelativeTime,
+  displayMode,
   inlineMediaEnabled,
   inlineVideoInitialVolume,
   allThreadImageUrls,
@@ -620,6 +623,7 @@ const ResItem = memo(function ResItem({
   readonly ngResult: NgFilterResult;
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
+  readonly displayMode: ThreadDisplayMode;
   readonly inlineMediaEnabled: boolean;
   readonly inlineVideoInitialVolume: number;
   readonly allThreadImageUrls: readonly string[];
@@ -907,10 +911,18 @@ const ResItem = memo(function ResItem({
         : '';
 
   const replyCount = replyNumbers.length;
+  const containerModeClass =
+    displayMode === 'hierarchy'
+      ? 'ml-2 border-l-2 border-l-[var(--color-border-secondary)] pl-3'
+      : displayMode === 'bubble'
+        ? 'mx-1 my-1 rounded-xl border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/40 px-3 py-2'
+        : 'px-4 py-2';
+  const bodyModeClass =
+    displayMode === 'bubble' ? 'mt-1 rounded-lg bg-[var(--color-bg-primary)]/70 px-2 py-1' : '';
 
   return (
     <div
-      className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${highlightClass}`}
+      className={`border-b border-[var(--color-border-secondary)] ${containerModeClass} ${highlightClass}`}
       id={`res-${String(res.number)}`}
       onContextMenu={handleContextMenu}
     >
@@ -1006,7 +1018,7 @@ const ResItem = memo(function ResItem({
           ))}
       </div>
       <div
-        className={`res-body ${isAaFinal ? 'aa-font' : 'text-sm leading-relaxed'} text-[var(--color-res-body)]`}
+        className={`res-body ${isAaFinal ? 'aa-font' : 'text-sm leading-relaxed'} ${bodyModeClass} text-[var(--color-res-body)]`}
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
         onMouseOver={handleMouseOver}
         onMouseOut={onAnchorLeave}
@@ -1535,6 +1547,26 @@ export function ThreadView(): React.JSX.Element {
   );
 
   const RELATIVE_TIME_KEY = 'vbbb-relative-time';
+  const [displayMode, setDisplayMode] = useState<ThreadDisplayMode>(() => {
+    try {
+      const raw = localStorage.getItem(THREAD_DISPLAY_MODE_KEY);
+      if (raw === 'standard' || raw === 'hierarchy' || raw === 'bubble') {
+        return raw;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'standard';
+  });
+  const handleChangeDisplayMode = useCallback((mode: ThreadDisplayMode) => {
+    setDisplayMode(mode);
+    try {
+      localStorage.setItem(THREAD_DISPLAY_MODE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const [showRelativeTime, setShowRelativeTime] = useState(() => {
     try {
       return localStorage.getItem(RELATIVE_TIME_KEY) === 'true';
@@ -2657,6 +2689,54 @@ export function ThreadView(): React.JSX.Element {
           />
           <span>%</span>
         </label>
+        <div
+          className="ml-1 inline-flex items-center overflow-hidden rounded border border-[var(--color-border-primary)]"
+          role="group"
+          aria-label="表示モード"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              handleChangeDisplayMode('standard');
+            }}
+            className={`px-2 py-0.5 text-[10px] ${
+              displayMode === 'standard'
+                ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+            }`}
+            title="標準表示"
+          >
+            標準
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleChangeDisplayMode('hierarchy');
+            }}
+            className={`border-l border-[var(--color-border-primary)] px-2 py-0.5 text-[10px] ${
+              displayMode === 'hierarchy'
+                ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+            }`}
+            title="階層表示"
+          >
+            階層
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleChangeDisplayMode('bubble');
+            }}
+            className={`border-l border-[var(--color-border-primary)] px-2 py-0.5 text-[10px] ${
+              displayMode === 'bubble'
+                ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+            }`}
+            title="吹き出し表示"
+          >
+            吹き出し
+          </button>
+        </div>
         <button
           type="button"
           onClick={handleToggleRelativeTime}
@@ -2994,6 +3074,7 @@ export function ThreadView(): React.JSX.Element {
                           ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
                           highlightType={getHighlightType(res.number)}
                           showRelativeTime={showRelativeTime}
+                          displayMode={displayMode}
                           inlineMediaEnabled={inlineMediaEnabled}
                           inlineVideoInitialVolume={inlineVideoInitialVolume}
                           allThreadImageUrls={allThreadImageUrls}
