@@ -42,7 +42,10 @@ import {
   type NgRule,
   type NgFilterResult,
   type NgMatchContext,
+  type NgStringField,
   AbonType,
+  NgStringField as NgStringFieldEnum,
+  NgStringMatchMode,
   NgTarget,
   NgFilterResult as NgFilterResultEnum,
 } from '@shared/ng';
@@ -603,7 +606,7 @@ const ResItem = memo(function ResItem({
   onAnchorLeave,
   onResNumberClick,
   onSetKokomade,
-  onAddNgWord,
+  onAddNgFromRes,
   onFilterById,
   onFilterByWatchoi,
   onScrollToResNumber,
@@ -633,7 +636,7 @@ const ResItem = memo(function ResItem({
   readonly onAnchorLeave: () => void;
   readonly onResNumberClick: (resNumber: number) => void;
   readonly onSetKokomade: (resNumber: number) => void;
-  readonly onAddNgWord: (selectedText: string) => void;
+  readonly onAddNgFromRes: (field: NgStringField, token: string) => void;
   readonly onFilterById: (id: string) => void;
   readonly onFilterByWatchoi: (label: string) => void;
   readonly onScrollToResNumber: (resNumber: number) => void;
@@ -648,6 +651,7 @@ const ResItem = memo(function ResItem({
     y: number;
   } | null>(null);
   const [ipPopup, setIpPopup] = useState<{ ip: string; x: number; y: number } | null>(null);
+  const [openContextSubMenu, setOpenContextSubMenu] = useState<'copy' | 'ng' | null>(null);
 
   const [selectedText, setSelectedText] = useState('');
 
@@ -673,53 +677,125 @@ const ResItem = memo(function ResItem({
     e.preventDefault();
     const selection = window.getSelection();
     setSelectedText(selection !== null ? selection.toString().trim() : '');
+    setOpenContextSubMenu(null);
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
+    setOpenContextSubMenu(null);
   }, []);
 
   const handleKokomade = useCallback(() => {
     onSetKokomade(res.number);
     setContextMenu(null);
+    setOpenContextSubMenu(null);
   }, [onSetKokomade, res.number]);
 
   const handleQuoteClick = useCallback(() => {
     onResNumberClick(res.number);
   }, [onResNumberClick, res.number]);
 
-  const handleAddNg = useCallback(() => {
-    if (selectedText.length > 0) {
-      onAddNgWord(selectedText);
-    }
-    setContextMenu(null);
-  }, [selectedText, onAddNgWord]);
+  const handleAddNg = useCallback(
+    (field: NgStringField, token: string) => {
+      onAddNgFromRes(field, token);
+      setContextMenu(null);
+      setOpenContextSubMenu(null);
+    },
+    [onAddNgFromRes],
+  );
 
-  const copyMenuOptions = useMemo(() => {
-    const plainName = res.name.replace(/<[^>]+>/g, '');
-    const plainBody = res.body
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&gt;/g, '>')
-      .replace(/&lt;/g, '<')
-      .replace(/&amp;/g, '&');
+  const menuBase = useMemo(() => {
+    const plainName = stripHtml(res.name);
+    const plainBody = stripHtml(res.body.replace(/<br\s*\/?>/gi, '\n'));
     const permalink = buildResPermalink(boardUrl, threadId, res.number);
     const header = `${String(res.number)} ${plainName}${res.mail.length > 0 ? ` [${res.mail}]` : ''} ${res.dateTime}`;
-    return [
-      { label: '名前をコピー', value: header },
-      { label: '本文をコピー', value: plainBody },
-      { label: 'URLをコピー', value: permalink },
-      { label: '名前+本文+URL', value: `${header}\n${plainBody}\n${permalink}` },
-      { label: '本文+URL', value: `${plainBody}\n${permalink}` },
-    ] as const;
+    return { plainName, plainBody, permalink, header };
   }, [res.name, res.body, res.mail, res.dateTime, res.number, boardUrl, threadId]);
+
+  const copyMenuOptions = useMemo(() => {
+    return [
+      { label: '名前をコピー', value: menuBase.header },
+      { label: '本文をコピー', value: menuBase.plainBody },
+      { label: 'URLをコピー', value: menuBase.permalink },
+      {
+        label: '名前+本文+URL',
+        value: `${menuBase.header}\n${menuBase.plainBody}\n${menuBase.permalink}`,
+      },
+      { label: '本文+URL', value: `${menuBase.plainBody}\n${menuBase.permalink}` },
+    ] as const;
+  }, [menuBase]);
+
+  const ngAddMenuOptions = useMemo(() => {
+    const fields = extractStringFields(res, '');
+    const options: Array<{ key: string; label: string; field: NgStringField; token: string }> = [];
+    const push = (key: string, label: string, field: NgStringField, token: string): void => {
+      const normalized = token.trim();
+      if (normalized.length === 0) return;
+      options.push({ key, label, field, token: normalized });
+    };
+
+    push('name', `名前: ${menuBase.plainName}`, NgStringFieldEnum.Name, menuBase.plainName);
+    push('body', `本文: ${menuBase.plainBody}`, NgStringFieldEnum.Body, menuBase.plainBody);
+    push('mail', `メール: ${res.mail}`, NgStringFieldEnum.Mail, res.mail);
+    push(
+      'id',
+      `ID: ${fields[NgStringFieldEnum.Id]}`,
+      NgStringFieldEnum.Id,
+      fields[NgStringFieldEnum.Id],
+    );
+    push(
+      'trip',
+      `トリップ: ${fields[NgStringFieldEnum.Trip]}`,
+      NgStringFieldEnum.Trip,
+      fields[NgStringFieldEnum.Trip],
+    );
+    push(
+      'watchoi',
+      `ワッチョイ: ${fields[NgStringFieldEnum.Watchoi]}`,
+      NgStringFieldEnum.Watchoi,
+      fields[NgStringFieldEnum.Watchoi],
+    );
+    for (const [index, ip] of [...new Set(resIps)].entries()) {
+      push(`ip-${String(index)}`, `IP: ${ip}`, NgStringFieldEnum.Ip, ip);
+    }
+    push(
+      'be',
+      `BE: ${fields[NgStringFieldEnum.Be]}`,
+      NgStringFieldEnum.Be,
+      fields[NgStringFieldEnum.Be],
+    );
+
+    const urls = fields[NgStringFieldEnum.Url]
+      .split(/\s+/)
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+    for (const [index, url] of [...new Set(urls)].entries()) {
+      push(`url-${String(index)}`, `URL: ${url}`, NgStringFieldEnum.Url, url);
+    }
+    if (selectedText.length > 0) {
+      push(
+        'selected-all',
+        `選択テキスト（全項目）: ${selectedText}`,
+        NgStringFieldEnum.All,
+        selectedText,
+      );
+    }
+    return options;
+  }, [menuBase.plainName, menuBase.plainBody, res, res.mail, resIps, selectedText]);
+
+  const handleCopy = useCallback((text: string) => {
+    void navigator.clipboard.writeText(text.trim());
+    setContextMenu(null);
+    setOpenContextSubMenu(null);
+  }, []);
 
   // Close context menu on click outside
   useEffect(() => {
     if (contextMenu === null) return;
     const handler = (): void => {
       setContextMenu(null);
+      setOpenContextSubMenu(null);
     };
     document.addEventListener('click', handler);
     return () => {
@@ -989,35 +1065,87 @@ const ResItem = memo(function ResItem({
               レスを引用 (&gt;&gt;{res.number})
             </button>
             <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
-            {/* F18: Copy options */}
-            {copyMenuOptions.map((opt) => (
+            <div
+              className="relative"
+              onMouseEnter={() => {
+                setOpenContextSubMenu('copy');
+              }}
+            >
               <button
-                key={opt.label}
                 type="button"
-                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                onClick={() => {
-                  void navigator.clipboard.writeText(opt.value.trim());
-                  setContextMenu(null);
-                }}
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
                 role="menuitem"
               >
-                {opt.label}
+                コピー
+                <MdiIcon path={mdiChevronRight} size={12} />
               </button>
-            ))}
-            {selectedText.length > 0 && (
-              <>
-                <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
-                <button
-                  type="button"
-                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                  onClick={handleAddNg}
-                  role="menuitem"
+              {openContextSubMenu === 'copy' && (
+                <div
+                  className="absolute top-0 left-full z-10 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+                  onMouseEnter={() => {
+                    setOpenContextSubMenu('copy');
+                  }}
                 >
-                  &quot;{selectedText.length > 20 ? `${selectedText.slice(0, 20)}…` : selectedText}
-                  &quot; をNGワードに追加
-                </button>
-              </>
-            )}
+                  {copyMenuOptions.map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                      onClick={() => {
+                        handleCopy(opt.value);
+                      }}
+                      role="menuitem"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div
+              className="relative"
+              onMouseEnter={() => {
+                setOpenContextSubMenu('ng');
+              }}
+            >
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                role="menuitem"
+              >
+                NG追加
+                <MdiIcon path={mdiChevronRight} size={12} />
+              </button>
+              {openContextSubMenu === 'ng' && (
+                <div
+                  className="absolute top-0 left-full z-10 min-w-56 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+                  onMouseEnter={() => {
+                    setOpenContextSubMenu('ng');
+                  }}
+                >
+                  {ngAddMenuOptions.length > 0 ? (
+                    ngAddMenuOptions.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        className="w-full truncate px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                        title={opt.label}
+                        onClick={() => {
+                          handleAddNg(opt.field, opt.token);
+                        }}
+                        role="menuitem"
+                      >
+                        {opt.label}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="block px-3 py-1.5 text-xs text-[var(--color-text-muted)]">
+                      追加可能なNG項目がありません
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
             <button
               type="button"
@@ -1025,6 +1153,7 @@ const ResItem = memo(function ResItem({
               onClick={() => {
                 onToggleAaFont(res.number, !isAaFinal);
                 setContextMenu(null);
+                setOpenContextSubMenu(null);
               }}
               role="menuitem"
             >
@@ -1181,7 +1310,7 @@ export function ThreadView(): React.JSX.Element {
   const ngRules = useBBSStore((s) => s.ngRules);
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
-  const openNgEditorWithToken = useBBSStore((s) => s.openNgEditorWithToken);
+  const addNgRule = useBBSStore((s) => s.addNgRule);
   const postHistory = useBBSStore((s) => s.postHistory);
   const highlightSettings = useBBSStore((s) => s.highlightSettings);
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
@@ -2291,13 +2420,30 @@ export function ThreadView(): React.JSX.Element {
     [scrollToResNumber],
   );
 
-  const handleAddNgWord = useCallback(
-    (selectedText: string) => {
+  const handleAddNgFromRes = useCallback(
+    (field: NgStringField, token: string) => {
       if (activeTab === undefined) return;
+      const normalizedToken = token.trim();
+      if (normalizedToken.length === 0) return;
       const boardId = extractBoardId(activeTab.boardUrl);
-      openNgEditorWithToken(selectedText, boardId, activeTab.threadId);
+      const rule: NgRule = {
+        id: crypto.randomUUID(),
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [field],
+          tokens: [normalizedToken],
+          negate: false,
+        },
+        target: NgTarget.Response,
+        abonType: AbonType.Normal,
+        boardId: boardId.length > 0 ? boardId : undefined,
+        threadId: activeTab.threadId,
+        enabled: true,
+      };
+      void addNgRule(rule);
     },
-    [activeTab, openNgEditorWithToken],
+    [activeTab, addNgRule],
   );
 
   const handleThreadWheel = useCallback(
@@ -2885,7 +3031,7 @@ export function ThreadView(): React.JSX.Element {
                           onAnchorLeave={handleAnchorLeave}
                           onResNumberClick={handleResNumberClick}
                           onSetKokomade={handleSetKokomade}
-                          onAddNgWord={handleAddNgWord}
+                          onAddNgFromRes={handleAddNgFromRes}
                           onScrollToResNumber={scrollToResNumber}
                           onFilterById={handleFilterById}
                           onFilterByWatchoi={handleFilterByWatchoi}
