@@ -5,6 +5,20 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-27
+
+### Added
+
+- BBSメニューURL設定を拡張し、取得元URLを複数登録・保存できる機能を追加
+- スレッド表示モードの切替機能を追加（標準 / 階層 / 吹き出し）
+- NGルール管理モーダルで既存ルールの編集・更新機能を追加
+
+### Changed
+
+- BBSメニュー取得処理を複数URL統合対応に変更し、取得結果をマージするよう改善
+- Cookie / UA 管理に BBSメニューURL設定タブを追加し、運用時の設定変更を容易化
+- NGルール管理の操作性を改善し、モーダルを閉じずに連続編集できるように変更
+
 ## [2.0.1] - 2026-02-26
 
 ### Changed
