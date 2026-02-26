@@ -4,7 +4,7 @@
  * Left panel: condition input form, Right panel: existing rule list.
  */
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { mdiClose, mdiPlus, mdiDelete } from '@mdi/js';
+import { mdiClose, mdiPlus, mdiDelete, mdiPencil } from '@mdi/js';
 import type {
   NgRule,
   NgStringCondition,
@@ -135,10 +135,14 @@ function NgRuleRow({
   rule,
   onRemove,
   onToggle,
+  onEdit,
+  isEditing,
 }: {
   readonly rule: NgRule;
   readonly onRemove: (id: string) => void;
   readonly onToggle: (id: string) => void;
+  readonly onEdit: (rule: NgRule) => void;
+  readonly isEditing: boolean;
 }): React.JSX.Element {
   const abonLabel = rule.abonType === AbonTypeEnum.Transparent ? '透明' : '通常';
   const targetLabel =
@@ -149,7 +153,11 @@ function NgRuleRow({
         : '[レス]';
 
   return (
-    <div className="flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] px-2 py-1 text-xs">
+    <div
+      className={`flex items-center gap-1.5 border-b border-[var(--color-border-secondary)] px-2 py-1 text-xs ${
+        isEditing ? 'bg-[var(--color-bg-active)]/30' : ''
+      }`}
+    >
       <button
         type="button"
         onClick={() => {
@@ -177,6 +185,16 @@ function NgRuleRow({
       <span className="min-w-0 flex-1 truncate text-[var(--color-text-primary)]">
         {rule.label !== undefined && rule.label.length > 0 ? rule.label : summarizeRule(rule)}
       </span>
+      <button
+        type="button"
+        onClick={() => {
+          onEdit(rule);
+        }}
+        className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-accent)]"
+        aria-label="編集"
+      >
+        <MdiIcon path={mdiPencil} size={12} />
+      </button>
       <button
         type="button"
         onClick={() => {
@@ -212,18 +230,28 @@ const STRING_FIELDS: readonly { value: NgStringField; label: string }[] = [
 function StringConditionForm({
   onAdd,
   initialToken,
+  initialCondition,
+  isEditing,
 }: {
   readonly onAdd: (condition: NgCondition) => void;
   readonly initialToken: string;
+  readonly initialCondition: NgStringCondition | undefined;
+  readonly isEditing: boolean;
 }): React.JSX.Element {
-  const [matchMode, setMatchMode] = useState<NgStringMatchMode>(NgStringMatchModeEnum.Plain);
-  const [fields, setFields] = useState<readonly NgStringField[]>([NgStringFieldEnum.All]);
-  const [negate, setNegate] = useState(false);
-  const [token, setToken] = useState(initialToken);
+  const [matchMode, setMatchMode] = useState<NgStringMatchMode>(
+    initialCondition?.matchMode ?? NgStringMatchModeEnum.Plain,
+  );
+  const [fields, setFields] = useState<readonly NgStringField[]>(
+    initialCondition?.fields ?? [NgStringFieldEnum.All],
+  );
+  const [negate, setNegate] = useState(initialCondition?.negate ?? false);
+  const [token, setToken] = useState(
+    initialCondition !== undefined ? initialCondition.tokens.join(' ') : initialToken,
+  );
 
   useEffect(() => {
-    if (initialToken.length > 0) setToken(initialToken);
-  }, [initialToken]);
+    if (initialCondition === undefined && initialToken.length > 0) setToken(initialToken);
+  }, [initialToken, initialCondition]);
 
   const toggleField = useCallback((f: NgStringField) => {
     setFields((prev) => {
@@ -248,8 +276,10 @@ function StringConditionForm({
       negate,
     };
     onAdd(condition);
-    setToken('');
-  }, [token, matchMode, fields, negate, onAdd]);
+    if (!isEditing) {
+      setToken('');
+    }
+  }, [token, matchMode, fields, negate, onAdd, isEditing]);
 
   return (
     <div className="flex flex-col gap-1.5 text-xs">
@@ -323,7 +353,7 @@ function StringConditionForm({
           className="flex items-center gap-0.5 rounded bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"
         >
           <MdiIcon path={mdiPlus} size={12} />
-          追加
+          {isEditing ? '更新' : '追加'}
         </button>
       </div>
     </div>
@@ -356,14 +386,20 @@ const NUMERIC_OPS: readonly { value: NgNumericOp; label: string }[] = [
 
 function NumericConditionForm({
   onAdd,
+  initialCondition,
+  isEditing,
 }: {
   readonly onAdd: (condition: NgCondition) => void;
+  readonly initialCondition: NgNumericCondition | undefined;
+  readonly isEditing: boolean;
 }): React.JSX.Element {
-  const [target, setTarget] = useState<NgNumericTarget>(NgNumericTargetEnum.ResNumber);
-  const [op, setOp] = useState<NgNumericOp>(NgNumericOpEnum.Gte);
-  const [value, setValue] = useState(0);
-  const [value2, setValue2] = useState(0);
-  const [negate, setNegate] = useState(false);
+  const [target, setTarget] = useState<NgNumericTarget>(
+    initialCondition?.target ?? NgNumericTargetEnum.ResNumber,
+  );
+  const [op, setOp] = useState<NgNumericOp>(initialCondition?.op ?? NgNumericOpEnum.Gte);
+  const [value, setValue] = useState(initialCondition?.value ?? 0);
+  const [value2, setValue2] = useState(initialCondition?.value2 ?? 0);
+  const [negate, setNegate] = useState(initialCondition?.negate ?? false);
 
   const handleAdd = useCallback(() => {
     const condition: NgNumericCondition = {
@@ -449,7 +485,7 @@ function NumericConditionForm({
         className="flex w-fit items-center gap-0.5 rounded bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:opacity-90"
       >
         <MdiIcon path={mdiPlus} size={12} />
-        追加
+        {isEditing ? '更新' : '追加'}
       </button>
     </div>
   );
@@ -463,17 +499,56 @@ const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as cons
 
 function TimeConditionForm({
   onAdd,
+  initialCondition,
+  isEditing,
 }: {
   readonly onAdd: (condition: NgCondition) => void;
+  readonly initialCondition: NgTimeCondition | undefined;
+  readonly isEditing: boolean;
 }): React.JSX.Element {
-  const [target, setTarget] = useState<NgTimeTarget>(NgTimeTargetEnum.Weekday);
-  const [negate, setNegate] = useState(false);
-  const [weekdays, setWeekdays] = useState<readonly number[]>([]);
-  const [hourFrom, setHourFrom] = useState(0);
-  const [hourTo, setHourTo] = useState(23);
-  const [relativeMinutes, setRelativeMinutes] = useState(60);
-  const [datetimeFrom, setDatetimeFrom] = useState('');
-  const [datetimeTo, setDatetimeTo] = useState('');
+  const [target, setTarget] = useState<NgTimeTarget>(
+    initialCondition?.target ?? NgTimeTargetEnum.Weekday,
+  );
+  const [negate, setNegate] = useState(initialCondition?.negate ?? false);
+  const [weekdays, setWeekdays] = useState<readonly number[]>(
+    initialCondition?.target === NgTimeTargetEnum.Weekday && 'days' in initialCondition.value
+      ? initialCondition.value.days
+      : [],
+  );
+  const [hourFrom, setHourFrom] = useState(
+    initialCondition?.target === NgTimeTargetEnum.Hour &&
+      'from' in initialCondition.value &&
+      typeof initialCondition.value.from === 'number'
+      ? initialCondition.value.from
+      : 0,
+  );
+  const [hourTo, setHourTo] = useState(
+    initialCondition?.target === NgTimeTargetEnum.Hour &&
+      'to' in initialCondition.value &&
+      typeof initialCondition.value.to === 'number'
+      ? initialCondition.value.to
+      : 23,
+  );
+  const [relativeMinutes, setRelativeMinutes] = useState(
+    initialCondition?.target === NgTimeTargetEnum.RelativeTime &&
+      'withinMinutes' in initialCondition.value
+      ? initialCondition.value.withinMinutes
+      : 60,
+  );
+  const [datetimeFrom, setDatetimeFrom] = useState(
+    initialCondition?.target === NgTimeTargetEnum.Datetime &&
+      'from' in initialCondition.value &&
+      typeof initialCondition.value.from === 'string'
+      ? initialCondition.value.from
+      : '',
+  );
+  const [datetimeTo, setDatetimeTo] = useState(
+    initialCondition?.target === NgTimeTargetEnum.Datetime &&
+      'to' in initialCondition.value &&
+      typeof initialCondition.value.to === 'string'
+      ? initialCondition.value.to
+      : '',
+  );
 
   const toggleWeekday = useCallback((day: number) => {
     setWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
@@ -638,7 +713,7 @@ function TimeConditionForm({
         className="flex w-fit items-center gap-0.5 rounded bg-[var(--color-accent)] px-2 py-1 text-xs text-white hover:opacity-90"
       >
         <MdiIcon path={mdiPlus} size={12} />
-        追加
+        {isEditing ? '更新' : '追加'}
       </button>
     </div>
   );
@@ -669,11 +744,17 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
   const [newAbonType, setNewAbonType] = useState<AbonType>(AbonTypeEnum.Normal);
   const [newBoardId, setNewBoardId] = useState('');
   const [newThreadId, setNewThreadId] = useState('');
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (ngEditorInitialBoardId.length > 0) setNewBoardId(ngEditorInitialBoardId);
     if (ngEditorInitialThreadId.length > 0) setNewThreadId(ngEditorInitialThreadId);
   }, [ngEditorInitialBoardId, ngEditorInitialThreadId]);
+
+  const editingRule = useMemo(
+    () => (editingRuleId !== null ? (ngRules.find((r) => r.id === editingRuleId) ?? null) : null),
+    [ngRules, editingRuleId],
+  );
 
   useEffect(() => {
     void fetchNgRules();
@@ -681,6 +762,22 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
 
   const handleAddCondition = useCallback(
     (condition: NgCondition) => {
+      if (editingRule !== null) {
+        const updated = ngRules.map((r) =>
+          r.id === editingRule.id
+            ? {
+                ...r,
+                condition,
+                target: newTarget,
+                abonType: newAbonType,
+                boardId: newBoardId.length > 0 ? newBoardId : undefined,
+                threadId: newThreadId.length > 0 ? newThreadId : undefined,
+              }
+            : r,
+        );
+        void saveFn(updated);
+        return;
+      }
       const rule: NgRule = {
         id: generateId(),
         condition,
@@ -693,7 +790,7 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
       void addNgRule(rule);
       setNewThreadId('');
     },
-    [newTarget, newAbonType, newBoardId, newThreadId, addNgRule],
+    [editingRule, ngRules, newTarget, newAbonType, newBoardId, newThreadId, saveFn, addNgRule],
   );
 
   const handleRemove = useCallback(
@@ -711,6 +808,19 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
     [ngRules, saveFn],
   );
 
+  const handleEditRule = useCallback((rule: NgRule) => {
+    setEditingRuleId(rule.id);
+    setActiveTab(rule.condition.type);
+    setNewTarget(rule.target);
+    setNewAbonType(rule.abonType);
+    setNewBoardId(rule.boardId ?? '');
+    setNewThreadId(rule.threadId ?? '');
+  }, []);
+
+  const handleCancelEditing = useCallback(() => {
+    setEditingRuleId(null);
+  }, []);
+
   const isInline = onClose === undefined;
   const [panelHeight, setPanelHeight] = useState(320);
   const handlePanelResize = useCallback((deltaY: number) => {
@@ -720,6 +830,12 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
   const filteredRules = useMemo(() => {
     return ngRules.filter((r) => r.condition.type === activeTab);
   }, [ngRules, activeTab]);
+
+  useEffect(() => {
+    if (editingRuleId !== null && editingRule === null) {
+      setEditingRuleId(null);
+    }
+  }, [editingRuleId, editingRule]);
 
   return (
     <>
@@ -771,6 +887,20 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
         <div className="flex min-h-0 flex-1">
           {/* Left: Condition form */}
           <div className="flex w-1/2 flex-col gap-2 overflow-y-auto border-r border-[var(--color-border-secondary)] p-2">
+            {editingRule !== null && (
+              <div className="flex items-center justify-between rounded border border-[var(--color-accent)]/40 bg-[var(--color-bg-active)]/30 px-2 py-1">
+                <span className="truncate text-[10px] text-[var(--color-text-secondary)]">
+                  既存ルールを編集中
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelEditing}
+                  className="rounded px-1 py-0.5 text-[10px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                >
+                  新規追加に戻る
+                </button>
+              </div>
+            )}
             {/* Common settings */}
             <div className="flex flex-wrap gap-1.5 text-xs">
               <select
@@ -816,10 +946,36 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
 
             {/* Tab-specific form */}
             {activeTab === 'string' && (
-              <StringConditionForm onAdd={handleAddCondition} initialToken={ngEditorInitialToken} />
+              <StringConditionForm
+                key={`string-${editingRuleId ?? 'new'}`}
+                onAdd={handleAddCondition}
+                initialToken={ngEditorInitialToken}
+                initialCondition={
+                  editingRule?.condition.type === 'string' ? editingRule.condition : undefined
+                }
+                isEditing={editingRule !== null}
+              />
             )}
-            {activeTab === 'numeric' && <NumericConditionForm onAdd={handleAddCondition} />}
-            {activeTab === 'time' && <TimeConditionForm onAdd={handleAddCondition} />}
+            {activeTab === 'numeric' && (
+              <NumericConditionForm
+                key={`numeric-${editingRuleId ?? 'new'}`}
+                onAdd={handleAddCondition}
+                initialCondition={
+                  editingRule?.condition.type === 'numeric' ? editingRule.condition : undefined
+                }
+                isEditing={editingRule !== null}
+              />
+            )}
+            {activeTab === 'time' && (
+              <TimeConditionForm
+                key={`time-${editingRuleId ?? 'new'}`}
+                onAdd={handleAddCondition}
+                initialCondition={
+                  editingRule?.condition.type === 'time' ? editingRule.condition : undefined
+                }
+                isEditing={editingRule !== null}
+              />
+            )}
           </div>
 
           {/* Right: Rule list */}
@@ -839,6 +995,8 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
                   rule={rule}
                   onRemove={handleRemove}
                   onToggle={handleToggleEnabled}
+                  onEdit={handleEditRule}
+                  isEditing={editingRuleId === rule.id}
                 />
               ))
             )}
