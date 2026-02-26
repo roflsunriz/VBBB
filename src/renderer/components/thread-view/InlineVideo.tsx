@@ -52,6 +52,11 @@ export function InlineVideo({
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);
   }, [originalUrl]);
+  const restoreVideoFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      videoElRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
 
   if (hasError) {
     return (
@@ -83,7 +88,12 @@ export function InlineVideo({
           preload="metadata"
           loop
           playsInline
+          tabIndex={0}
           onError={handleError}
+          onClick={restoreVideoFocus}
+          onPlay={restoreVideoFocus}
+          onPause={restoreVideoFocus}
+          onVolumeChange={restoreVideoFocus}
           onKeyDown={handleVideoKeyDown}
           className="rounded border border-[var(--color-border-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
           style={{
