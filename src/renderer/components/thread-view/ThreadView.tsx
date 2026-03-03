@@ -34,6 +34,7 @@ import {
   mdiChevronRight,
   mdiArrowRightBold,
   mdiVolumeHigh,
+  mdiEye,
 } from '@mdi/js';
 import type { Res, SubjectRecord } from '@shared/domain';
 import { BoardType } from '@shared/domain';
@@ -280,6 +281,7 @@ function renderDateTimeWithBe(
 }
 
 const EMPTY_RES_NUMBERS: readonly number[] = [];
+const EMPTY_MATCHED_NG_RULES: readonly NgRule[] = [];
 
 /** Popup state for anchor hover */
 interface PopupState {
@@ -338,6 +340,116 @@ function applyNgFilter(
     }
   }
   return NgFilterResultEnum.None;
+}
+
+/**
+ * Collect ALL NG rules that match a response (for highlight).
+ * Unlike applyNgFilter which returns on first match, this finds every match.
+ */
+function findAllMatchingNgRules(
+  rules: readonly NgRule[],
+  res: Res,
+  boardId: string,
+  threadId: string,
+  context: ApplyNgFilterContext,
+): readonly NgRule[] {
+  const matched: NgRule[] = [];
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (rule.target !== NgTarget.Response) continue;
+    if (rule.boardId !== undefined && rule.boardId !== boardId) continue;
+    if (rule.threadId !== undefined && rule.threadId !== threadId) continue;
+
+    const extractedFields = extractStringFields(res, context.threadTitle);
+    const numericValues = buildNumericValuesForRes(
+      res,
+      context.idCountMap,
+      context.repliedCountMap,
+      context.threadResCount,
+      0,
+    );
+    const parsedDate = parseDateTimeField(res.dateTime);
+
+    const matchContext: NgMatchContext = {
+      extractedFields,
+      numericValues,
+      parsedDate,
+      ruleId: rule.id,
+    };
+
+    if (matchNgCondition(rule.condition, matchContext)) {
+      matched.push(rule);
+    }
+  }
+  return matched;
+}
+
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Build a combined RegExp that matches all NG tokens from the given rules.
+ * Only string conditions produce highlightable tokens.
+ */
+function buildNgHighlightRegex(rules: readonly NgRule[]): RegExp | null {
+  const patterns: string[] = [];
+
+  for (const rule of rules) {
+    if (rule.condition.type !== 'string') continue;
+    const cond = rule.condition;
+
+    switch (cond.matchMode) {
+      case NgStringMatchMode.Plain:
+      case NgStringMatchMode.Fuzzy:
+        for (const token of cond.tokens) {
+          if (token.length > 0) patterns.push(escapeRegExp(token));
+        }
+        break;
+      case NgStringMatchMode.Regexp:
+      case NgStringMatchMode.RegexpNoCase: {
+        const pat = cond.tokens[0];
+        if (pat !== undefined && pat.length > 0) {
+          try {
+            new RegExp(pat);
+            patterns.push(pat);
+          } catch {
+            /* invalid regex, skip */
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  if (patterns.length === 0) return null;
+
+  try {
+    return new RegExp(`(${patterns.join('|')})`, 'gi');
+  } catch {
+    return null;
+  }
+}
+
+const NG_HIGHLIGHT_OPEN = '<mark style="background:rgba(239,68,68,0.35);color:inherit;padding:0 1px;border-radius:2px">';
+const NG_HIGHLIGHT_CLOSE = '</mark>';
+
+/**
+ * Highlight NG tokens in an HTML string.
+ * Only text segments (outside HTML tags) are processed.
+ */
+function highlightNgTokensInHtml(html: string, regex: RegExp): string {
+  const parts = html.split(/(<[^>]*>)/);
+  const result: string[] = [];
+  for (const part of parts) {
+    if (part.length > 0 && part[0] === '<') {
+      result.push(part);
+    } else {
+      regex.lastIndex = 0;
+      result.push(part.replace(regex, `${NG_HIGHLIGHT_OPEN}$&${NG_HIGHLIGHT_CLOSE}`));
+    }
+  }
+  return result.join('');
 }
 
 /** Highlight type for a response */
@@ -617,6 +729,7 @@ const ResItem = memo(function ResItem({
   onFilterByKotehan,
   aaOverride,
   onToggleAaFont,
+  matchedNgRules,
 }: {
   readonly res: Res;
   readonly boardUrl: string;
@@ -648,6 +761,8 @@ const ResItem = memo(function ResItem({
   readonly onFilterByKotehan: (name: string) => void;
   readonly aaOverride: boolean | undefined;
   readonly onToggleAaFont: (resNumber: number, forceAa: boolean) => void;
+  /** Matched NG rules for this response (non-empty when revealAbon is active) */
+  readonly matchedNgRules: readonly NgRule[];
 }): React.JSX.Element | null {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [watchoiPopup, setWatchoiPopup] = useState<{
@@ -808,10 +923,26 @@ const ResItem = memo(function ResItem({
     };
   }, [contextMenu]);
 
-  const bodyHtml = useMemo(
-    () => linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body))),
-    [res.body],
+  const highlightRegex = useMemo(
+    () => (matchedNgRules.length > 0 ? buildNgHighlightRegex(matchedNgRules) : null),
+    [matchedNgRules],
   );
+
+  const bodyHtml = useMemo(() => {
+    let html = linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body)));
+    if (highlightRegex !== null) {
+      html = highlightNgTokensInHtml(html, highlightRegex);
+    }
+    return html;
+  }, [res.body, highlightRegex]);
+
+  const nameHtml = useMemo(() => {
+    let html = sanitizeHtml(res.name);
+    if (highlightRegex !== null) {
+      html = highlightNgTokensInHtml(html, highlightRegex);
+    }
+    return html;
+  }, [res.name, highlightRegex]);
 
   // ASCII art detection and manual override
   const isAutoAa = useMemo(() => isAsciiArt(res.body), [res.body]);
@@ -887,11 +1018,13 @@ const ResItem = memo(function ResItem({
     [onScrollToResNumber],
   );
 
-  // Transparent abon: completely hidden
-  if (ngResult === NgFilterResultEnum.TransparentAbon) return null;
+  const isRevealing = matchedNgRules.length > 0;
 
-  // Normal abon: show placeholder
-  if (ngResult === NgFilterResultEnum.NormalAbon) {
+  // Transparent abon: completely hidden (unless revealing)
+  if (ngResult === NgFilterResultEnum.TransparentAbon && !isRevealing) return null;
+
+  // Normal abon: show placeholder (unless revealing)
+  if (ngResult === NgFilterResultEnum.NormalAbon && !isRevealing) {
     return (
       <div
         className="border-b border-[var(--color-border-secondary)] px-4 py-2 opacity-40"
@@ -905,6 +1038,13 @@ const ResItem = memo(function ResItem({
       </div>
     );
   }
+
+  const abonLabel =
+    ngResult === NgFilterResultEnum.TransparentAbon
+      ? '透明あぼーん'
+      : ngResult === NgFilterResultEnum.NormalAbon
+        ? 'あぼーん'
+        : null;
 
   const highlightClass =
     highlightType === 'own'
@@ -923,12 +1063,21 @@ const ResItem = memo(function ResItem({
   const bodyModeClass =
     displayMode === 'bubble' ? 'mt-1 rounded-lg bg-[var(--color-bg-primary)]/70 px-2 py-1' : '';
 
+  const revealClass = isRevealing
+    ? 'border-l-2 border-l-[var(--color-error)] bg-[var(--color-error)]/5'
+    : '';
+
   return (
     <div
-      className={`border-b border-[var(--color-border-secondary)] ${containerModeClass} ${highlightClass}`}
+      className={`border-b border-[var(--color-border-secondary)] ${containerModeClass} ${isRevealing ? revealClass : highlightClass}`}
       id={`res-${String(res.number)}`}
       onContextMenu={handleContextMenu}
     >
+      {abonLabel !== null && (
+        <span className="mb-0.5 inline-block rounded bg-[var(--color-error)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-error)]">
+          {abonLabel} (リヴィール中)
+        </span>
+      )}
       <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
         {replyCount > 0 && (
           <button
@@ -958,7 +1107,7 @@ const ResItem = memo(function ResItem({
         <span className="inline-flex items-baseline gap-0.5">
           <span
             className="text-[var(--color-res-name)]"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
+            dangerouslySetInnerHTML={{ __html: nameHtml }}
           />
           {resKotehan !== null && (
             <CountBadge
@@ -1338,6 +1487,7 @@ export function ThreadView(): React.JSX.Element {
   const ngEditorOpen = useBBSStore((s) => s.ngEditorOpen);
   const toggleNgEditor = useBBSStore((s) => s.toggleNgEditor);
   const addNgRule = useBBSStore((s) => s.addNgRule);
+  const [revealAbon, setRevealAbon] = useState(false);
   const postHistory = useBBSStore((s) => s.postHistory);
   const highlightSettings = useBBSStore((s) => s.highlightSettings);
   const setHighlightSettings = useBBSStore((s) => s.setHighlightSettings);
@@ -2037,8 +2187,12 @@ export function ThreadView(): React.JSX.Element {
   );
 
   // Pre-compute NG results for all responses in active tab
-  const ngResults = useMemo(() => {
-    if (activeTab === undefined || ngRules.length === 0) return new Map<number, NgFilterResult>();
+  const { ngResults, ngMatchedRulesMap } = useMemo(() => {
+    const emptyResult = {
+      ngResults: new Map<number, NgFilterResult>(),
+      ngMatchedRulesMap: new Map<number, readonly NgRule[]>(),
+    };
+    if (activeTab === undefined || ngRules.length === 0) return emptyResult;
     const boardId = extractBoardId(activeTab.boardUrl);
     const threadTitle = activeTab.responses[0]?.title ?? activeTab.title ?? '';
     const idCountMap = buildIdCountMap(activeTab.responses);
@@ -2050,14 +2204,31 @@ export function ThreadView(): React.JSX.Element {
       threadResCount: activeTab.responses.length,
     };
     const results = new Map<number, NgFilterResult>();
+    const matchedMap = new Map<number, readonly NgRule[]>();
     for (const res of activeTab.responses) {
-      const result = applyNgFilter(ngRules, res, boardId, activeTab.threadId, context);
-      if (result !== NgFilterResultEnum.None) {
-        results.set(res.number, result);
+      if (revealAbon) {
+        const matched = findAllMatchingNgRules(ngRules, res, boardId, activeTab.threadId, context);
+        if (matched.length > 0) {
+          const first = matched[0];
+          if (first !== undefined) {
+            results.set(
+              res.number,
+              first.abonType === AbonType.Transparent
+                ? NgFilterResultEnum.TransparentAbon
+                : NgFilterResultEnum.NormalAbon,
+            );
+          }
+          matchedMap.set(res.number, matched);
+        }
+      } else {
+        const result = applyNgFilter(ngRules, res, boardId, activeTab.threadId, context);
+        if (result !== NgFilterResultEnum.None) {
+          results.set(res.number, result);
+        }
       }
     }
-    return results;
-  }, [activeTab, ngRules]);
+    return { ngResults: results, ngMatchedRulesMap: matchedMap };
+  }, [activeTab, ngRules, revealAbon]);
 
   // Pre-compute highlight data
   const ownResNumbers = useMemo(() => {
@@ -2828,6 +2999,18 @@ export function ThreadView(): React.JSX.Element {
         </button>
         <button
           type="button"
+          onClick={() => {
+            setRevealAbon((prev) => !prev);
+          }}
+          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            revealAbon ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''
+          }`}
+          title={revealAbon ? 'あぼーんリヴィール: ON' : 'あぼーんリヴィール: OFF'}
+        >
+          <MdiIcon path={mdiEye} size={14} />
+        </button>
+        <button
+          type="button"
           onClick={handleTogglePostEditor}
           className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
             postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''
@@ -3166,6 +3349,7 @@ export function ThreadView(): React.JSX.Element {
                           onFilterByKotehan={handleFilterByKotehan}
                           aaOverride={aaOverrides.get(res.number)}
                           onToggleAaFont={handleToggleAaFont}
+                          matchedNgRules={ngMatchedRulesMap.get(res.number) ?? EMPTY_MATCHED_NG_RULES}
                         />
                       </div>
                     );
