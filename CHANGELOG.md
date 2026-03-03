@@ -5,6 +5,16 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-04
+
+### Added
+
+- あぼーんリヴィール機能を追加。スレッドビューのツールバーに目のアイコンボタンを追加し、クリックすることで通常あぼーん・透明あぼーんされたレスを一時的に表示できるようになった
+- リヴィール中はマッチしたNGワードが赤系の `<mark>` ハイライトで強調表示される（本文・名前フィールド対応）
+- あぼーんの種類（通常あぼーん / 透明あぼーん）を示すバッジを表示し、リヴィール中であることを視覚的に表示
+- リヴィール中のレスには赤いボーダーと薄赤背景を適用し、通常レスと区別できるよう改善
+- NGルールの正規表現・単純比較・あいまい一致すべてのマッチモードに対応してハイライト処理を実施
+
 ## [2.1.1] - 2026-02-27
 
 ### Added
