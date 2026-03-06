@@ -7,13 +7,15 @@ import {
 } from '../../src/main/services/be-auth';
 import { clearAllCookies, setCookie, getCookie } from '../../src/main/services/cookie-store';
 
+const TEST_DOMAIN = '5ch.io';
+
 beforeEach(() => {
   clearAllCookies();
 });
 
 describe('getBeSession', () => {
   it('returns logged out when no cookies', () => {
-    const session = getBeSession();
+    const session = getBeSession(TEST_DOMAIN);
     expect(session.loggedIn).toBe(false);
   });
 
@@ -21,7 +23,7 @@ describe('getBeSession', () => {
     setCookie({
       name: 'DMDM',
       value: 'val1',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: false,
       secure: false,
@@ -29,13 +31,13 @@ describe('getBeSession', () => {
     setCookie({
       name: 'MDMD',
       value: 'val2',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: false,
       secure: false,
     });
 
-    const session = getBeSession();
+    const session = getBeSession(TEST_DOMAIN);
     expect(session.loggedIn).toBe(true);
   });
 
@@ -43,13 +45,13 @@ describe('getBeSession', () => {
     setCookie({
       name: 'DMDM',
       value: 'val1',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: false,
       secure: false,
     });
 
-    const session = getBeSession();
+    const session = getBeSession(TEST_DOMAIN);
     expect(session.loggedIn).toBe(false);
   });
 });
@@ -59,7 +61,7 @@ describe('beLogout', () => {
     setCookie({
       name: 'DMDM',
       value: 'val1',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: false,
       secure: false,
@@ -67,16 +69,16 @@ describe('beLogout', () => {
     setCookie({
       name: 'MDMD',
       value: 'val2',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: false,
       secure: false,
     });
 
-    beLogout();
+    beLogout(TEST_DOMAIN);
 
-    expect(getCookie('DMDM', '5ch.net')).toBeUndefined();
-    expect(getCookie('MDMD', '5ch.net')).toBeUndefined();
+    expect(getCookie('DMDM', '5ch.io')).toBeUndefined();
+    expect(getCookie('MDMD', '5ch.io')).toBeUndefined();
   });
 });
 
@@ -104,13 +106,18 @@ describe('parseBeId', () => {
 });
 
 describe('buildBeProfileUrl', () => {
-  it('builds correct profile URL', () => {
-    const url = buildBeProfileUrl('34600695', 42);
-    expect(url).toBe('https://be.5ch.net/test/p.php?i=34600695/42');
+  it('builds correct profile URL for configured domain', () => {
+    const url = buildBeProfileUrl('34600695', 42, TEST_DOMAIN);
+    expect(url).toBe('https://be.5ch.io/test/p.php?i=34600695/42');
   });
 
   it('handles res number 1', () => {
-    const url = buildBeProfileUrl('12345678', 1);
-    expect(url).toBe('https://be.5ch.net/test/p.php?i=12345678/1');
+    const url = buildBeProfileUrl('12345678', 1, TEST_DOMAIN);
+    expect(url).toBe('https://be.5ch.io/test/p.php?i=12345678/1');
+  });
+
+  it('uses the provided domain in the URL', () => {
+    const url = buildBeProfileUrl('99999999', 10, 'example.com');
+    expect(url).toBe('https://be.example.com/test/p.php?i=99999999/10');
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Be authentication service.
- * Handles login to be.5ch.net and DMDM/MDMD Cookie management.
+ * Handles login to be.5ch.net (or configured domain) and DMDM/MDMD Cookie management.
  *
  * IMPORTANT: Passwords are NEVER persisted or logged.
  */
@@ -11,8 +11,6 @@ import { httpFetch } from './http-client';
 
 const logger = createLogger('be-auth');
 
-const BE_LOGIN_URL = 'https://be.5ch.net/log';
-const BE_DOMAIN = '.5ch.net';
 const DMDM_COOKIE = 'DMDM';
 const MDMD_COOKIE = 'MDMD';
 
@@ -22,31 +20,35 @@ const MDMD_COOKIE = 'MDMD';
  *
  * @param mail - Be account email address
  * @param password - Be account password (NEVER persisted)
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
 export async function beLogin(
   mail: string,
   password: string,
+  domain: string,
 ): Promise<{ success: boolean; message: string }> {
   logger.info('Attempting Be login (credentials masked)');
 
+  const loginUrl = `https://be.${domain}/log`;
+  const beDomain = `.${domain}`;
   const body = `mail=${encodeURIComponent(mail)}&pass=${encodeURIComponent(password)}`;
 
   try {
     const response = await httpFetch({
-      url: BE_LOGIN_URL,
+      url: loginUrl,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: 'https://be.5ch.net/',
+        Referer: `https://be.${domain}/`,
       },
       body,
     });
 
     // Parse Set-Cookie headers to extract DMDM/MDMD
-    parseSetCookieHeaders(response.headers, BE_LOGIN_URL);
+    parseSetCookieHeaders(response.headers, loginUrl);
 
-    const dmdm = getCookie(DMDM_COOKIE, '5ch.net');
-    const mdmd = getCookie(MDMD_COOKIE, '5ch.net');
+    const dmdm = getCookie(DMDM_COOKIE, domain);
+    const mdmd = getCookie(MDMD_COOKIE, domain);
 
     if (dmdm !== undefined && mdmd !== undefined) {
       logger.info('Be login successful (DMDM/MDMD obtained)');
@@ -62,7 +64,7 @@ export async function beLogin(
       setCookie({
         name: DMDM_COOKIE,
         value: dmdmMatch[1],
-        domain: BE_DOMAIN,
+        domain: beDomain,
         path: '/',
         sessionOnly: false,
         secure: false,
@@ -70,7 +72,7 @@ export async function beLogin(
       setCookie({
         name: MDMD_COOKIE,
         value: mdmdMatch[1],
-        domain: BE_DOMAIN,
+        domain: beDomain,
         path: '/',
         sessionOnly: false,
         secure: false,
@@ -90,19 +92,24 @@ export async function beLogin(
 
 /**
  * Logout from Be. Clears DMDM/MDMD cookies.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function beLogout(): void {
-  removeCookie(DMDM_COOKIE, BE_DOMAIN);
-  removeCookie(MDMD_COOKIE, BE_DOMAIN);
+export function beLogout(domain: string): void {
+  const beDomain = `.${domain}`;
+  removeCookie(DMDM_COOKIE, beDomain);
+  removeCookie(MDMD_COOKIE, beDomain);
   logger.info('Be logged out');
 }
 
 /**
  * Get current Be session state.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function getBeSession(): BeSession {
-  const dmdm = getCookie(DMDM_COOKIE, '5ch.net');
-  const mdmd = getCookie(MDMD_COOKIE, '5ch.net');
+export function getBeSession(domain: string): BeSession {
+  const dmdm = getCookie(DMDM_COOKIE, domain);
+  const mdmd = getCookie(MDMD_COOKIE, domain);
   return { loggedIn: dmdm !== undefined && mdmd !== undefined };
 }
 
@@ -120,7 +127,11 @@ export function parseBeId(dateTimeField: string): { beId: string; beLevel: strin
 
 /**
  * Build a Be profile URL from a Be ID and res number.
+ *
+ * @param beId - Be account ID
+ * @param resNumber - Response number
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function buildBeProfileUrl(beId: string, resNumber: number): string {
-  return `https://be.5ch.net/test/p.php?i=${beId}/${String(resNumber)}`;
+export function buildBeProfileUrl(beId: string, resNumber: number, domain: string): string {
+  return `https://be.${domain}/test/p.php?i=${beId}/${String(resNumber)}`;
 }

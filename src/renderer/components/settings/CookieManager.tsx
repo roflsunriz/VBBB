@@ -1,9 +1,17 @@
 /**
- * Cookie, Monakey, and User-Agent management panel.
- * Provides UI to view/delete cookies and change user agent.
+ * Cookie, Monakey, User-Agent, and domain management panel.
+ * Provides UI to view/delete cookies, change user agent, configure BBS menu URLs,
+ * and set the 5ch base domain.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { mdiClose, mdiDelete, mdiCookie, mdiWeb, mdiFormatListBulleted } from '@mdi/js';
+import {
+  mdiClose,
+  mdiDelete,
+  mdiCookie,
+  mdiWeb,
+  mdiFormatListBulleted,
+  mdiDomain,
+} from '@mdi/js';
 import type { StoredCookie } from '@shared/cookie';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -11,7 +19,7 @@ interface CookieManagerProps {
   readonly onClose: () => void;
 }
 
-type CookieTab = 'cookies' | 'useragent' | 'bbsmenu';
+type CookieTab = 'cookies' | 'useragent' | 'bbsmenu' | 'domain';
 
 export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<CookieTab>('cookies');
@@ -20,16 +28,19 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
   const [originalUserAgent, setOriginalUserAgent] = useState('');
   const [bbsMenuUrlsText, setBbsMenuUrlsText] = useState('');
   const [originalBbsMenuUrlsText, setOriginalBbsMenuUrlsText] = useState('');
+  const [domainInput, setDomainInput] = useState('');
+  const [originalDomain, setOriginalDomain] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
 
   // Load data on mount
   useEffect(() => {
     void (async () => {
       try {
-        const [allCookies, currentUA, bbsMenuUrls] = await Promise.all([
+        const [allCookies, currentUA, bbsMenuUrls, currentDomain] = await Promise.all([
           window.electronApi.invoke('cookie:get-all'),
           window.electronApi.invoke('config:get-user-agent'),
           window.electronApi.invoke('config:get-bbs-menu-urls'),
+          window.electronApi.invoke('config:get-5ch-domain'),
         ]);
         const urlsText = bbsMenuUrls.join('\n');
         setCookies(allCookies);
@@ -37,6 +48,8 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         setOriginalUserAgent(currentUA);
         setBbsMenuUrlsText(urlsText);
         setOriginalBbsMenuUrlsText(urlsText);
+        setDomainInput(currentDomain);
+        setOriginalDomain(currentDomain);
       } catch {
         setStatusMessage('Failed to load settings');
       }
@@ -92,6 +105,27 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
     setBbsMenuUrlsText(originalBbsMenuUrlsText);
   }, [originalBbsMenuUrlsText]);
 
+  const handleSaveDomain = useCallback(async () => {
+    const trimmed = domainInput.trim();
+    if (trimmed.length === 0) {
+      setStatusMessage('ドメインを入力してください');
+      return;
+    }
+    try {
+      await window.electronApi.invoke('config:set-5ch-domain', trimmed);
+      const saved = await window.electronApi.invoke('config:get-5ch-domain');
+      setDomainInput(saved);
+      setOriginalDomain(saved);
+      setStatusMessage('5ch ドメインを保存しました。認証 Cookie は再設定が必要です。');
+    } catch {
+      setStatusMessage('5ch ドメインの保存に失敗しました');
+    }
+  }, [domainInput]);
+
+  const handleResetDomain = useCallback(() => {
+    setDomainInput(originalDomain);
+  }, [originalDomain]);
+
   // Group cookies by domain
   const groupedCookies = cookies.reduce<Record<string, StoredCookie[]>>((acc, cookie) => {
     const key = cookie.domain;
@@ -103,6 +137,8 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
     }
     return acc;
   }, {});
+
+  const previewDomain = domainInput.trim().length > 0 ? domainInput.trim() : '(未入力)';
 
   return (
     <div className="flex h-full flex-col rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
@@ -161,6 +197,20 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
         >
           <MdiIcon path={mdiFormatListBulleted} size={14} />
           BBSメニューURL
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('domain');
+          }}
+          className={`flex items-center gap-1 px-4 py-2 text-xs ${
+            activeTab === 'domain'
+              ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
+              : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+          }`}
+        >
+          <MdiIcon path={mdiDomain} size={14} />
+          ドメイン
         </button>
       </div>
 
@@ -286,7 +336,7 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
                 }}
                 rows={8}
                 className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-3 py-2 font-mono text-xs text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
-                placeholder="https://menu.5ch.net/bbsmenu.html"
+                placeholder="https://menu.5ch.io/bbsmenu.html"
               />
               <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                 空行は無視されます。無効なURLのみの場合はデフォルトURLに戻ります。
@@ -305,6 +355,72 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
               <button
                 type="button"
                 onClick={handleResetBbsMenuUrls}
+                className="rounded border border-[var(--color-border-primary)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+              >
+                リセット
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'domain' && (
+          <div className="space-y-4">
+            <div>
+              <label
+                className="mb-1 block text-xs text-[var(--color-text-secondary)]"
+                htmlFor="domain-input"
+              >
+                5ch ベースドメイン
+              </label>
+              <input
+                id="domain-input"
+                type="text"
+                value={domainInput}
+                onChange={(e) => {
+                  setDomainInput(e.target.value);
+                }}
+                className="w-full rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-3 py-2 font-mono text-xs text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none"
+                placeholder="5ch.io"
+                spellCheck={false}
+              />
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                ドメイン名のみを入力してください（例: 5ch.io）。https:// は不要です。
+              </p>
+            </div>
+
+            {/* Service URL preview */}
+            <div className="rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] p-3">
+              <p className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                設定後の各サービス URL
+              </p>
+              <ul className="space-y-1 font-mono text-xs text-[var(--color-text-muted)]">
+                <li>Be: https://be.{previewDomain}/</li>
+                <li>UPLIFT: https://uplift.{previewDomain}/</li>
+                <li>どんぐり: https://donguri.{previewDomain}/</li>
+                <li>BBSメニュー(デフォルト): https://menu.{previewDomain}/bbsmenu.html</li>
+              </ul>
+            </div>
+
+            {/* Warning */}
+            <div className="rounded border border-[var(--color-warning,#f59e0b)] bg-[var(--color-bg-primary)] p-3">
+              <p className="text-xs text-[var(--color-warning,#f59e0b)]">
+                ドメインを変更すると、Be / UPLIFT / どんぐりの認証 Cookie が無効になります。変更後は各サービスへ再ログインしてください。
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSaveDomain();
+                }}
+                className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-xs text-white hover:opacity-90"
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                onClick={handleResetDomain}
                 className="rounded border border-[var(--color-border-primary)] px-4 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
               >
                 リセット

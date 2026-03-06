@@ -23,9 +23,6 @@ import { httpFetch } from './http-client';
 const logger = createLogger('donguri');
 
 const ACORN_COOKIE = 'acorn';
-const ACORN_DOMAIN = '.5ch.net';
-const DONGURI_ROOT_URL = 'https://donguri.5ch.net/';
-const DONGURI_LOGIN_URL = 'https://donguri.5ch.net/login';
 
 /** Current donguri state (updated based on post responses) */
 let currentState: DonguriState = { status: DonguriStatus.None, message: '', loggedIn: false };
@@ -49,7 +46,7 @@ function extractWithRegex(html: string, pattern: RegExp): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
-function parseDonguriHomeHtml(html: string): DonguriState {
+function parseDonguriHomeHtml(html: string, domain: string): DonguriState {
   const id = extractWithRegex(html, /\[ID:([^\]]+)\]/);
   const mode = extractWithRegex(html, /(警備員|ハンター)(?:[^<\[]*)?\[ID:/);
   const userName = extractWithRegex(html, /<div class="stats header">([\s\S]*?)<\/div>/i);
@@ -64,10 +61,10 @@ function parseDonguriHomeHtml(html: string): DonguriState {
     /<label>\s*大乱闘の統計\s*<\/label>\s*<div>([\s\S]*?)<\/div>/i,
   );
   const loggedIn = id !== undefined && id.length > 0;
-  const hasAcornCookie = getCookie(ACORN_COOKIE, '5ch.net') !== undefined;
+  const hasAcorn = getCookie(ACORN_COOKIE, domain) !== undefined;
 
   return {
-    status: loggedIn || hasAcornCookie ? DonguriStatus.Active : DonguriStatus.None,
+    status: loggedIn || hasAcorn ? DonguriStatus.Active : DonguriStatus.None,
     message: loggedIn ? '' : 'どんぐりにログインしていません',
     loggedIn,
     userId: id,
@@ -107,9 +104,11 @@ function decodeDonguriHtml(body: Buffer, headers: Readonly<Record<string, string
 /**
  * Get the current donguri state.
  * Checks acorn cookie presence and returns combined state.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function getDonguriState(): DonguriState {
-  const acorn = getCookie(ACORN_COOKIE, '5ch.net');
+export function getDonguriState(domain: string): DonguriState {
+  const acorn = getCookie(ACORN_COOKIE, domain);
 
   if (acorn === undefined) {
     if (currentState.loggedIn !== true && currentState.status === DonguriStatus.Active) {
@@ -128,19 +127,24 @@ export function getDonguriState(): DonguriState {
 
 /**
  * Check if acorn cookie is present.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function hasAcornCookie(): boolean {
-  return getCookie(ACORN_COOKIE, '5ch.net') !== undefined;
+export function hasAcornCookie(domain: string): boolean {
+  return getCookie(ACORN_COOKIE, domain) !== undefined;
 }
 
 /**
  * Set an acorn cookie value manually.
+ *
+ * @param value - Cookie value
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function setAcornCookie(value: string): void {
+export function setAcornCookie(value: string, domain: string): void {
   setCookie({
     name: ACORN_COOKIE,
     value,
-    domain: ACORN_DOMAIN,
+    domain: `.${domain}`,
     path: '/',
     sessionOnly: false,
     secure: false,
@@ -151,39 +155,44 @@ export function setAcornCookie(value: string): void {
 
 /**
  * Clear the acorn cookie and reset state.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function clearAcornCookie(): void {
-  removeCookie(ACORN_COOKIE, ACORN_DOMAIN);
+export function clearAcornCookie(domain: string): void {
+  removeCookie(ACORN_COOKIE, `.${domain}`);
   currentState = { status: DonguriStatus.None, message: '', loggedIn: false };
   logger.info('Acorn cookie cleared');
 }
 
 /**
  * Refresh donguri state by fetching donguri home page and parsing details.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export async function refreshDonguriState(): Promise<DonguriState> {
+export async function refreshDonguriState(domain: string): Promise<DonguriState> {
+  const rootUrl = `https://donguri.${domain}/`;
   try {
     const response = await httpFetch({
-      url: DONGURI_ROOT_URL,
+      url: rootUrl,
       method: 'GET',
     });
 
     if (response.status !== 200) {
       currentState = {
-        ...getDonguriState(),
+        ...getDonguriState(domain),
         message: `どんぐり状態の取得に失敗しました (HTTP ${String(response.status)})`,
       };
       return currentState;
     }
 
     const html = decodeDonguriHtml(response.body, response.headers);
-    const parsed = parseDonguriHomeHtml(html);
+    const parsed = parseDonguriHomeHtml(html, domain);
     currentState = applyDonguriStatHeader(parsed, response.headers);
     return currentState;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     currentState = {
-      ...getDonguriState(),
+      ...getDonguriState(domain),
       message: `どんぐり状態取得エラー: ${message}`,
     };
     return currentState;
@@ -193,15 +202,26 @@ export async function refreshDonguriState(): Promise<DonguriState> {
 /**
  * Login to donguri with mail/password.
  * Successful login is verified by refreshing donguri home state.
+ *
+ * @param mail - Donguri account email
+ * @param password - Donguri password (NEVER persisted)
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export async function loginDonguri(mail: string, password: string): Promise<DonguriLoginResult> {
+export async function loginDonguri(
+  mail: string,
+  password: string,
+  domain: string,
+): Promise<DonguriLoginResult> {
+  const rootUrl = `https://donguri.${domain}/`;
+  const loginUrl = `https://donguri.${domain}/login`;
+
   const trimmedMail = mail.trim();
   const trimmedPassword = password;
   if (trimmedMail.length === 0 || trimmedPassword.length === 0) {
     return {
       success: false,
       message: 'メールアドレスとパスワードを入力してください',
-      state: getDonguriState(),
+      state: getDonguriState(domain),
     };
   }
 
@@ -210,10 +230,10 @@ export async function loginDonguri(mail: string, password: string): Promise<Dong
     pass: trimmedPassword,
   }).toString();
 
-  const cookieHeader = buildCookieHeader(DONGURI_LOGIN_URL);
+  const cookieHeader = buildCookieHeader(loginUrl);
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    Referer: DONGURI_ROOT_URL,
+    Referer: rootUrl,
   };
   if (cookieHeader.length > 0) {
     headers['Cookie'] = cookieHeader;
@@ -221,14 +241,14 @@ export async function loginDonguri(mail: string, password: string): Promise<Dong
 
   try {
     const response = await httpFetch({
-      url: DONGURI_LOGIN_URL,
+      url: loginUrl,
       method: 'POST',
       headers,
       body,
     });
-    parseSetCookieHeaders(response.headers, DONGURI_LOGIN_URL);
+    parseSetCookieHeaders(response.headers, loginUrl);
 
-    const refreshed = await refreshDonguriState();
+    const refreshed = await refreshDonguriState(domain);
     if (refreshed.loggedIn === true) {
       return {
         success: true,
@@ -247,7 +267,7 @@ export async function loginDonguri(mail: string, password: string): Promise<Dong
     return {
       success: false,
       message: `どんぐりログインエラー: ${message}`,
-      state: getDonguriState(),
+      state: getDonguriState(domain),
     };
   }
 }

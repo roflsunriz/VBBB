@@ -94,12 +94,13 @@ import {
   saveTabs,
   saveTabsSync,
 } from '../services/tab-persistence';
-import { upliftLogin, upliftLogout, getUpliftSession } from '../services/uplift-auth';
-import { DEFAULT_BBS_MENU_URLS, DEFAULT_USER_AGENT } from '@shared/file-format';
+import { upliftLogin, upliftLogout, getUpliftSession, setActiveDomain } from '../services/uplift-auth';
+import { DEFAULT_5CH_DOMAIN, DEFAULT_BBS_MENU_URLS, DEFAULT_USER_AGENT } from '@shared/file-format';
 import { checkForUpdate, downloadAndInstall } from '../services/updater';
 
 const logger = createLogger('ipc');
 const BBS_MENU_URLS_FILE = 'bbs-menu-urls.json';
+const FIVECH_DOMAIN_FILE = '5ch-domain.json';
 
 function getDataDir(): string {
   return join(app.getPath('userData'), 'vbbb-data');
@@ -133,6 +134,7 @@ function handle<K extends keyof IpcChannelMap>(
 /** Board URL -> Board object cache (populated from BBS menu) */
 const boardCache = new Map<string, Board>();
 let bbsMenuUrls: readonly string[] = [...DEFAULT_BBS_MENU_URLS];
+let fivechDomain: string = DEFAULT_5CH_DOMAIN;
 
 function lookupBoard(boardUrl: string): Board {
   const cached = boardCache.get(boardUrl);
@@ -178,6 +180,7 @@ function lookupBoard(boardUrl: string): Board {
 export async function registerIpcHandlers(): Promise<void> {
   const dataDir = getDataDir();
   const bbsMenuUrlsPath = join(dataDir, BBS_MENU_URLS_FILE);
+  const fivechDomainPath = join(dataDir, FIVECH_DOMAIN_FILE);
 
   const loadBbsMenuUrlsAsync = async (): Promise<void> => {
     const content = await readFileSafeAsync(bbsMenuUrlsPath);
@@ -192,6 +195,29 @@ export async function registerIpcHandlers(): Promise<void> {
     const normalized = normalizeBBSMenuSourceUrls(urls);
     bbsMenuUrls = normalized;
     await atomicWriteFile(bbsMenuUrlsPath, JSON.stringify(normalized, null, 2));
+  };
+
+  const loadFivechDomainAsync = async (): Promise<void> => {
+    const content = await readFileSafeAsync(fivechDomainPath);
+    if (content !== null) {
+      const raw = content.toString('utf-8').trim();
+      // Validate: non-empty string without protocol or slashes
+      if (raw.length > 0 && !raw.includes('/') && !raw.includes(':')) {
+        fivechDomain = raw;
+      }
+    }
+    setActiveDomain(fivechDomain);
+  };
+
+  const saveFivechDomainAsync = async (domain: string): Promise<void> => {
+    // Sanitize: remove protocol prefix and trailing slashes
+    const sanitized = domain.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    if (sanitized.length === 0 || sanitized.includes('/') || sanitized.includes(':')) {
+      throw new Error(`Invalid domain: "${domain}"`);
+    }
+    fivechDomain = sanitized;
+    setActiveDomain(fivechDomain);
+    await atomicWriteFile(fivechDomainPath, sanitized);
   };
 
   handle('app:get-data-dir', () => {
@@ -223,7 +249,7 @@ export async function registerIpcHandlers(): Promise<void> {
    * cache already exists, the cache and in-memory boardCache are left untouched.
    */
   const fetchAndUpdateMenu = async (oldBoards: Board[]): Promise<BBSMenu> => {
-    const menu = await fetchBBSMenu(bbsMenuUrls);
+    const menu = await fetchBBSMenu(bbsMenuUrls, fivechDomain);
 
     // Guard: do not overwrite a good cache with an empty menu.
     // This protects against 5ch returning non-standard HTML (CAPTCHA, error page)
@@ -254,7 +280,7 @@ export async function registerIpcHandlers(): Promise<void> {
     }
 
     // Cache-first: return cached menu and refresh in background
-    const cached = await loadBBSMenuCacheAsync(dataDir);
+    const cached = await loadBBSMenuCacheAsync(dataDir, fivechDomain);
     if (cached !== null) {
       populateBoardCache(cached);
       // Background refresh — do not block the renderer
@@ -608,8 +634,8 @@ export async function registerIpcHandlers(): Promise<void> {
   handle('post:clear-related-data', async () => {
     const clearedCookies = getAllCookies().length;
     clearAllCookies();
-    upliftLogout();
-    beLogout();
+    upliftLogout(fivechDomain);
+    beLogout(fivechDomain);
     resetDonguriState();
     await saveCookies(dataDir);
     logger.info(`Cleared post-related data for retry recovery (${String(clearedCookies)} cookies)`);
@@ -666,14 +692,14 @@ export async function registerIpcHandlers(): Promise<void> {
   // Auth handlers
   handle('auth:get-state', () => {
     return Promise.resolve({
-      uplift: getUpliftSession(),
-      be: getBeSession(),
-      donguri: getDonguriState(),
+      uplift: getUpliftSession(fivechDomain),
+      be: getBeSession(fivechDomain),
+      donguri: getDonguriState(fivechDomain),
     });
   });
 
   handle('auth:uplift-login', async (userId: string, password: string) => {
-    const result = await upliftLogin(userId, password);
+    const result = await upliftLogin(userId, password, fivechDomain);
     if (result.success) {
       await saveCookies(dataDir);
     }
@@ -681,12 +707,12 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('auth:uplift-logout', () => {
-    upliftLogout();
+    upliftLogout(fivechDomain);
     return Promise.resolve();
   });
 
   handle('auth:be-login', async (mail: string, password: string) => {
-    const result = await beLogin(mail, password);
+    const result = await beLogin(mail, password, fivechDomain);
     if (result.success) {
       await saveCookies(dataDir);
     }
@@ -694,16 +720,16 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('auth:be-logout', async () => {
-    beLogout();
+    beLogout(fivechDomain);
     await saveCookies(dataDir);
   });
 
   handle('auth:donguri-refresh', async () => {
-    return refreshDonguriState();
+    return refreshDonguriState(fivechDomain);
   });
 
   handle('auth:donguri-login', async (mail: string, password: string) => {
-    const result = await loginDonguri(mail, password);
+    const result = await loginDonguri(mail, password, fivechDomain);
     if (result.success) {
       await saveCookies(dataDir);
     }
@@ -802,6 +828,14 @@ export async function registerIpcHandlers(): Promise<void> {
 
   handle('config:set-bbs-menu-urls', async (urls: readonly string[]) => {
     await saveBbsMenuUrlsAsync(urls);
+  });
+
+  handle('config:get-5ch-domain', () => {
+    return Promise.resolve(fivechDomain);
+  });
+
+  handle('config:set-5ch-domain', async (domain: string) => {
+    await saveFivechDomainAsync(domain);
   });
 
   // Diagnostic log handlers
@@ -913,6 +947,7 @@ export async function registerIpcHandlers(): Promise<void> {
     loadCookiesAsync(dataDir),
     loadProxyConfigAsync(dataDir),
     loadBbsMenuUrlsAsync(),
+    loadFivechDomainAsync(),
     initializeBoardPlugins(),
   ]);
 

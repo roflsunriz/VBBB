@@ -234,6 +234,7 @@ function renderDateTimeWithBe(
   dateTime: string,
   resNumber: number,
   showRelative: boolean,
+  domain: string,
 ): React.ReactNode {
   const match = BE_PATTERN.exec(dateTime);
   const relativeNode = showRelative
@@ -260,7 +261,7 @@ function renderDateTimeWithBe(
   const beId = match[1];
   const before = dateTime.substring(0, match.index);
   const after = dateTime.substring(match.index + match[0].length);
-  const profileUrl = `https://be.5ch.net/test/p.php?i=${beId}/${String(resNumber)}`;
+  const profileUrl = `https://be.${domain}/test/p.php?i=${beId}/${String(resNumber)}`;
 
   return (
     <>
@@ -706,6 +707,7 @@ const ResItem = memo(function ResItem({
   ngResult,
   highlightType,
   showRelativeTime,
+  fivechDomain,
   displayMode,
   inlineMediaEnabled,
   inlineVideoInitialVolume,
@@ -737,6 +739,7 @@ const ResItem = memo(function ResItem({
   readonly ngResult: NgFilterResult;
   readonly highlightType: HighlightType;
   readonly showRelativeTime: boolean;
+  readonly fivechDomain: string;
   readonly displayMode: ThreadDisplayMode;
   readonly inlineMediaEnabled: boolean;
   readonly inlineVideoInitialVolume: number;
@@ -1140,7 +1143,7 @@ const ResItem = memo(function ResItem({
         </span>
         {res.mail.length > 0 && <span className="text-[var(--color-res-mail)]">[{res.mail}]</span>}
         <span className="inline-flex items-baseline gap-0.5 text-[var(--color-res-datetime)]">
-          {renderDateTimeWithBe(res.dateTime, res.number, showRelativeTime)}
+          {renderDateTimeWithBe(res.dateTime, res.number, showRelativeTime, fivechDomain)}
           {resId !== null && res.id !== undefined && <span>ID:{resId}</span>}
           {resId !== null && (
             <CountBadge
@@ -1739,6 +1742,13 @@ export function ThreadView(): React.JSX.Element {
       return false;
     }
   });
+
+  const [fivechDomain, setFivechDomain] = useState('5ch.io');
+  useEffect(() => {
+    void window.electronApi.invoke('config:get-5ch-domain').then((d) => {
+      setFivechDomain(d);
+    });
+  }, []);
   const handleToggleRelativeTime = useCallback(() => {
     setShowRelativeTime((prev) => {
       const next = !prev;
@@ -3304,6 +3314,7 @@ export function ThreadView(): React.JSX.Element {
                           ngResult={ngResults.get(res.number) ?? NgFilterResultEnum.None}
                           highlightType={getHighlightType(res.number)}
                           showRelativeTime={showRelativeTime}
+                          fivechDomain={fivechDomain}
                           displayMode={displayMode}
                           inlineMediaEnabled={inlineMediaEnabled}
                           inlineVideoInitialVolume={inlineVideoInitialVolume}

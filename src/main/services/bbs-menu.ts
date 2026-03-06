@@ -3,7 +3,7 @@
  * Parses bbsmenu.html -> categories/boards -> saves as local cache.
  */
 import { type BBSMenu, type Board, BoardType, type Category } from '@shared/domain';
-import { DEFAULT_BBS_MENU_URLS, IGNORED_CATEGORIES } from '@shared/file-format';
+import { DEFAULT_5CH_DOMAIN, DEFAULT_BBS_MENU_URLS, IGNORED_CATEGORIES } from '@shared/file-format';
 import { BBSMenuSchema } from '@shared/zod-schemas';
 import { createLogger } from '../logger';
 import { decodeBuffer } from './encoding';
@@ -90,13 +90,15 @@ function parseBoardUrl(url: string): { bbsId: string; serverUrl: string; jbbsDir
 /**
  * Normalize a board URL:
  * - http -> https
- * - .2ch.net -> .5ch.net
+ * - .2ch.net -> configured domain (backward compat)
+ * - .5ch.net -> configured domain (legacy migration)
  * - Ensure trailing /
  */
-function normalizeUrl(url: string): string {
+function normalizeUrl(url: string, domain: string): string {
   let normalized = url.trim();
   normalized = normalized.replace(/^http:\/\//, 'https://');
-  normalized = normalized.replace(/\.2ch\.net\//g, '.5ch.net/');
+  normalized = normalized.replace(/\.2ch\.net\//g, `.${domain}/`);
+  normalized = normalized.replace(/\.5ch\.net\//g, `.${domain}/`);
   if (!normalized.endsWith('/')) {
     normalized += '/';
   }
@@ -104,9 +106,25 @@ function normalizeUrl(url: string): string {
 }
 
 /**
- * Parse bbsmenu.html to extract categories and boards.
+ * Check if a raw board URL is a valid board URL for the configured domain.
+ * Accepts the configured domain, legacy 5ch.net, legacy 2ch.net, and bbspink.com.
  */
-export function parseBBSMenuHtml(html: string): BBSMenu {
+function isValidBoardUrl(rawUrl: string, domain: string): boolean {
+  return (
+    rawUrl.includes(`.${domain}/`) ||
+    rawUrl.includes('.5ch.net/') ||
+    rawUrl.includes('.2ch.net/') ||
+    rawUrl.includes('.bbspink.com/')
+  );
+}
+
+/**
+ * Parse bbsmenu.html to extract categories and boards.
+ *
+ * @param html - Raw HTML from bbsmenu.html
+ * @param domain - 5ch base domain (e.g. "5ch.io")
+ */
+export function parseBBSMenuHtml(html: string, domain: string): BBSMenu {
   const categories: Category[] = [];
   let currentCategory: { name: string; boards: Board[] } | null = null;
 
@@ -141,15 +159,11 @@ export function parseBBSMenuHtml(html: string): BBSMenu {
       const title = boardMatch[2].trim();
 
       // Skip non-board URLs (external sites, etc.)
-      if (
-        !rawUrl.includes('.5ch.net/') &&
-        !rawUrl.includes('.2ch.net/') &&
-        !rawUrl.includes('.bbspink.com/')
-      ) {
+      if (!isValidBoardUrl(rawUrl, domain)) {
         continue;
       }
 
-      const url = normalizeUrl(rawUrl);
+      const url = normalizeUrl(rawUrl, domain);
       const { bbsId, serverUrl, jbbsDir } = parseBoardUrl(url);
       const boardType = detectBoardType(url);
 
@@ -165,9 +179,13 @@ export function parseBBSMenuHtml(html: string): BBSMenu {
 
 /**
  * Fetch BBS menu from server.
+ *
+ * @param sourceUrls - List of BBSmenu source URLs
+ * @param domain - 5ch base domain used for board URL filtering/normalization (e.g. "5ch.io")
  */
 export async function fetchBBSMenu(
   sourceUrls: readonly string[] = DEFAULT_BBS_MENU_URLS,
+  domain: string = DEFAULT_5CH_DOMAIN,
 ): Promise<BBSMenu> {
   const menuUrls = normalizeBBSMenuSourceUrls(sourceUrls);
   logger.info(`Fetching BBS menu from ${String(menuUrls.length)} source(s)`);
@@ -187,7 +205,7 @@ export async function fetchBBSMenu(
 
       // BBS menu is Shift_JIS encoded
       const html = decodeBuffer(response.body, 'Shift_JIS');
-      const menu = parseBBSMenuHtml(html);
+      const menu = parseBBSMenuHtml(html, domain);
 
       for (const category of menu.categories) {
         const categoryBoards = mergedCategories.get(category.name) ?? new Map<string, Board>();
@@ -232,7 +250,7 @@ export async function saveBBSMenuCache(dataDir: string, menu: BBSMenu): Promise<
   await atomicWriteFile(cachePath, data);
 }
 
-function parseCachedMenu(content: Buffer): BBSMenu | null {
+function parseCachedMenu(content: Buffer, domain: string): BBSMenu | null {
   try {
     const parsed: unknown = JSON.parse(content.toString('utf-8'));
     const validated = BBSMenuSchema.safeParse(parsed);
@@ -240,7 +258,7 @@ function parseCachedMenu(content: Buffer): BBSMenu | null {
       const categories: Category[] = validated.data.categories.map((cat) => ({
         name: cat.name,
         boards: cat.boards.map((b) => {
-          const url = normalizeUrl(b.url);
+          const url = normalizeUrl(b.url, domain);
           const { bbsId, serverUrl, jbbsDir } = parseBoardUrl(url);
           return {
             title: b.title,
@@ -264,20 +282,29 @@ function parseCachedMenu(content: Buffer): BBSMenu | null {
 
 /**
  * Load BBS menu from local cache (synchronous).
+ *
+ * @param dataDir - Data directory path
+ * @param domain - 5ch base domain for URL normalization (e.g. "5ch.io")
  */
-export function loadBBSMenuCache(dataDir: string): BBSMenu | null {
+export function loadBBSMenuCache(dataDir: string, domain: string = DEFAULT_5CH_DOMAIN): BBSMenu | null {
   const cachePath = `${dataDir}/bbs-menu-cache.json`;
   const content = readFileSafe(cachePath);
   if (content === null) return null;
-  return parseCachedMenu(content);
+  return parseCachedMenu(content, domain);
 }
 
 /**
  * Load BBS menu from local cache (async, non-blocking).
+ *
+ * @param dataDir - Data directory path
+ * @param domain - 5ch base domain for URL normalization (e.g. "5ch.io")
  */
-export async function loadBBSMenuCacheAsync(dataDir: string): Promise<BBSMenu | null> {
+export async function loadBBSMenuCacheAsync(
+  dataDir: string,
+  domain: string = DEFAULT_5CH_DOMAIN,
+): Promise<BBSMenu | null> {
   const cachePath = `${dataDir}/bbs-menu-cache.json`;
   const content = await readFileSafeAsync(cachePath);
   if (content === null) return null;
-  return parseCachedMenu(content);
+  return parseCachedMenu(content, domain);
 }

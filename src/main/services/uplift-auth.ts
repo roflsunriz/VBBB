@@ -1,24 +1,32 @@
 /**
  * UPLIFT authentication service.
- * Handles login to uplift.5ch.net and session management.
+ * Handles login to uplift.5ch.net (or configured domain) and session management.
  *
  * IMPORTANT: Passwords are NEVER persisted or logged.
  */
 import type { UpliftSession } from '@shared/auth';
-import { DEFAULT_USER_AGENT } from '@shared/file-format';
+import { DEFAULT_5CH_DOMAIN, DEFAULT_USER_AGENT } from '@shared/file-format';
 import { createLogger } from '../logger';
 import { setCookie, getCookie, removeCookie } from './cookie-store';
 import { httpFetch } from './http-client';
 
 const logger = createLogger('uplift-auth');
 
-const UPLIFT_LOGIN_URL = 'https://uplift.5ch.net/log';
-const UPLIFT_REFERER = 'https://uplift.5ch.net/login';
-const UPLIFT_DOMAIN = '.5ch.net';
 const SID_COOKIE_NAME = 'sid';
 
 /** Current UPLIFT session state */
 let currentSession: UpliftSession = { loggedIn: false, sessionId: '' };
+
+/** Active 5ch domain — updated via setActiveDomain when user changes the setting */
+let activeDomain: string = DEFAULT_5CH_DOMAIN;
+
+/**
+ * Update the active 5ch domain used for cookie lookups in getUpliftSid.
+ * Called from IPC handlers whenever the domain config changes.
+ */
+export function setActiveDomain(domain: string): void {
+  activeDomain = domain;
+}
 
 /**
  * Attempt UPLIFT login.
@@ -26,22 +34,27 @@ let currentSession: UpliftSession = { loggedIn: false, sessionId: '' };
  *
  * @param userId - UPLIFT user ID
  * @param password - UPLIFT password (NEVER persisted)
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
 export async function upliftLogin(
   userId: string,
   password: string,
+  domain: string,
 ): Promise<{ success: boolean; message: string }> {
   logger.info('Attempting UPLIFT login (credentials masked)');
 
+  const loginUrl = `https://uplift.${domain}/log`;
+  const referer = `https://uplift.${domain}/login`;
+  const upliftDomain = `.${domain}`;
   const body = `usr=${encodeURIComponent(userId)}&pwd=${encodeURIComponent(password)}&log=`;
 
   try {
     const response = await httpFetch({
-      url: UPLIFT_LOGIN_URL,
+      url: loginUrl,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: UPLIFT_REFERER,
+        Referer: referer,
       },
       body,
     });
@@ -59,7 +72,7 @@ export async function upliftLogin(
         setCookie({
           name: SID_COOKIE_NAME,
           value: sidValue,
-          domain: UPLIFT_DOMAIN,
+          domain: upliftDomain,
           path: '/',
           sessionOnly: true,
           secure: true,
@@ -93,20 +106,25 @@ export async function upliftLogin(
 
 /**
  * Logout from UPLIFT. Clears the sid cookie and session state.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function upliftLogout(): void {
-  removeCookie(SID_COOKIE_NAME, UPLIFT_DOMAIN);
+export function upliftLogout(domain: string): void {
+  const upliftDomain = `.${domain}`;
+  removeCookie(SID_COOKIE_NAME, upliftDomain);
   currentSession = { loggedIn: false, sessionId: '' };
   logger.info('UPLIFT logged out');
 }
 
 /**
  * Get current UPLIFT session state.
+ *
+ * @param domain - 5ch base domain (e.g. "5ch.io")
  */
-export function getUpliftSession(): UpliftSession {
+export function getUpliftSession(domain: string): UpliftSession {
   // Also check if the sid cookie still exists
   if (currentSession.loggedIn) {
-    const sidCookie = getCookie(SID_COOKIE_NAME, '5ch.net');
+    const sidCookie = getCookie(SID_COOKIE_NAME, domain);
     if (sidCookie === undefined) {
       currentSession = { loggedIn: false, sessionId: '' };
     }
@@ -117,8 +135,9 @@ export function getUpliftSession(): UpliftSession {
 /**
  * Get the current sid value for injection into requests.
  * Returns empty string if not logged in.
+ * Uses the activeDomain set via setActiveDomain (defaults to DEFAULT_5CH_DOMAIN).
  */
 export function getUpliftSid(): string {
-  const sidCookie = getCookie(SID_COOKIE_NAME, '5ch.net');
+  const sidCookie = getCookie(SID_COOKIE_NAME, activeDomain);
   return sidCookie?.value ?? '';
 }

@@ -2,14 +2,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { getUpliftSession, upliftLogout } from '../../src/main/services/uplift-auth';
 import { clearAllCookies, getCookie, setCookie } from '../../src/main/services/cookie-store';
 
+const TEST_DOMAIN = '5ch.io';
+
 beforeEach(() => {
   clearAllCookies();
-  upliftLogout();
+  upliftLogout(TEST_DOMAIN);
 });
 
 describe('getUpliftSession', () => {
   it('returns logged out state by default', () => {
-    const session = getUpliftSession();
+    const session = getUpliftSession(TEST_DOMAIN);
     expect(session.loggedIn).toBe(false);
     expect(session.sessionId).toBe('');
   });
@@ -17,8 +19,8 @@ describe('getUpliftSession', () => {
 
 describe('upliftLogout', () => {
   it('clears session state', () => {
-    upliftLogout();
-    const session = getUpliftSession();
+    upliftLogout(TEST_DOMAIN);
+    const session = getUpliftSession(TEST_DOMAIN);
     expect(session.loggedIn).toBe(false);
     expect(session.sessionId).toBe('');
   });
@@ -27,14 +29,14 @@ describe('upliftLogout', () => {
     setCookie({
       name: 'sid',
       value: 'test-session',
-      domain: '.5ch.net',
+      domain: '.5ch.io',
       path: '/',
       sessionOnly: true,
       secure: true,
     });
-    expect(getCookie('sid', '5ch.net')).toBeDefined();
+    expect(getCookie('sid', TEST_DOMAIN)).toBeDefined();
 
-    upliftLogout();
-    expect(getCookie('sid', '5ch.net')).toBeUndefined();
+    upliftLogout(TEST_DOMAIN);
+    expect(getCookie('sid', TEST_DOMAIN)).toBeUndefined();
   });
 });

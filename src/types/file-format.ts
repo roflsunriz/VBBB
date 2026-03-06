@@ -26,9 +26,12 @@ export const MAX_POPUP_RES = 10 as const;
 /** Default User-Agent template — matches Monazilla convention: "Monazilla/1.00 (AppName/Version)" */
 export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.2.0)' as const;
 
+/** Default 5ch base domain */
+export const DEFAULT_5CH_DOMAIN = '5ch.io' as const;
+
 /** Default BBS Menu URLs */
 export const DEFAULT_BBS_MENU_URLS: readonly string[] = [
-  'https://menu.5ch.net/bbsmenu.html',
+  `https://menu.${DEFAULT_5CH_DOMAIN}/bbsmenu.html`,
 ] as const;
 
 /** Backward-compatible primary BBS Menu URL */

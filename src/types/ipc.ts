@@ -383,6 +383,16 @@ export interface IpcChannelMap {
     args: [urls: readonly string[]];
     result: void;
   };
+  /** Get 5ch base domain (e.g. "5ch.io") */
+  'config:get-5ch-domain': {
+    args: [];
+    result: string;
+  };
+  /** Set 5ch base domain */
+  'config:set-5ch-domain': {
+    args: [domain: string];
+    result: void;
+  };
   /** Add a single entry to the diagnostic log buffer (from renderer) */
   'diag:add-log': {
     args: [level: DiagLogLevel, tag: string, message: string];
