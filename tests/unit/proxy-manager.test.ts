@@ -1,6 +1,26 @@
-import { describe, it, expect } from 'vitest';
-import { parseProxyIni, serializeProxyIni } from '../../src/main/services/proxy-manager';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  parseProxyIni,
+  serializeProxyIni,
+  loadProxyConfig,
+  saveProxyConfig,
+  getProxyConfig,
+  getProxyAgent,
+} from '../../src/main/services/proxy-manager';
 import { DEFAULT_PROXY_CONFIG } from '../../src/types/proxy';
+
+let tmpDir: string;
+
+beforeEach(async () => {
+  tmpDir = await mkdtemp(join(tmpdir(), 'vbbb-proxy-test-'));
+});
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
+});
 
 describe('parseProxyIni', () => {
   it('parses a full proxy.ini with both sections', () => {
@@ -138,5 +158,113 @@ describe('serializeProxyIni', () => {
     expect(serialized).toContain('[ReadProxy]');
     expect(serialized).toContain('[WriteProxy]');
     expect(serialized).toContain('Proxy=false');
+  });
+});
+
+describe('loadProxyConfig / saveProxyConfig', () => {
+  it('returns DEFAULT_PROXY_CONFIG when no file exists', () => {
+    const config = loadProxyConfig(tmpDir);
+    expect(config).toStrictEqual(DEFAULT_PROXY_CONFIG);
+  });
+
+  it('round-trips save and load', async () => {
+    const config = {
+      readProxy: {
+        enabled: true,
+        address: 'proxy.example.com',
+        port: 8080,
+        userId: 'user1',
+        password: 'pass1',
+      },
+      writeProxy: {
+        enabled: false,
+        address: '',
+        port: 0,
+        userId: '',
+        password: '',
+      },
+    };
+
+    await saveProxyConfig(tmpDir, config);
+    const loaded = loadProxyConfig(tmpDir);
+    expect(loaded).toStrictEqual(config);
+  });
+
+  it('loaded config matches getProxyConfig after saveProxyConfig', async () => {
+    const config = {
+      readProxy: {
+        enabled: true,
+        address: '127.0.0.1',
+        port: 3128,
+        userId: '',
+        password: '',
+      },
+      writeProxy: DEFAULT_PROXY_CONFIG.writeProxy,
+    };
+
+    await saveProxyConfig(tmpDir, config);
+    expect(getProxyConfig()).toStrictEqual(config);
+  });
+});
+
+describe('getProxyAgent', () => {
+  it('returns undefined for read when read proxy is disabled', async () => {
+    await saveProxyConfig(tmpDir, DEFAULT_PROXY_CONFIG);
+    const agent = getProxyAgent('read');
+    expect(agent).toBeUndefined();
+  });
+
+  it('returns undefined for write when write proxy is disabled', async () => {
+    await saveProxyConfig(tmpDir, DEFAULT_PROXY_CONFIG);
+    const agent = getProxyAgent('write');
+    expect(agent).toBeUndefined();
+  });
+
+  it('returns an agent for read when read proxy is enabled', async () => {
+    await saveProxyConfig(tmpDir, {
+      ...DEFAULT_PROXY_CONFIG,
+      readProxy: {
+        enabled: true,
+        address: '127.0.0.1',
+        port: 8080,
+        userId: '',
+        password: '',
+      },
+    });
+
+    const agent = getProxyAgent('read');
+    expect(agent).toBeDefined();
+  });
+
+  it('returns an agent for write when write proxy is enabled', async () => {
+    await saveProxyConfig(tmpDir, {
+      ...DEFAULT_PROXY_CONFIG,
+      writeProxy: {
+        enabled: true,
+        address: '127.0.0.1',
+        port: 9090,
+        userId: '',
+        password: '',
+      },
+    });
+
+    const agent = getProxyAgent('write');
+    expect(agent).toBeDefined();
+  });
+
+  it('returns undefined when proxy address is empty even if enabled', async () => {
+    await saveProxyConfig(tmpDir, {
+      ...DEFAULT_PROXY_CONFIG,
+      readProxy: {
+        enabled: true,
+        address: '',
+        port: 8080,
+        userId: '',
+        password: '',
+      },
+    });
+
+    const agent = getProxyAgent('read');
+    expect(agent).toBeUndefined();
   });
 });

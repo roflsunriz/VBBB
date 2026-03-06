@@ -57,7 +57,7 @@ const DIAG_HTML_LIMIT = 2000;
  * defaulting to Error. Success patterns are checked broadly to handle
  * server-side text variations.
  */
-function detectJBBSResultType(html: string): PostResultType {
+export function detectJBBSResultType(html: string): PostResultType {
   // Success patterns — match broadly to cover wording/encoding variations.
   // したらば write.cgi returns an HTML page with one of these phrases on success.
   // The server uses several variations:

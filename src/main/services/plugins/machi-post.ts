@@ -41,7 +41,7 @@ function buildMachiPostBody(params: PostParams, board: Board): string {
  * Detect the result type from a Machi BBS response.
  * Machi BBS has its own success/error patterns distinct from 5ch.
  */
-function detectMachiResultType(html: string): PostResultType {
+export function detectMachiResultType(html: string): PostResultType {
   // Success patterns
   if (
     html.includes('\u66F8\u304D\u3053\u307F\u304C\u7D42\u308F\u308A\u307E\u3057\u305F') || // 書きこみが終わりました

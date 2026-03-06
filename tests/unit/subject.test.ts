@@ -1,17 +1,54 @@
 /**
- * subject.txt parsing tests.
- * Covers <> format, comma format, count bracket variations, Age/Sage/New/Archive.
+ * subject.txt parsing, buildUpdatedIndex, and fetchSubject tests.
  */
-import { describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+vi.mock('../../src/main/services/http-client', () => ({
+  httpFetch: vi.fn(),
+}));
+
 import {
   parseSubjectLine,
   parseSubjectTxt,
   determineAgeSage,
   parseFolderIdx,
   serializeFolderIdx,
+  buildUpdatedIndex,
+  fetchSubject,
 } from '../../src/main/services/subject';
-import { AgeSage, type ThreadIndex } from '../../src/types/domain';
-import { FOLDER_IDX_VERSION } from '../../src/types/file-format';
+import { AgeSage, BoardType, type ThreadIndex, type Board } from '../../src/types/domain';
+import { FOLDER_IDX_VERSION, KOKOMADE_UNSET } from '../../src/types/file-format';
+import { httpFetch } from '../../src/main/services/http-client';
+import type { HttpResponse } from '../../src/types/api';
+
+const mockHttpFetch = httpFetch as unknown as Mock<typeof httpFetch>;
+
+function makeResponse(overrides: Partial<HttpResponse> = {}): HttpResponse {
+  return { status: 200, headers: {}, body: Buffer.from(''), ...overrides };
+}
+
+const TEST_BOARD: Board = {
+  title: 'テスト板',
+  url: 'https://test.5ch.io/board/',
+  bbsId: 'board',
+  serverUrl: 'https://test.5ch.io/',
+  boardType: BoardType.Type2ch,
+};
+
+let tmpDir: string;
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  tmpDir = await mkdtemp(join(tmpdir(), 'vbbb-subject-test-'));
+});
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
+});
 
 describe('parseSubjectLine', () => {
   it('parses standard <> format with (N) count', () => {
@@ -181,5 +218,145 @@ describe('Folder.idx serialization', () => {
     expect(first.size).toBe(2560);
     expect(first.kokomade).toBe(-1);
     expect(first.ageSage).toBe(AgeSage.None);
+  });
+});
+
+describe('buildUpdatedIndex', () => {
+  const makeIdx = (no: number, fileName: string, count: number): ThreadIndex => ({
+    no,
+    fileName,
+    title: 'title',
+    count,
+    size: 0,
+    roundDate: null,
+    lastModified: null,
+    kokomade: KOKOMADE_UNSET,
+    newReceive: 0,
+    unRead: false,
+    scrollTop: 0,
+    scrollResNumber: 0,
+    scrollResOffset: 0,
+    allResCount: count,
+    newResCount: 0,
+    ageSage: AgeSage.None,
+  });
+
+  it('creates new entries for unknown threads', () => {
+    const subjects = [{ fileName: '111.dat', title: 'New Thread', count: 10 }];
+    const ageSageMap = new Map([['111.dat', AgeSage.New]]);
+    const result = buildUpdatedIndex(subjects, [], ageSageMap);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.fileName).toBe('111.dat');
+    expect(result[0]?.no).toBe(1);
+    expect(result[0]?.allResCount).toBe(10);
+    expect(result[0]?.unRead).toBe(true);
+    expect(result[0]?.ageSage).toBe(AgeSage.New);
+  });
+
+  it('updates existing thread entries', () => {
+    const existing = [makeIdx(1, '111.dat', 50)];
+    const subjects = [{ fileName: '111.dat', title: 'Updated Thread', count: 60 }];
+    const ageSageMap = new Map([['111.dat', AgeSage.Sage]]);
+    const result = buildUpdatedIndex(subjects, existing, ageSageMap);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.allResCount).toBe(60);
+    expect(result[0]?.newResCount).toBe(10); // 60 - 50
+    expect(result[0]?.ageSage).toBe(AgeSage.Sage);
+    expect(result[0]?.title).toBe('Updated Thread');
+  });
+
+  it('appends archived threads at the end', () => {
+    const existing = [makeIdx(1, '111.dat', 50), makeIdx(2, '222.dat', 30)];
+    // Only 111 is in new subject; 222 is archived
+    const subjects = [{ fileName: '111.dat', title: 'Active', count: 50 }];
+    const ageSageMap = new Map<string, AgeSage>([
+      ['111.dat', AgeSage.None],
+      ['222.dat', AgeSage.Archive],
+    ]);
+    const result = buildUpdatedIndex(subjects, existing, ageSageMap);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]?.fileName).toBe('111.dat');
+    expect(result[1]?.fileName).toBe('222.dat');
+    expect(result[1]?.ageSage).toBe(AgeSage.Archive);
+  });
+
+  it('assigns sequential no values', () => {
+    const subjects = [
+      { fileName: 'a.dat', title: 'A', count: 10 },
+      { fileName: 'b.dat', title: 'B', count: 20 },
+      { fileName: 'c.dat', title: 'C', count: 30 },
+    ];
+    const ageSageMap = new Map<string, AgeSage>([
+      ['a.dat', AgeSage.New],
+      ['b.dat', AgeSage.New],
+      ['c.dat', AgeSage.New],
+    ]);
+    const result = buildUpdatedIndex(subjects, [], ageSageMap);
+
+    expect(result[0]?.no).toBe(1);
+    expect(result[1]?.no).toBe(2);
+    expect(result[2]?.no).toBe(3);
+  });
+});
+
+describe('fetchSubject', () => {
+  it('returns threads on HTTP 200', async () => {
+    // ASCII-only subject.txt (Shift_JIS == UTF-8 for ASCII range)
+    const content = '1111111111.dat<>Thread A (10)\n2222222222.dat<>Thread B (20)\n';
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({ status: 200, body: Buffer.from(content, 'ascii') }),
+    );
+
+    const result = await fetchSubject(TEST_BOARD, tmpDir);
+    expect(result.notModified).toBe(false);
+    expect(result.threads).toHaveLength(2);
+    expect(result.threads[0]?.title).toBe('Thread A');
+    expect(result.threads[1]?.count).toBe(20);
+  });
+
+  it('returns notModified=true on HTTP 304 with cache', async () => {
+    // First fetch to populate cache
+    const content = '1111111111.dat<>Cached Thread (5)\n';
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({ status: 200, body: Buffer.from(content, 'ascii') }),
+    );
+    await fetchSubject(TEST_BOARD, tmpDir);
+
+    // Second fetch returns 304
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 304, body: Buffer.from('') }));
+    const result = await fetchSubject(TEST_BOARD, tmpDir);
+
+    expect(result.notModified).toBe(true);
+    expect(result.threads).toHaveLength(1);
+    expect(result.threads[0]?.title).toBe('Cached Thread');
+  });
+
+  it('throws on non-200/304 HTTP status', async () => {
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 503, body: Buffer.from('') }));
+
+    await expect(fetchSubject(TEST_BOARD, tmpDir)).rejects.toThrow('503');
+  });
+
+  it('sends If-Modified-Since on second fetch', async () => {
+    // First fetch
+    const content = '1111111111.dat<>Thread (1)\n';
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({
+        status: 200,
+        body: Buffer.from(content, 'ascii'),
+        lastModified: 'Fri, 01 Jan 2021 00:00:00 GMT',
+      }),
+    );
+    await fetchSubject(TEST_BOARD, tmpDir);
+
+    // Second fetch
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 304, body: Buffer.from('') }));
+    await fetchSubject(TEST_BOARD, tmpDir);
+
+    const secondCall = mockHttpFetch.mock.calls[1]?.[0];
+    expect(secondCall?.ifModifiedSince).toBe('Fri, 01 Jan 2021 00:00:00 GMT');
   });
 });

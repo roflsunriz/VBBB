@@ -1,16 +1,112 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { Mock } from 'vitest';
+
+vi.mock('../../src/main/services/http-client', () => ({
+  httpFetch: vi.fn(),
+}));
+
 import {
   getBeSession,
+  beLogin,
   beLogout,
   parseBeId,
   buildBeProfileUrl,
 } from '../../src/main/services/be-auth';
 import { clearAllCookies, setCookie, getCookie } from '../../src/main/services/cookie-store';
+import { httpFetch } from '../../src/main/services/http-client';
+import type { HttpResponse } from '../../src/types/api';
+
+const mockHttpFetch = httpFetch as unknown as Mock<typeof httpFetch>;
 
 const TEST_DOMAIN = '5ch.io';
 
+function makeResponse(overrides: Partial<HttpResponse> = {}): HttpResponse {
+  return {
+    status: 200,
+    headers: {},
+    body: Buffer.from(''),
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
+  vi.clearAllMocks();
   clearAllCookies();
+});
+
+describe('beLogin', () => {
+  it('succeeds when server returns DMDM and MDMD cookies', async () => {
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({
+        status: 200,
+        headers: {
+          'set-cookie':
+            'DMDM=dmdmvalue123; Path=/; Domain=.5ch.io\nMDMD=mdmdvalue456; Path=/; Domain=.5ch.io',
+        },
+        body: Buffer.from('Login OK'),
+      }),
+    );
+
+    const result = await beLogin('test@example.com', 'password', TEST_DOMAIN);
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('successful');
+
+    const session = getBeSession(TEST_DOMAIN);
+    expect(session.loggedIn).toBe(true);
+  });
+
+  it('fails when server returns no DMDM/MDMD cookies', async () => {
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({
+        status: 200,
+        headers: {},
+        body: Buffer.from('Login failed'),
+      }),
+    );
+
+    const result = await beLogin('bad@example.com', 'wrongpass', TEST_DOMAIN);
+    expect(result.success).toBe(false);
+
+    const session = getBeSession(TEST_DOMAIN);
+    expect(session.loggedIn).toBe(false);
+  });
+
+  it('succeeds with manual Set-Cookie header extraction fallback', async () => {
+    // Simulate a single concatenated Set-Cookie header (some servers do this)
+    mockHttpFetch.mockResolvedValueOnce(
+      makeResponse({
+        status: 200,
+        headers: {
+          'set-cookie': 'DMDM=manual_dmdm; Path=/, MDMD=manual_mdmd; Path=/',
+        },
+        body: Buffer.from('OK'),
+      }),
+    );
+
+    const result = await beLogin('user@example.com', 'pass', TEST_DOMAIN);
+    expect(result.success).toBe(true);
+  });
+
+  it('handles network error gracefully', async () => {
+    mockHttpFetch.mockRejectedValueOnce(new Error('Connection refused'));
+
+    const result = await beLogin('user@example.com', 'pass', TEST_DOMAIN);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('error');
+  });
+
+  it('POSTs to the correct Be login URL', async () => {
+    mockHttpFetch.mockResolvedValueOnce(makeResponse());
+
+    await beLogin('test@example.com', 'pass', TEST_DOMAIN);
+
+    expect(mockHttpFetch).toHaveBeenCalledOnce();
+    const callArgs = mockHttpFetch.mock.calls[0]?.[0];
+    expect(callArgs?.url).toBe(`https://be.${TEST_DOMAIN}/log`);
+    expect(callArgs?.method).toBe('POST');
+    expect(callArgs?.body).toContain('mail=test%40example.com');
+    expect(callArgs?.body).toContain('pass=pass');
+  });
 });
 
 describe('getBeSession', () => {
