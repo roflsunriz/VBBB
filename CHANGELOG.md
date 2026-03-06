@@ -5,6 +5,23 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-06
+
+### Added
+
+- 5ch ベースドメインをアプリ設定画面から変更できる機能を追加
+  - 設定 → 「Cookie / UA 管理」→「ドメイン」タブで 5ch のベースドメイン（例: `5ch.io`）を入力・保存できるようになった
+  - 設定は `{userData}/vbbb-data/5ch-domain.json` に永続化され、アプリ再起動後も維持される
+  - Be・UPLIFT・どんぐりの認証サービス URL、BBSメニューのフィルタリング、Be プロフィール URL の生成が設定ドメインに連動して動的に切り替わる
+  - 変更後にリクエストされる各サービス URL のプレビューと、認証 Cookie の再設定が必要である旨の警告を表示
+
+### Changed
+
+- デフォルトの 5ch ベースドメインを `5ch.net` から `5ch.io` に更新（5ch の正式ドメイン変更に対応）
+- デフォルトの BBSメニュー URL を `https://menu.5ch.io/bbsmenu.html` に更新
+- BBSメニュー解析で `.5ch.net/` 形式の旧 URL を設定済みドメインへ自動正規化（ローカルキャッシュの後方互換性を維持）
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.3.0` に更新
+
 ## [2.2.0] - 2026-03-04
 
 ### Added
