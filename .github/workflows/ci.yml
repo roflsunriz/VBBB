@@ -47,6 +47,47 @@ jobs:
         run: bun run ${{ matrix.check.script }}
 
   # -----------------------------------------------------------------------
+  # E2E Tests — runs after quality checks, in parallel with build
+  # -----------------------------------------------------------------------
+  e2e:
+    name: E2E Tests
+    needs: quality
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build (required for E2E)
+        run: bun run build
+
+      - name: E2E Tests
+        run: bun run test:e2e
+
+  # -----------------------------------------------------------------------
   # Build — runs only after all quality checks pass
   # -----------------------------------------------------------------------
   build:
