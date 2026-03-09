@@ -11,7 +11,9 @@
 import { test, expect } from './fixtures/electron-fixture';
 
 test.describe('アプリ起動', () => {
-  test('ウィンドウタイトルに VBBB が含まれる', async ({ electronApp }) => {
+  test('ウィンドウタイトルに VBBB が含まれる', async ({ electronApp, window: _window }) => {
+    // _window を要求することで window フィクスチャが起動し、
+    // header が表示されるまで待機してからタイトルを取得する
     const title = await electronApp.evaluate(({ BrowserWindow }) => {
       return BrowserWindow.getAllWindows()[0]?.getTitle() ?? '';
     });
@@ -36,7 +38,7 @@ test.describe('アプリ起動', () => {
   });
 
   test('左ペインのタブが 4 つ表示される', async ({ window }) => {
-    await expect(window.getByRole('button', { name: /板一覧/ })).toBeVisible();
+    await expect(window.getByRole('button', { name: '板一覧', exact: true })).toBeVisible();
     await expect(window.getByRole('button', { name: /お気に入り/ })).toBeVisible();
     await expect(window.getByRole('button', { name: /検索/ })).toBeVisible();
     await expect(window.getByRole('button', { name: /履歴/ })).toBeVisible();

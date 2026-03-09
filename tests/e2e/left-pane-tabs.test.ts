@@ -13,7 +13,7 @@ import type { Page } from '@playwright/test';
 
 /** Returns the tab button locator for the given label. */
 function tabButton(window: Page, name: string) {
-  return window.getByRole('button', { name: new RegExp(name) });
+  return window.getByRole('button', { name, exact: true });
 }
 
 test.describe('左ペインタブ切り替え', () => {
