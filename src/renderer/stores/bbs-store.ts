@@ -199,6 +199,8 @@ interface BBSState {
   openNewThreadEditorWithDraft: (subject: string, message: string) => void;
   /** Navigate to the previous or next open thread tab (Slevo: SwitchToPreviousTab / SwitchToNextTab) */
   switchToAdjacentTab: (direction: 'prev' | 'next') => void;
+  /** Find a board by URL (from boardTabs, menu, or externalBoards) and select it. */
+  selectBoardByUrl: (boardUrl: string) => Promise<void>;
 }
 
 const HIGHLIGHT_SETTINGS_KEY = 'vbbb-highlight-settings';
@@ -1744,6 +1746,31 @@ export const useBBSStore = create<BBSState>((set, get) => ({
     const target = tabs[targetIndex];
     if (target !== undefined) {
       set({ activeTabId: target.id });
+    }
+  },
+
+  selectBoardByUrl: async (boardUrl: string) => {
+    const { boardTabs, menu, externalBoards } = get();
+
+    const existingTab = boardTabs.find((t) => t.board.url === boardUrl);
+    if (existingTab !== undefined) {
+      await get().selectBoard(existingTab.board);
+      return;
+    }
+
+    if (menu !== null) {
+      for (const cat of menu.categories) {
+        const board = cat.boards.find((b) => b.url === boardUrl);
+        if (board !== undefined) {
+          await get().selectBoard(board);
+          return;
+        }
+      }
+    }
+
+    const extBoard = externalBoards.find((b) => b.url === boardUrl);
+    if (extBoard !== undefined) {
+      await get().selectBoard(extBoard);
     }
   },
 }));

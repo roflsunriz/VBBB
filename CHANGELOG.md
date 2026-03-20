@@ -5,6 +5,24 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-03-20
+
+### Added
+
+- スレッドビューのタブ右クリックメニューに「コピー」サブメニューを追加
+  - 「スレッドのURLをコピー」: スレッドのページURLをクリップボードにコピー
+  - 「タイトル+URLをコピー」: スレッドタイトルとURLを改行区切りでクリップボードにコピー
+- 次スレ立て機能のテンプレート生成で、本文中の「前スレ」参照のスレ番を自動インクリメントする機能を追加
+  - 「前スレ」を含む行とその直後2行（URL行を除く）の末尾数字を +1 する
+- 「次スレを立てる」ボタン押下時に、対象スレッドと同じ板のタブを自動で開く（または既存タブにフォーカスを切り替える）機能を追加
+- ストアに `selectBoardByUrl` アクションを追加し、板URL指定で板タブの選択・新規作成を行えるようにした
+- `incrementPrevThreadReferences` のユニットテストを追加
+- `generateNextThreadTemplate` に前スレ番号インクリメントの統合テストを追加
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.3.1` に更新
+
 ## [2.3.0] - 2026-03-06
 
 ### Added

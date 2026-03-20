@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   htmlBodyToText,
   incrementTitleNumber,
+  incrementPrevThreadReferences,
   generateNextThreadTemplate,
 } from '../../src/renderer/utils/next-thread-template';
 
@@ -56,6 +57,43 @@ describe('incrementTitleNumber', () => {
 
   it('handles large numbers', () => {
     expect(incrementTitleNumber('スレ999')).toBe('スレ1000');
+  });
+});
+
+describe('incrementPrevThreadReferences', () => {
+  it('increments number on the line after "前スレ"', () => {
+    const lines = ['前スレ', '雑談スレ Part42', 'https://example.com/test/'];
+    const result = incrementPrevThreadReferences(lines);
+    expect(result[0]).toBe('前スレ');
+    expect(result[1]).toBe('雑談スレ Part43');
+    expect(result[2]).toBe('https://example.com/test/');
+  });
+
+  it('increments number on the same line as "前スレ"', () => {
+    const lines = ['前スレ 【雑談スレ★42】'];
+    const result = incrementPrevThreadReferences(lines);
+    expect(result[0]).toBe('前スレ 【雑談スレ★43】');
+  });
+
+  it('skips URL lines', () => {
+    const lines = [
+      '前スレ',
+      'https://news.5ch.net/test/read.cgi/newsplus/1234567890/',
+    ];
+    const result = incrementPrevThreadReferences(lines);
+    expect(result[1]).toBe('https://news.5ch.net/test/read.cgi/newsplus/1234567890/');
+  });
+
+  it('does not modify lines without "前スレ" nearby', () => {
+    const lines = ['ここはスレ Part42 です', '前スレなし'];
+    const result = incrementPrevThreadReferences(lines);
+    expect(result[0]).toBe('ここはスレ Part42 です');
+  });
+
+  it('returns identical array when no "前スレ" is found', () => {
+    const lines = ['テスト本文', 'テスト2行目'];
+    const result = incrementPrevThreadReferences(lines);
+    expect(result).toEqual(lines);
   });
 });
 
@@ -181,5 +219,29 @@ describe('generateNextThreadTemplate', () => {
     expect(result.message).toContain(
       'https://phoebe.bbspink.com/test/read.cgi/pinkplus/1111111111/',
     );
+  });
+
+  it('increments 前スレ title number in message body', () => {
+    const prevUrl = 'https://news.5ch.net/test/read.cgi/newsplus/9999999999/';
+    const body = [
+      'ここは雑談スレ Part5 です',
+      '',
+      '前スレ',
+      '雑談スレ Part4',
+      prevUrl,
+    ].join('<br>');
+
+    const result = generateNextThreadTemplate({
+      ...baseInput,
+      firstPostBody: body,
+      currentTitle: '雑談スレ Part5',
+    });
+
+    expect(result.subject).toBe('雑談スレ Part6');
+    const lines = result.message.split('\n');
+    expect(lines[0]).toBe('ここは雑談スレ Part5 です');
+    expect(lines[2]).toBe('前スレ');
+    expect(lines[3]).toBe('雑談スレ Part5');
+    expect(lines[4]).toContain('1234567890');
   });
 });

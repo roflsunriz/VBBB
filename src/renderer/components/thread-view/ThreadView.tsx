@@ -1474,6 +1474,7 @@ export function ThreadView(): React.JSX.Element {
   const toggleTabProgPost = useBBSStore((s) => s.toggleTabProgPost);
   const closeTabProgPost = useBBSStore((s) => s.closeTabProgPost);
   const openNewThreadEditorWithDraft = useBBSStore((s) => s.openNewThreadEditorWithDraft);
+  const selectBoardByUrl = useBBSStore((s) => s.selectBoardByUrl);
 
   const handleTogglePostEditor = useCallback(() => {
     if (activeTabId !== null) toggleTabPostEditor(activeTabId);
@@ -1508,6 +1509,7 @@ export function ThreadView(): React.JSX.Element {
     x: number;
     y: number;
     tabId: string;
+    title: string;
     isFavorite: boolean;
     isRoundItem: boolean;
     threadPageUrl: string;
@@ -1518,6 +1520,7 @@ export function ThreadView(): React.JSX.Element {
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [relatedError, setRelatedError] = useState<string | null>(null);
   const [relatedThreads, setRelatedThreads] = useState<readonly RelatedThreadCandidate[]>([]);
+  const [tabCopySubMenuOpen, setTabCopySubMenuOpen] = useState(false);
 
   // Build favorite lookup for thread URLs
   const favoriteUrlToId = useMemo(() => {
@@ -1542,6 +1545,7 @@ export function ThreadView(): React.JSX.Element {
     const handler = (): void => {
       setTabCtxMenu(null);
       setRelatedSubMenuOpen(false);
+      setTabCopySubMenuOpen(false);
     };
     document.addEventListener('click', handler);
     return () => {
@@ -1574,6 +1578,7 @@ export function ThreadView(): React.JSX.Element {
           x: e.clientX,
           y: e.clientY,
           tabId,
+          title: tab?.title ?? '',
           isFavorite: favoriteUrlToId.has(threadUrl),
           isRoundItem,
           threadPageUrl,
@@ -1675,6 +1680,7 @@ export function ThreadView(): React.JSX.Element {
     if (tab === undefined) return;
 
     setRelatedSubMenuOpen(true);
+    setTabCopySubMenuOpen(false);
     setRelatedLoading(true);
     setRelatedError(null);
     setRelatedThreads([]);
@@ -2006,8 +2012,11 @@ export function ThreadView(): React.JSX.Element {
       boardUrl: activeTab.boardUrl,
       threadId: activeTab.threadId,
     });
-    openNewThreadEditorWithDraft(template.subject, template.message);
-  }, [activeTab, openNewThreadEditorWithDraft]);
+    void (async () => {
+      await selectBoardByUrl(activeTab.boardUrl);
+      openNewThreadEditorWithDraft(template.subject, template.message);
+    })();
+  }, [activeTab, selectBoardByUrl, openNewThreadEditorWithDraft]);
 
   // Per-tab panel states derived from the active tab
   const postEditorOpen = activeTab?.postEditorOpen ?? false;
@@ -3493,6 +3502,62 @@ export function ThreadView(): React.JSX.Element {
                       </span>
                     </button>
                   ))}
+              </div>
+            )}
+          </div>
+          <div
+            className="relative"
+            onMouseLeave={() => {
+              setTabCopySubMenuOpen(false);
+            }}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              onMouseEnter={() => {
+                setTabCopySubMenuOpen(true);
+                setRelatedSubMenuOpen(false);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setTabCopySubMenuOpen(true);
+                setRelatedSubMenuOpen(false);
+              }}
+              role="menuitem"
+            >
+              コピー
+              <MdiIcon path={mdiChevronRight} size={12} />
+            </button>
+            {tabCopySubMenuOpen && (
+              <div className="absolute left-full top-0 z-50 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
+                <button
+                  type="button"
+                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  onClick={() => {
+                    if (tabCtxMenu.threadPageUrl.length > 0) {
+                      void navigator.clipboard.writeText(tabCtxMenu.threadPageUrl);
+                    }
+                    setTabCtxMenu(null);
+                  }}
+                  role="menuitem"
+                >
+                  スレッドのURLをコピー
+                </button>
+                <button
+                  type="button"
+                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  onClick={() => {
+                    if (tabCtxMenu.threadPageUrl.length > 0) {
+                      void navigator.clipboard.writeText(
+                        `${tabCtxMenu.title}\n${tabCtxMenu.threadPageUrl}`,
+                      );
+                    }
+                    setTabCtxMenu(null);
+                  }}
+                  role="menuitem"
+                >
+                  タイトル+URLをコピー
+                </button>
               </div>
             )}
           </div>

@@ -14,6 +14,9 @@
 import { decodeHtmlEntities } from '@shared/html-entities';
 import { extractRightmostNumber } from './next-thread-detect';
 
+/** Regex for detecting URL-only lines (skipped during 前スレ number incrementing). */
+const URL_LINE_PATTERN = /^\s*https?:\/\//;
+
 /** Regex matching a `!extend:...` command line (case-insensitive). */
 const EXTEND_CMD_PATTERN = /^!extend:[^\n]*/i;
 
@@ -72,6 +75,31 @@ export function incrementTitleNumber(title: string): string {
   return `${parsed.before}${String(parsed.num + 1)}${parsed.after}`;
 }
 
+/**
+ * Increment series numbers in lines near "前スレ" references.
+ *
+ * Scans for lines containing "前スレ" and increments the rightmost number
+ * on that line and the next 2 non-URL lines. This updates the previous
+ * thread title reference (e.g. "★42" → "★43") to match the current thread.
+ */
+export function incrementPrevThreadReferences(lines: readonly string[]): string[] {
+  const result = [...lines];
+  for (let i = 0; i < result.length; i++) {
+    const line = result[i];
+    if (line === undefined || !line.includes('前スレ')) continue;
+    for (let j = i; j < Math.min(i + 3, result.length); j++) {
+      const target = result[j];
+      if (target === undefined) continue;
+      if (URL_LINE_PATTERN.test(target)) continue;
+      const incremented = incrementTitleNumber(target);
+      if (incremented !== target) {
+        result[j] = incremented;
+      }
+    }
+  }
+  return result;
+}
+
 export interface NextThreadTemplate {
   /** Suggested subject (thread title) with incremented series number. */
   readonly subject: string;
@@ -117,12 +145,14 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
     line.replace(THREAD_URL_PATTERN, currentThreadUrl),
   );
 
+  const incrementedLines = incrementPrevThreadReferences(replacedLines);
+
   let messageLines: string[];
   if (extendCmd !== null) {
     const extendLines = [extendCmd, extendCmd];
-    messageLines = [...extendLines, ...replacedLines];
+    messageLines = [...extendLines, ...incrementedLines];
   } else {
-    messageLines = replacedLines;
+    messageLines = incrementedLines;
   }
 
   const message = messageLines.join('\n').trim();
