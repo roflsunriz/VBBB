@@ -5,6 +5,15 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-03-22
+
+### Changed
+
+- grtOK 未取得時の自動再投稿（grtCookie/grtCheck リトライ）を無効化し、初回投稿のみに変更
+  - 投稿自体は成功しているが grtOK が返らないケースで連投になる問題を防止
+  - `MAX_POST_RETRIES` を `2` → `0` に変更
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.3.2` に更新
+
 ## [2.3.1] - 2026-03-20
 
 ### Added

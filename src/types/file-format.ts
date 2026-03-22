@@ -14,8 +14,8 @@ export const ZERO_DATE_HEX = '25569' as const;
 /** Kokomade unset sentinel */
 export const KOKOMADE_UNSET = -1 as const;
 
-/** Maximum retries for post */
-export const MAX_POST_RETRIES = 2 as const;
+/** Maximum retries for post (grtCookie/grtCheck confirmation retry) */
+export const MAX_POST_RETRIES = 0 as const;
 
 /** ADJUST_MARGIN for DAT differential fetch */
 export const DAT_ADJUST_MARGIN = 16 as const;
@@ -24,7 +24,7 @@ export const DAT_ADJUST_MARGIN = 16 as const;
 export const MAX_POPUP_RES = 10 as const;
 
 /** Default User-Agent template — matches Monazilla convention: "Monazilla/1.00 (AppName/Version)" */
-export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.3.1)' as const;
+export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.3.2)' as const;
 
 /** Default 5ch base domain */
 export const DEFAULT_5CH_DOMAIN = '5ch.io' as const;
