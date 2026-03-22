@@ -14,8 +14,11 @@ export const ZERO_DATE_HEX = '25569' as const;
 /** Kokomade unset sentinel */
 export const KOKOMADE_UNSET = -1 as const;
 
-/** Maximum retries for post (grtCookie/grtCheck confirmation retry) */
+/** Maximum retries for post (grtCheck confirmation retry — currently disabled) */
 export const MAX_POST_RETRIES = 0 as const;
+
+/** Maximum retries specifically for grtCookie (cookie confirmation retry) */
+export const MAX_COOKIE_RETRIES = 1 as const;
 
 /** ADJUST_MARGIN for DAT differential fetch */
 export const DAT_ADJUST_MARGIN = 16 as const;

@@ -10,7 +10,7 @@ import {
   type PostResult,
   PostResultType,
 } from '@shared/domain';
-import { MAX_POST_RETRIES } from '@shared/file-format';
+import { MAX_COOKIE_RETRIES, MAX_POST_RETRIES } from '@shared/file-format';
 import { decodeHtmlEntities } from '@shared/html-entities';
 import { createLogger } from '../logger';
 import {
@@ -430,7 +430,8 @@ export function extractHiddenFields(html: string): Record<string, string> {
 
 /**
  * Post a response to a thread.
- * Handles grtCookie/grtCheck with up to MAX_POST_RETRIES retries.
+ * Handles grtCookie with up to MAX_COOKIE_RETRIES retries, and
+ * grtCheck with up to MAX_POST_RETRIES retries (currently disabled).
  */
 export async function postResponse(params: PostParams, board: Board): Promise<PostResult> {
   const postUrl = getPostUrl(board);
@@ -455,7 +456,8 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
   let retryUrl: string | undefined;
   let lastPayloadHash = '';
 
-  for (let attempt = 0; attempt <= MAX_POST_RETRIES; attempt++) {
+  const maxAttempts = Math.max(MAX_POST_RETRIES, MAX_COOKIE_RETRIES);
+  for (let attempt = 0; attempt <= maxAttempts; attempt++) {
     const isRetry = hiddenFields !== undefined && retrySubmitBtn !== undefined;
 
     // On retry after grtCookie/grtCheck, submit the server's confirmation
@@ -586,10 +588,12 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       return { success: true, resultType, message: html };
     }
 
-    if (
-      (resultType === PostResultType.Cookie || resultType === PostResultType.Check) &&
-      attempt < MAX_POST_RETRIES
-    ) {
+    const isCookieRetryable =
+      resultType === PostResultType.Cookie && attempt < MAX_COOKIE_RETRIES;
+    const isCheckRetryable =
+      resultType === PostResultType.Check && attempt < MAX_POST_RETRIES;
+
+    if (isCookieRetryable || isCheckRetryable) {
       // Diagnostic: log full confirmation page HTML for debugging
       const confirmSnippet =
         html.length > CONFIRMATION_HTML_LIMIT
