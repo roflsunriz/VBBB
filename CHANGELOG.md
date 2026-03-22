@@ -5,6 +5,16 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-03-22
+
+### Added
+
+- grtCookie（クッキー確認）応答時の自動リトライ機能を追加
+  - `MAX_COOKIE_RETRIES = 1` として、grtCookie の場合のみ確認画面のフォームを自動送信してリトライする
+  - grtCheck（書き込み確認）のリトライは引き続き無効（`MAX_POST_RETRIES = 0`）のまま
+  - 5ch のクッキー確認ページから hidden フィールドと `<pre>` タグ内 Cookie を抽出し、3秒待機後に再送信するフロー
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.4.0` に更新
+
 ## [2.3.2] - 2026-03-22
 
 ### Changed
