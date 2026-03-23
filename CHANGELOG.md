@@ -5,6 +5,30 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-23
+
+### Added
+
+- ホバーポップアップ（`>>N` レス参照、ID別・名前別バッジ）内でインライン画像展開をサポート
+  - インライン展開がONの場合、ポップアップ内のレス本文に含まれる画像URLをサムネイル表示
+  - ネストされた子ポップアップにも画像展開が伝搬
+  - 音声・動画はポップアップ内では展開しない（メインスレッドビューのみ）
+- User-Agent 設定のファイル永続化を実装（`user-agent-store.ts`）
+  - アプリ再起動後もカスタム User-Agent が保持される
+  - 起動時のフォールバック: 保存済みファイル → `.env` の `VBBB_USER_AGENT` → デフォルト値
+
+### Fixed
+
+- 設定画面で変更した User-Agent が HTTP リクエストに反映されない問題を修正
+  - `http-client.ts` が常に `DEFAULT_USER_AGENT` をハードコード使用していた問題を解消
+  - IPC ハンドラーのメモリ変数のみの管理をストアモジュール経由に置換
+- `.env` の `VBBB_USER_AGENT` 環境変数が読み込まれない問題を修正
+- UPLIFT 認証の `sessionId` 生成で固定の `DEFAULT_USER_AGENT` が使用されていた問題を修正し、カスタム UA と連動するよう変更
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.5.0` に更新
+
 ## [2.4.0] - 2026-03-22
 
 ### Added
@@ -361,6 +385,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[2.5.0]: https://github.com/roflsunriz/VBBB/compare/v2.4.0...v2.5.0
 [2.0.0]: https://github.com/roflsunriz/VBBB/compare/v1.6.2...v2.0.0
 [1.6.2]: https://github.com/roflsunriz/VBBB/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/roflsunriz/VBBB/compare/v1.6.0...v1.6.1
