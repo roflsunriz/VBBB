@@ -5,6 +5,15 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-03-23
+
+### Changed
+
+- HTTP クライアント (`http-client.ts`) の自動リトライを無効化（`maxRetries` を `3` → `0` に変更）
+  - リトライによる意図しない重複リクエストや遅延を防止
+  - リモート検索 (`remote-search.ts`) および IP ルックアップ (`handlers.ts`) の個別リトライ設定も削除し、デフォルト設定に統一
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.5.1` に更新
+
 ## [2.5.0] - 2026-03-23
 
 ### Added
@@ -385,6 +394,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[2.5.1]: https://github.com/roflsunriz/VBBB/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/roflsunriz/VBBB/compare/v2.4.0...v2.5.0
 [2.0.0]: https://github.com/roflsunriz/VBBB/compare/v1.6.2...v2.0.0
 [1.6.2]: https://github.com/roflsunriz/VBBB/compare/v1.6.1...v1.6.2

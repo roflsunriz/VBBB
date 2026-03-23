@@ -27,7 +27,7 @@ export const DAT_ADJUST_MARGIN = 16 as const;
 export const MAX_POPUP_RES = 10 as const;
 
 /** Default User-Agent template — matches Monazilla convention: "Monazilla/1.00 (AppName/Version)" */
-export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.5.0)' as const;
+export const DEFAULT_USER_AGENT = 'Monazilla/1.00 (VBBB/2.5.1)' as const;
 
 /** Default 5ch base domain */
 export const DEFAULT_5CH_DOMAIN = '5ch.io' as const;
