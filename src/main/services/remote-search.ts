@@ -125,14 +125,11 @@ export async function searchRemoteThreads(
   options?: { start?: number },
 ): Promise<RemoteSearchResult> {
   const sourceUrl = buildRemoteSearchUrl(keywords, options?.start);
-  const response = await httpFetch(
-    {
-      url: sourceUrl,
-      method: 'GET',
-      acceptGzip: true,
-    },
-    { maxRetries: 1, initialDelayMs: 500, maxDelayMs: 2_000, retryableStatuses: [429, 503] },
-  );
+  const response = await httpFetch({
+    url: sourceUrl,
+    method: 'GET',
+    acceptGzip: true,
+  });
 
   if (response.status !== 200) {
     throw new Error(`リモート検索に失敗しました: HTTP ${String(response.status)}`);

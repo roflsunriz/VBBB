@@ -14,7 +14,7 @@ import { getCurrentUserAgent } from './user-agent-store';
 const logger = createLogger('http-client');
 
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,
+  maxRetries: 0,
   initialDelayMs: 1000,
   maxDelayMs: 30_000,
   retryableStatuses: [429, 503, 502, 504],

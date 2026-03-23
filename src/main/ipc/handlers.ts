@@ -900,14 +900,11 @@ export async function registerIpcHandlers(): Promise<void> {
   handle('ip:lookup', async (ip: string): Promise<IpLookupResult> => {
     // Normalize BBS masked IPv6 (e.g. "240b:11:442:d510:*" → "240b:11:442:d510::")
     const lookupIp = ip.endsWith(':*') ? `${ip.slice(0, -1)}:` : ip;
-    const response = await httpFetch(
-      {
-        url: `http://ip-api.com/json/${encodeURIComponent(lookupIp)}?lang=ja&fields=country,regionName,city,isp,org,as,query`,
-        method: 'GET',
-        acceptGzip: true,
-      },
-      { maxRetries: 1, initialDelayMs: 500, maxDelayMs: 2000, retryableStatuses: [429, 503] },
-    );
+    const response = await httpFetch({
+      url: `http://ip-api.com/json/${encodeURIComponent(lookupIp)}?lang=ja&fields=country,regionName,city,isp,org,as,query`,
+      method: 'GET',
+      acceptGzip: true,
+    });
     if (response.status !== 200) {
       throw new Error(`IP API error: ${String(response.status)}`);
     }
