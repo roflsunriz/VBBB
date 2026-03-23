@@ -7,9 +7,9 @@ import { URL } from 'node:url';
 import { gunzip } from 'node:zlib';
 import { promisify } from 'node:util';
 import { type HttpRequestConfig, type HttpResponse, type RetryConfig } from '@shared/api';
-import { DEFAULT_USER_AGENT } from '@shared/file-format';
 import { createLogger } from '../logger';
 import { parseSetCookieHeaders } from './cookie-store';
+import { getCurrentUserAgent } from './user-agent-store';
 
 const logger = createLogger('http-client');
 
@@ -54,7 +54,7 @@ function doRequest(config: HttpRequestConfig): Promise<HttpResponse> {
     const requestFn = isHttps ? httpsRequest : httpRequest;
 
     const headers: Record<string, string> = {
-      'User-Agent': DEFAULT_USER_AGENT,
+      'User-Agent': getCurrentUserAgent(),
       ...config.headers,
     };
 

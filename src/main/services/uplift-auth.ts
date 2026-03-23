@@ -5,10 +5,11 @@
  * IMPORTANT: Passwords are NEVER persisted or logged.
  */
 import type { UpliftSession } from '@shared/auth';
-import { DEFAULT_5CH_DOMAIN, DEFAULT_USER_AGENT } from '@shared/file-format';
+import { DEFAULT_5CH_DOMAIN } from '@shared/file-format';
 import { createLogger } from '../logger';
 import { setCookie, getCookie, removeCookie } from './cookie-store';
 import { httpFetch } from './http-client';
+import { getCurrentUserAgent } from './user-agent-store';
 
 const logger = createLogger('uplift-auth');
 
@@ -67,7 +68,7 @@ export async function upliftLogin(
       if (sidMatch?.[1] !== undefined) {
         const sidValue = sidMatch[1];
         // Session ID = {UserAgent}:{SessionValue}
-        const sessionId = `${DEFAULT_USER_AGENT}:${sidValue}`;
+        const sessionId = `${getCurrentUserAgent()}:${sidValue}`;
 
         setCookie({
           name: SID_COOKIE_NAME,

@@ -3596,6 +3596,8 @@ export function ThreadView(): React.JSX.Element {
           expandReplies={popup.expandReplies}
           onClose={handlePopupClose}
           onMouseEnter={handlePopupMouseEnter}
+          inlineMediaEnabled={inlineMediaEnabled}
+          allThreadImageUrls={allThreadImageUrls}
         />
       )}
     </section>

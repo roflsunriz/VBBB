@@ -8,7 +8,9 @@ import { MAX_POPUP_RES } from '@shared/file-format';
 import { sanitizeHtml } from '../../hooks/use-sanitize';
 import { isAsciiArt } from '../../utils/aa-detect';
 import { convertAnchorsToLinks } from '../../utils/anchor-parser';
+import { detectImageUrls } from '../../utils/image-detect';
 import { linkifyUrls } from '../../utils/url-linkify';
+import { ImageThumbnail } from './ImageThumbnail';
 
 interface ResPopupProps {
   /** Response numbers to display */
@@ -27,6 +29,10 @@ interface ResPopupProps {
   readonly expandReplies?: boolean | undefined;
   /** Current nesting depth (0 = top-level) */
   readonly depth?: number | undefined;
+  /** Whether inline media expansion is enabled */
+  readonly inlineMediaEnabled?: boolean | undefined;
+  /** All image URLs in the thread (for modal keyboard navigation) */
+  readonly allThreadImageUrls?: readonly string[] | undefined;
 }
 
 /** Popup offset from cursor */
@@ -90,6 +96,8 @@ export function ResPopup({
   onMouseEnter,
   expandReplies = false,
   depth = 0,
+  inlineMediaEnabled = false,
+  allThreadImageUrls,
 }: ResPopupProps): React.JSX.Element | null {
   const popupRef = useRef<HTMLDivElement>(null);
   const [childPopup, setChildPopup] = useState<ChildPopupState | null>(null);
@@ -137,8 +145,9 @@ export function ResPopup({
         bodyIsAa: isAsciiArt(res.body),
         bodyHtml: linkifyUrls(convertAnchorsToLinks(sanitizeHtml(res.body))),
         replyCount: replyMap.get(res.number)?.length ?? 0,
+        images: inlineMediaEnabled ? detectImageUrls(res.body) : [],
       })),
-    [matchedResponses, replyMap],
+    [matchedResponses, replyMap, inlineMediaEnabled],
   );
 
   // Position adjustment to keep popup within viewport
@@ -286,7 +295,7 @@ export function ResPopup({
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnterSelf}
     >
-      {processedResponses.map(({ res, bodyIsAa, bodyHtml, replyCount }) => (
+      {processedResponses.map(({ res, bodyIsAa, bodyHtml, replyCount, images }) => (
         <div
           key={res.number}
           className="border-b border-[var(--color-border-secondary)] px-3 py-1.5 last:border-b-0"
@@ -314,6 +323,18 @@ export function ResPopup({
             onMouseOut={canNest ? handleBodyMouseOut : undefined}
             onClick={handleBodyClick}
           />
+          {images.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {images.map((img) => (
+                <ImageThumbnail
+                  key={img.url}
+                  url={img.url}
+                  displayUrl={img.displayUrl}
+                  allImageUrls={allThreadImageUrls}
+                />
+              ))}
+            </div>
+          )}
         </div>
       ))}
 
@@ -333,6 +354,8 @@ export function ResPopup({
           onClose={handleChildClose}
           onMouseEnter={handleChildMouseEnter}
           depth={depth + 1}
+          inlineMediaEnabled={inlineMediaEnabled}
+          allThreadImageUrls={allThreadImageUrls}
         />
       )}
     </div>

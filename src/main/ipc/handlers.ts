@@ -95,8 +95,13 @@ import {
   saveTabsSync,
 } from '../services/tab-persistence';
 import { upliftLogin, upliftLogout, getUpliftSession, setActiveDomain } from '../services/uplift-auth';
-import { DEFAULT_5CH_DOMAIN, DEFAULT_BBS_MENU_URLS, DEFAULT_USER_AGENT } from '@shared/file-format';
+import { DEFAULT_5CH_DOMAIN, DEFAULT_BBS_MENU_URLS } from '@shared/file-format';
 import { checkForUpdate, downloadAndInstall } from '../services/updater';
+import {
+  getCurrentUserAgent,
+  loadUserAgentAsync,
+  saveUserAgentAsync,
+} from '../services/user-agent-store';
 
 const logger = createLogger('ipc');
 const BBS_MENU_URLS_FILE = 'bbs-menu-urls.json';
@@ -810,16 +815,14 @@ export async function registerIpcHandlers(): Promise<void> {
     await shell.openExternal(url);
   });
 
-  // User-Agent management
-  let customUserAgent: string | null = null;
-
+  // User-Agent management (persisted via user-agent-store)
   handle('config:get-user-agent', () => {
-    return Promise.resolve(customUserAgent ?? DEFAULT_USER_AGENT);
+    return Promise.resolve(getCurrentUserAgent());
   });
 
-  handle('config:set-user-agent', (userAgent: string) => {
-    customUserAgent = userAgent.trim().length > 0 ? userAgent.trim() : null;
-    return Promise.resolve();
+  handle('config:set-user-agent', async (userAgent: string) => {
+    const value = userAgent.trim().length > 0 ? userAgent.trim() : null;
+    await saveUserAgentAsync(dataDir, value);
   });
 
   handle('config:get-bbs-menu-urls', () => {
@@ -948,6 +951,7 @@ export async function registerIpcHandlers(): Promise<void> {
     loadProxyConfigAsync(dataDir),
     loadBbsMenuUrlsAsync(),
     loadFivechDomainAsync(),
+    loadUserAgentAsync(dataDir),
     initializeBoardPlugins(),
   ]);
 
