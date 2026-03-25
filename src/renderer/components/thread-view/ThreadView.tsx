@@ -2151,61 +2151,10 @@ export function ThreadView(): React.JSX.Element {
     return set;
   }, [deferredSearchQuery, searchField, activeTab]);
 
-  // Build the display-ready response list (filtered or full)
-  const displayResponses = useMemo(() => {
-    if (activeTab === undefined) return [];
-    const responses =
-      filteredResNumbers === null
-        ? activeTab.responses
-        : activeTab.responses.filter((res) => filteredResNumbers.has(res.number));
-    if (searchFilteredResNumbers === null) return responses;
-    return responses.filter((res) => searchFilteredResNumbers.has(res.number));
-  }, [activeTab, filteredResNumbers, searchFilteredResNumbers]);
-
-  // Map resNumber -> index in displayResponses for virtual scroll navigation
-  const resNumberToIndex = useMemo(() => {
-    const map = new Map<number, number>();
-    for (let i = 0; i < displayResponses.length; i++) {
-      const res = displayResponses[i];
-      if (res !== undefined) {
-        map.set(res.number, i);
-      }
-    }
-    return map;
-  }, [displayResponses]);
-
-  // Virtual scrolling for the response list
-  // getItemKey ensures size cache is keyed by res number, not by index.
-  // Without this, applying a filter changes which item occupies each index,
-  // causing the virtualizer to reuse wrong cached heights → overlapping text / huge gaps.
-  const virtualizer = useVirtualizer({
-    count: displayResponses.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 80,
-    overscan: 5,
-    getItemKey: (index) => displayResponses[index]?.number ?? index,
-  });
-
-  // Stable refs for use in callbacks without deps churn
-  const virtualizerRef = useRef(virtualizer);
-  virtualizerRef.current = virtualizer;
-  const displayResponsesRef = useRef(displayResponses);
-  displayResponsesRef.current = displayResponses;
-  const resNumberToIndexRef = useRef(resNumberToIndex);
-  resNumberToIndexRef.current = resNumberToIndex;
-
-  // Scroll to a specific res number using the virtualizer
-  const scrollToResNumber = useCallback(
-    (resNumber: number) => {
-      const index = resNumberToIndex.get(resNumber);
-      if (index !== undefined) {
-        virtualizerRef.current.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
-      }
-    },
-    [resNumberToIndex],
-  );
-
-  // Pre-compute NG results for all responses in active tab
+  // Pre-compute NG results for all responses in active tab.
+  // Placed before displayResponses so transparent-aboned items can be excluded
+  // from the virtual list (rendering null inside a measured wrapper div causes
+  // the virtualizer to cache 0px heights → layout corruption / cross-tab bleed).
   const { ngResults, ngMatchedRulesMap } = useMemo(() => {
     const emptyResult = {
       ngResults: new Map<number, NgFilterResult>(),
@@ -2248,6 +2197,72 @@ export function ThreadView(): React.JSX.Element {
     }
     return { ngResults: results, ngMatchedRulesMap: matchedMap };
   }, [activeTab, ngRules, revealAbon]);
+
+  // Build the display-ready response list (filtered or full).
+  // Transparent-aboned items are excluded here so the virtualizer never
+  // allocates an empty wrapper div for them (which would measure as 0px
+  // and corrupt the layout).
+  const displayResponses = useMemo(() => {
+    if (activeTab === undefined) return [];
+    let responses: readonly Res[] =
+      filteredResNumbers === null
+        ? activeTab.responses
+        : activeTab.responses.filter((res) => filteredResNumbers.has(res.number));
+    if (searchFilteredResNumbers !== null) {
+      responses = responses.filter((res) => searchFilteredResNumbers.has(res.number));
+    }
+    if (!revealAbon) {
+      responses = responses.filter(
+        (res) => ngResults.get(res.number) !== NgFilterResultEnum.TransparentAbon,
+      );
+    }
+    return responses;
+  }, [activeTab, filteredResNumbers, searchFilteredResNumbers, ngResults, revealAbon]);
+
+  // Map resNumber -> index in displayResponses for virtual scroll navigation
+  const resNumberToIndex = useMemo(() => {
+    const map = new Map<number, number>();
+    for (let i = 0; i < displayResponses.length; i++) {
+      const res = displayResponses[i];
+      if (res !== undefined) {
+        map.set(res.number, i);
+      }
+    }
+    return map;
+  }, [displayResponses]);
+
+  // Virtual scrolling for the response list.
+  // getItemKey is prefixed with activeTabId so the measurement cache is
+  // isolated per tab — without this, switching tabs causes the virtualizer
+  // to reuse stale heights from a different thread (same res numbers but
+  // different content / abon state), leading to overlapping text / huge gaps.
+  const virtualizer = useVirtualizer({
+    count: displayResponses.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+    getItemKey: (index) =>
+      `${activeTabId ?? ''}-${String(displayResponses[index]?.number ?? index)}`,
+  });
+
+  // Stable refs for use in callbacks without deps churn
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+  const displayResponsesRef = useRef(displayResponses);
+  displayResponsesRef.current = displayResponses;
+  const resNumberToIndexRef = useRef(resNumberToIndex);
+  resNumberToIndexRef.current = resNumberToIndex;
+
+  // Scroll to a specific res number using the virtualizer
+  const scrollToResNumber = useCallback(
+    (resNumber: number) => {
+      const index = resNumberToIndex.get(resNumber);
+      if (index !== undefined) {
+        virtualizerRef.current.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+      }
+    },
+    [resNumberToIndex],
+  );
 
   // Pre-compute highlight data
   const ownResNumbers = useMemo(() => {

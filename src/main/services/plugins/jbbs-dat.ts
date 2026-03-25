@@ -66,14 +66,26 @@ export function parseJBBSDatLine(line: string): Res | null {
 
 /**
  * Parse entire JBBS DAT content into Res array.
- * Handles gaps in res numbers (abon).
+ * Handles gaps in res numbers (abon) and deduplicates by res number
+ * (keeps the last occurrence so appended differential data wins).
  */
 export function parseJBBSDat(content: string): Res[] {
-  const responses: Res[] = [];
+  const seen = new Map<number, Res>();
+  const order: number[] = [];
   const lines = content.split('\n');
   for (const line of lines) {
     const res = parseJBBSDatLine(line);
     if (res !== null) {
+      if (!seen.has(res.number)) {
+        order.push(res.number);
+      }
+      seen.set(res.number, res);
+    }
+  }
+  const responses: Res[] = [];
+  for (const num of order) {
+    const res = seen.get(num);
+    if (res !== undefined) {
       responses.push(res);
     }
   }
@@ -105,21 +117,23 @@ export async function fetchJBBSDat(
   const encoding = getReadEncoding(board);
 
   const localExists = existsSync(localPath);
-  let existingResCount = 0;
+  let lastResNumber = 0;
 
   if (localExists) {
-    // Count existing responses to know where to start differential fetch
     const localContent = readFileSafe(localPath);
     if (localContent !== null) {
       const text = decodeBuffer(localContent, encoding);
       const existing = parseJBBSDat(text);
-      existingResCount = existing.length;
+      const last = existing[existing.length - 1];
+      lastResNumber = last !== undefined ? last.number : 0;
     }
   }
 
-  // For JBBS, differential fetch uses res number range, not byte range
-  if (existingResCount > 0) {
-    const startFrom = existingResCount + 1;
+  // For JBBS, differential fetch uses res number range, not byte range.
+  // Use the last res number (not line count) because JBBS threads can
+  // have gaps in res numbers (server-side abone).
+  if (lastResNumber > 0) {
+    const startFrom = lastResNumber + 1;
     const diffUrl = getRawModeUrl(board, threadId, startFrom);
 
     logger.info(`JBBS differential fetch from res ${String(startFrom)}: ${diffUrl}`);
