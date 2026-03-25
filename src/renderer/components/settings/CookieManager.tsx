@@ -4,14 +4,7 @@
  * and set the 5ch base domain.
  */
 import { useState, useCallback, useEffect } from 'react';
-import {
-  mdiClose,
-  mdiDelete,
-  mdiCookie,
-  mdiWeb,
-  mdiFormatListBulleted,
-  mdiDomain,
-} from '@mdi/js';
+import { mdiClose, mdiDelete, mdiCookie, mdiWeb, mdiFormatListBulleted, mdiDomain } from '@mdi/js';
 import type { StoredCookie } from '@shared/cookie';
 import { MdiIcon } from '../common/MdiIcon';
 
@@ -404,7 +397,8 @@ export function CookieManager({ onClose }: CookieManagerProps): React.JSX.Elemen
             {/* Warning */}
             <div className="rounded border border-[var(--color-warning,#f59e0b)] bg-[var(--color-bg-primary)] p-3">
               <p className="text-xs text-[var(--color-warning,#f59e0b)]">
-                ドメインを変更すると、Be / UPLIFT / どんぐりの認証 Cookie が無効になります。変更後は各サービスへ再ログインしてください。
+                ドメインを変更すると、Be / UPLIFT / どんぐりの認証 Cookie
+                が無効になります。変更後は各サービスへ再ログインしてください。
               </p>
             </div>
 

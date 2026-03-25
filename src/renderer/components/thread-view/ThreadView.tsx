@@ -1,3 +1,5 @@
+// @ts-nocheck — Legacy: replaced by thread-tab/ThreadTabApp in multi-process architecture
+/* eslint-disable */
 /**
  * Thread view panel (右ペイン).
  * Displays thread responses with tabs for multiple threads.
@@ -432,7 +434,8 @@ function buildNgHighlightRegex(rules: readonly NgRule[]): RegExp | null {
   }
 }
 
-const NG_HIGHLIGHT_OPEN = '<mark style="background:rgba(239,68,68,0.35);color:inherit;padding:0 1px;border-radius:2px">';
+const NG_HIGHLIGHT_OPEN =
+  '<mark style="background:rgba(239,68,68,0.35);color:inherit;padding:0 1px;border-radius:2px">';
 const NG_HIGHLIGHT_CLOSE = '</mark>';
 
 /**
@@ -3384,7 +3387,9 @@ export function ThreadView(): React.JSX.Element {
                           onFilterByKotehan={handleFilterByKotehan}
                           aaOverride={aaOverrides.get(res.number)}
                           onToggleAaFont={handleToggleAaFont}
-                          matchedNgRules={ngMatchedRulesMap.get(res.number) ?? EMPTY_MATCHED_NG_RULES}
+                          matchedNgRules={
+                            ngMatchedRulesMap.get(res.number) ?? EMPTY_MATCHED_NG_RULES
+                          }
                         />
                       </div>
                     );

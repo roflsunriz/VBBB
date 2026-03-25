@@ -1,11 +1,13 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, session, shell } from 'electron';
-import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { app, BaseWindow, session, shell } from 'electron';
+import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { performance } from 'node:perf_hooks';
 import { registerIpcHandlers } from './ipc/handlers';
 import { buildAppMenu } from './menu';
 import { createLogger } from './logger';
 import { loadWindowState, saveWindowState } from './services/window-state';
+import { ViewManager } from './view-manager';
+import { setViewManager } from './view-manager-ref';
 
 const startupLogger = createLogger('startup');
 const rendererLogger = createLogger('renderer');
@@ -14,11 +16,11 @@ function getDataDir(): string {
   return join(app.getPath('userData'), 'vbbb-data');
 }
 
-function createWindow(): BrowserWindow {
+function createWindow(): BaseWindow {
   const dataDir = getDataDir();
   const windowState = loadWindowState(dataDir);
 
-  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+  const windowOptions: Electron.BaseWindowConstructorOptions = {
     width: windowState.width,
     height: windowState.height,
     minWidth: 800,
@@ -26,35 +28,29 @@ function createWindow(): BrowserWindow {
     show: false,
     title: `VBBB - Versatile BBS Browser v${app.getVersion()}`,
     icon: join(__dirname, '../../resources/icon.png'),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      webviewTag: true,
-    },
   };
 
-  // Restore position only if valid (not -1)
   if (windowState.x >= 0 && windowState.y >= 0) {
     windowOptions.x = windowState.x;
     windowOptions.y = windowState.y;
   }
 
-  const mainWindow = new BrowserWindow(windowOptions);
+  const mainWindow = new BaseWindow(windowOptions);
 
-  // Restore maximized state after window is ready
-  mainWindow.on('ready-to-show', () => {
+  const vm = new ViewManager(mainWindow);
+  setViewManager(vm);
+
+  const shellView = vm.createShellView();
+
+  shellView.webContents.on('did-finish-load', () => {
     if (windowState.isMaximized) {
       mainWindow.maximize();
     }
     mainWindow.show();
   });
 
-  // Save window state before close
   mainWindow.on('close', () => {
     const isMaximized = mainWindow.isMaximized();
-    // Get bounds from non-maximized state for proper restore
     if (isMaximized) {
       mainWindow.unmaximize();
     }
@@ -68,28 +64,25 @@ function createWindow(): BrowserWindow {
     });
   });
 
-  // Prevent renderer <title> from overriding BrowserWindow title
-  mainWindow.on('page-title-updated', (e) => {
-    e.preventDefault();
+  mainWindow.on('closed', () => {
+    vm.destroyAll();
+    setViewManager(null);
   });
 
-  // Forward renderer console errors/warnings to terminal
-  mainWindow.webContents.on('console-message', (_event, level, message) => {
+  mainWindow.on('resize', () => {
+    vm.handleWindowResize();
+  });
+
+  shellView.webContents.on('console-message', (_event, level, message) => {
     if (level >= 2) {
       rendererLogger.info(`[${level >= 3 ? 'ERROR' : 'WARN'}] ${message}`);
     }
   });
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  shellView.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url);
     return { action: 'deny' };
   });
-
-  if (is.dev && process.env['ELECTRON_RENDERER_URL'] !== undefined) {
-    void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
-  } else {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
-  }
 
   return mainWindow;
 }
@@ -102,8 +95,6 @@ void app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window);
   });
 
-  // Inject Referer header for Twitter video CDN so <video> elements can load media.
-  // video.twimg.com rejects requests without a valid Referer from x.com.
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['https://video.twimg.com/*'] },
     (details, callback) => {
@@ -114,11 +105,6 @@ void app.whenReady().then(async () => {
     },
   );
 
-  // Start IPC handler registration — all handle() calls execute synchronously
-  // before the first internal await, so every Phase-1 channel used by the
-  // renderer (bbs:fetch-menu, fav:load, …) is available immediately.
-  // createWindow() is called in parallel so the renderer begins loading while
-  // the async parts of handler registration (plugin dynamic-imports) run.
   const ipcReady = registerIpcHandlers();
   const tHandlesRegistered = performance.now();
   startupLogger.info(`IPC handles registered in ${(tHandlesRegistered - t0).toFixed(1)}ms`);
@@ -128,13 +114,12 @@ void app.whenReady().then(async () => {
   const tWindowCreated = performance.now();
   startupLogger.info(`Window created in ${(tWindowCreated - tHandlesRegistered).toFixed(1)}ms`);
 
-  // Await completion so any unhandled rejection surfaces here.
   await ipcReady;
   const tReady = performance.now();
   startupLogger.info(`Startup complete in ${(tReady - t0).toFixed(1)}ms`);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (BaseWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });

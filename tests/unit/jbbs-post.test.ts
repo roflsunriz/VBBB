@@ -8,10 +8,7 @@ vi.mock('../../src/main/services/http-client', () => ({
   httpFetch: vi.fn(),
 }));
 
-import {
-  detectJBBSResultType,
-  postJBBSResponse,
-} from '../../src/main/services/plugins/jbbs-post';
+import { detectJBBSResultType, postJBBSResponse } from '../../src/main/services/plugins/jbbs-post';
 import { PostResultType, BoardType } from '../../src/types/domain';
 import type { Board, PostParams } from '../../src/types/domain';
 import { httpFetch } from '../../src/main/services/http-client';
@@ -105,9 +102,7 @@ describe('postJBBSResponse', () => {
   });
 
   it('returns success on HTTP 302 with empty body (redirect success)', async () => {
-    mockHttpFetch.mockResolvedValueOnce(
-      makeResponse({ status: 302, body: Buffer.from('') }),
-    );
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 302, body: Buffer.from('') }));
 
     const result = await postJBBSResponse(TEST_PARAMS, TEST_BOARD);
     expect(result.success).toBe(true);

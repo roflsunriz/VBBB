@@ -286,7 +286,10 @@ function parseCachedMenu(content: Buffer, domain: string): BBSMenu | null {
  * @param dataDir - Data directory path
  * @param domain - 5ch base domain for URL normalization (e.g. "5ch.io")
  */
-export function loadBBSMenuCache(dataDir: string, domain: string = DEFAULT_5CH_DOMAIN): BBSMenu | null {
+export function loadBBSMenuCache(
+  dataDir: string,
+  domain: string = DEFAULT_5CH_DOMAIN,
+): BBSMenu | null {
   const cachePath = `${dataDir}/bbs-menu-cache.json`;
   const content = readFileSafe(cachePath);
   if (content === null) return null;

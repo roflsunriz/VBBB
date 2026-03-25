@@ -16,11 +16,7 @@ import {
 } from '../../src/renderer/utils/next-thread-detect';
 import type { IpcChannelMap } from '../../src/types/ipc';
 import type { FavNode, FavFolder, FavSeparator, FavTree, FavItem } from '../../src/types/favorite';
-import type {
-  NgStringCondition,
-  NgNumericCondition,
-  NgTimeCondition,
-} from '../../src/types/ng';
+import type { NgStringCondition, NgNumericCondition, NgTimeCondition } from '../../src/types/ng';
 import {
   NgStringMatchMode,
   NgStringField,
@@ -78,9 +74,7 @@ describe('F4: 次スレ作成支援ボタン（findNextThread の動作）', () 
   });
 
   it('findNextThread returns undefined when title has no series number', () => {
-    const subjects: SubjectRecord[] = [
-      { title: '関連スレ', fileName: '2000000000.dat', count: 5 },
-    ];
+    const subjects: SubjectRecord[] = [{ title: '関連スレ', fileName: '2000000000.dat', count: 5 }];
     const result = findNextThread('シリーズ番号なし', '1000000000.dat', subjects);
     expect(result).toBeUndefined();
   });
@@ -155,9 +149,7 @@ describe('F2: ★クリックでお気に入りトグル（データモデルと
         },
       ],
     };
-    const found = tree.children.find(
-      (n): n is FavItem => n.kind === 'item' && n.url === threadUrl,
-    );
+    const found = tree.children.find((n): n is FavItem => n.kind === 'item' && n.url === threadUrl);
     expect(found).toBeDefined();
     expect(found?.id).toBe('fav-1');
   });
@@ -318,9 +310,7 @@ describe('B1: 巡回バグ修正（IPC とタイマー設定）', () => {
   });
 
   it('round:set-timer IPC channel accepts a full RoundTimerConfig', () => {
-    const args: IpcChannelMap['round:set-timer']['args'] = [
-      { enabled: true, intervalMinutes: 60 },
-    ];
+    const args: IpcChannelMap['round:set-timer']['args'] = [{ enabled: true, intervalMinutes: 60 }];
     expect(args[0]?.enabled).toBe(true);
     expect(args[0]?.intervalMinutes).toBe(60);
   });

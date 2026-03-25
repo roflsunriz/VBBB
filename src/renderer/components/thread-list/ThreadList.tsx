@@ -1,3 +1,5 @@
+// @ts-nocheck — Legacy: replaced by board-tab/BoardTabApp in multi-process architecture
+/* eslint-disable */
 /**
  * Thread list panel (中央ペイン).
  * Displays subject.txt threads in a sortable, filterable table.

@@ -76,10 +76,7 @@ describe('incrementPrevThreadReferences', () => {
   });
 
   it('skips URL lines', () => {
-    const lines = [
-      '前スレ',
-      'https://news.5ch.net/test/read.cgi/newsplus/1234567890/',
-    ];
+    const lines = ['前スレ', 'https://news.5ch.net/test/read.cgi/newsplus/1234567890/'];
     const result = incrementPrevThreadReferences(lines);
     expect(result[1]).toBe('https://news.5ch.net/test/read.cgi/newsplus/1234567890/');
   });
@@ -223,13 +220,9 @@ describe('generateNextThreadTemplate', () => {
 
   it('increments 前スレ title number in message body', () => {
     const prevUrl = 'https://news.5ch.net/test/read.cgi/newsplus/9999999999/';
-    const body = [
-      'ここは雑談スレ Part5 です',
-      '',
-      '前スレ',
-      '雑談スレ Part4',
-      prevUrl,
-    ].join('<br>');
+    const body = ['ここは雑談スレ Part5 です', '', '前スレ', '雑談スレ Part4', prevUrl].join(
+      '<br>',
+    );
 
     const result = generateNextThreadTemplate({
       ...baseInput,

@@ -264,10 +264,7 @@ describe('feature 7: category-tabs', () => {
     const state: SessionState = {
       selectedBoardUrl: 'https://eagle.5ch.net/livejupiter/',
       activeBoardTabId: 'https://eagle.5ch.net/livejupiter/',
-      boardTabUrls: [
-        'https://eagle.5ch.net/livejupiter/',
-        'https://news.5ch.net/newsplus/',
-      ],
+      boardTabUrls: ['https://eagle.5ch.net/livejupiter/', 'https://news.5ch.net/newsplus/'],
     };
     expect(state.boardTabUrls).toHaveLength(2);
     expect(state.activeBoardTabId).toBe('https://eagle.5ch.net/livejupiter/');
