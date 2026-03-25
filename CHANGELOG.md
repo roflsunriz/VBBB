@@ -5,6 +5,22 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-03-25
+
+### Fixed
+
+- JBBS（したらば）スレッドで重複レスが蓄積し表示が崩壊する問題を修正
+  - 差分取得の開始位置を行数 (`existing.length`) から最終レス番号 (`last.number`) に変更
+  - サーバー側あぼーんによるレス番号ギャップがある場合に、既存レスを再取得して重複エントリが蓄積していた
+  - 起動のたびにギャップ数だけ重複が増え、React のキー衝突 → レイアウト崩壊 → タブ間波及という連鎖を引き起こしていた
+- `parseJBBSDat` にレス番号による重複排除を追加し、既存の破損 DAT ファイルも正しく読み込めるように修正
+- 透明あぼーんレスを `displayResponses` 段階で除外するよう変更し、仮想スクロールの空ラッパー div が 0px で測定される問題を解消
+- 仮想スクロールの `getItemKey` にタブ ID プレフィックスを追加し、タブ間の測定キャッシュ衝突を防止
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `2.5.2` に更新
+
 ## [2.5.1] - 2026-03-23
 
 ### Changed
