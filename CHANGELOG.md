@@ -5,6 +5,63 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-03-25
+
+### BREAKING CHANGES
+
+- アプリケーション全体をマルチプロセスアーキテクチャに移行
+  - 板タブ・スレッドタブをそれぞれ独立した `WebContentsView` (Electron) で描画するよう変更
+  - 各タブが専用のレンダラープロセスで動作し、1タブのクラッシュや重い処理が他タブに影響しなくなった
+  - 仮想スクロールを廃止し、全レスを直接レンダリングする方式に単純化
+- 書き込み欄・プログラマティック書き込み欄・NGエディタを独立 `BrowserWindow` に分離
+  - 各エディタがメインウィンドウとは独立したOSウィンドウとして開き、位置・サイズが永続化される
+
+### Added
+
+- `ViewManager` (メインプロセス): `WebContentsView` のライフサイクル管理・レイアウト制御・タブ切替を統括
+- `PanelWindowManager` (メインプロセス): 書き込み欄等の独立ウィンドウのライフサイクル管理・状態永続化
+- 板タブ (`board-tab`) / スレッドタブ (`thread-tab`) 用の独立レンダラーエントリーポイント (HTML + React)
+- パネルエディタ (`panel-post-editor` / `panel-programmatic-post` / `panel-ng-editor`) 用の独立レンダラーエントリーポイント
+- `shell-store`: Shell レンダラー専用の Zustand ストアを新設し、板メニュー・お気に入り・NGルール・タブレジストリ等を管理
+- `board-tab-store` / `thread-tab-store`: 各タブプロセス専用の Zustand ストアを新設
+- タブ永続化機能: 開いているタブとスクロール位置をアプリ終了時に保存し、次回起動時に復元
+- IPC チャネルの拡充: `view:*` (タブ管理) / `panel:*` (パネルウィンドウ管理) チャネルを追加
+- モーダル表示時のZ順制御: アプリ内モーダル（外部板追加・認証・プロキシ設定等）表示中はタブ `WebContentsView` を非表示化し、モーダルが常に前面に表示されるよう制御
+- レスヘッダーのインタラクティブ化
+  - コテハン・ワッチョイ・ID・IP のオリジナル表示テキストを直接クリック/ホバー可能な `FilterLink` に変更
+  - 各要素クリックで即座にフィルタリング、ホバーで該当レスのプレビューポップアップを表示
+  - IP フィルタ機能を追加（IP 別の書き込み絞り込み）
+  - IP 逆引き機能を追加（🔍ボタンで国・地域・ISP 等を表示）
+- ステータスログの復元: `shell-store` の主要アクション（板メニュー取得・お気に入り操作・NGルール操作・タブ操作等）にステータスログ通知を追加
+
+### Fixed
+
+- パネル `BrowserWindow` クローズ時の `TypeError: Object has been destroyed` エラーを修正
+  - `close` / `closed` イベントハンドラーで `isDestroyed()` ガードを追加
+  - `destroyAll()` で `win.close()` の代わりに `win.destroy()` を使用し、シャットダウン時のイベント発火を抑制
+- `WebContentsView` 破棄時の `TypeError: Object has been destroyed` エラーを修正
+  - 破棄前に `webContents.isDestroyed()` チェックを追加し、`try-catch` で保護
+- アプリ終了時の `ViewManager not initialized` エラーを修正
+  - `getViewManagerOrNull()` / `getPanelWindowManagerOrNull()` を導入し、IPC ハンドラーでの null ガードを実装
+- `ThreadTabApp` のアンカー属性名バグを修正 (`dataset['anchor']` → `dataset['anchorNums']`)
+- レス番号クリックによる引用機能の復元 (`span` → `button` + `panel:open` IPC)
+- ホバーポップアップ（`>>N` レス参照）の復元
+- ID/IP/ワッチョイ/コテハン別フィルタ＋ホバープレビューの復元
+- 返信カウント (`+N`) ホバー対応の復元
+- 右クリックコンテキストメニューの復元（ここまで読んだ・レス引用・NG追加）
+- 縦タブ表示レイアウトの復元
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.0.0` に更新
+- `electron-vite` のビルド設定に複数レンダラーエントリーポイントを追加
+- レスヘッダーから独立した `>>` 引用ボタンを削除（レス番号クリックで引用可能なため不要）
+- CSS に `html, body, #root { height: 100%; overflow: hidden; }` を追加し、ヘッダー固定表示を実現
+
+### Removed
+
+- 仮想スクロール (`@tanstack/react-virtual` ベース) を廃止し、全レス直接レンダリングに移行
+
 ## [2.5.2] - 2026-03-25
 
 ### Fixed
