@@ -20,9 +20,6 @@ import type {
   RectBounds,
 } from '@shared/view-ipc';
 import type { Board } from '@shared/domain';
-import { createLogger } from './logger';
-
-const logger = createLogger('view-manager');
 
 interface BoardTabEntry {
   readonly meta: BoardTabMeta;
@@ -356,8 +353,14 @@ export class ViewManager {
     this.threadTabs.clear();
 
     if (this.shellView !== null) {
-      this.window.contentView.removeChildView(this.shellView);
-      this.shellView.webContents.close();
+      try {
+        if (!this.shellView.webContents.isDestroyed()) {
+          this.window.contentView.removeChildView(this.shellView);
+          this.shellView.webContents.close();
+        }
+      } catch {
+        // Already destroyed during window close
+      }
       this.shellView = null;
     }
 
@@ -424,10 +427,11 @@ export class ViewManager {
   private destroyTabView(view: WebContentsView | null): void {
     if (view === null) return;
     try {
+      if (view.webContents.isDestroyed()) return;
       this.window.contentView.removeChildView(view);
       view.webContents.close();
-    } catch (err) {
-      logger.info(`Failed to destroy tab view: ${String(err)}`);
+    } catch {
+      // View already destroyed by Electron during window close — safe to ignore
     }
   }
 

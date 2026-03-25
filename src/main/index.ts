@@ -73,9 +73,10 @@ function createWindow(): BaseWindow {
     vm.handleWindowResize();
   });
 
-  shellView.webContents.on('console-message', (_event, level, message) => {
-    if (level >= 2) {
-      rendererLogger.info(`[${level >= 3 ? 'ERROR' : 'WARN'}] ${message}`);
+  shellView.webContents.on('console-message', (event) => {
+    const { level, message } = event;
+    if (level === 'warning' || level === 'error') {
+      rendererLogger.info(`[${level === 'error' ? 'ERROR' : 'WARN'}] ${message}`);
     }
   });
 
