@@ -11,9 +11,15 @@ import type { HighlightSettings } from '@shared/settings';
 import type { BoardTabMeta, ThreadTabMeta, TabRegistryState } from '@shared/view-ipc';
 import { DEFAULT_HIGHLIGHT_SETTINGS } from '@shared/settings';
 import type { PostHistoryEntry } from '@shared/post-history';
+import type { StatusLogCategory, StatusLogLevel } from '@shared/status-log';
+import { useStatusLogStore } from '../../stores/status-log-store';
 
 function getApi(): Window['electronApi'] {
   return window.electronApi;
+}
+
+function pushStatus(category: StatusLogCategory, level: StatusLogLevel, message: string): void {
+  useStatusLogStore.getState().pushLog(category, level, message);
 }
 
 interface ShellState {
@@ -150,44 +156,55 @@ export const useShellStore = create<ShellState>((set, get) => ({
   statusMessage: '',
 
   fetchMenu: async () => {
-    set({ menuLoading: true, menuError: null });
+    set({ menuLoading: true, menuError: null, statusMessage: '板一覧を取得中...' });
+    pushStatus('board', 'info', '板一覧を取得中...');
     try {
       const menu = await getApi().invoke('bbs:fetch-menu');
-      set({ menu, menuLoading: false });
+      set({ menu, menuLoading: false, statusMessage: `${String(menu.categories.length)} カテゴリを読み込みました` });
+      pushStatus('board', 'success', `板一覧取得完了: ${String(menu.categories.length)} カテゴリ`);
       return menu;
     } catch (err) {
-      set({ menuError: String(err), menuLoading: false });
+      const message = err instanceof Error ? err.message : String(err);
+      set({ menuError: message, menuLoading: false, statusMessage: '板一覧の取得に失敗しました' });
+      pushStatus('board', 'error', `板一覧取得失敗: ${message}`);
       return null;
     }
   },
 
   fetchFavorites: async () => {
+    pushStatus('board', 'info', 'お気に入りを読み込み中...');
     const tree = await getApi().invoke('fav:load');
     set({ favorites: tree });
+    pushStatus('board', 'success', `お気に入り読み込み完了: ${String(tree.children.length)} 件`);
     return tree;
   },
 
   fetchNgRules: async () => {
+    pushStatus('board', 'info', 'NGルールを読み込み中...');
     const rules = await getApi().invoke('ng:get-rules');
     set({ ngRules: rules });
+    pushStatus('board', 'success', `NGルール読み込み完了: ${String(rules.length)} 件`);
     return rules;
   },
 
   loadPostHistory: async () => {
     const history = await getApi().invoke('post:load-history');
     set({ postHistory: history });
+    pushStatus('board', 'info', `投稿履歴読み込み完了: ${String(history.length)} 件`);
   },
 
   addFavorite: async (node) => {
     await getApi().invoke('fav:add', node);
     const tree = await getApi().invoke('fav:load');
     set({ favorites: tree });
+    pushStatus('board', 'success', 'お気に入りに追加しました');
   },
 
   removeFavorite: async (nodeId) => {
     await getApi().invoke('fav:remove', nodeId);
     const tree = await getApi().invoke('fav:load');
     set({ favorites: tree });
+    pushStatus('board', 'info', 'お気に入りから削除しました');
   },
 
   saveFavorites: async (tree) => {
@@ -222,34 +239,43 @@ export const useShellStore = create<ShellState>((set, get) => ({
   saveNgRules: async (rules) => {
     await getApi().invoke('ng:set-rules', rules);
     set({ ngRules: rules });
+    pushStatus('board', 'success', `NGルールを保存しました (${String(rules.length)} 件)`);
   },
 
   addNgRule: async (rule) => {
     await getApi().invoke('ng:add-rule', rule);
     const rules = await getApi().invoke('ng:get-rules');
     set({ ngRules: rules });
+    pushStatus('board', 'success', 'NGルールを追加しました');
   },
 
   removeNgRule: async (ruleId) => {
     await getApi().invoke('ng:remove-rule', ruleId);
     const rules = await getApi().invoke('ng:get-rules');
     set({ ngRules: rules });
+    pushStatus('board', 'info', 'NGルールを削除しました');
   },
 
   selectBoard: async (board) => {
+    pushStatus('board', 'info', `板タブを開いています: ${board.title}`);
     await getApi().invoke('view:create-board-tab', board.url, board.title, board.boardType);
+    pushStatus('board', 'success', `板タブを開きました: ${board.title}`);
   },
 
   openThread: async (boardUrl, threadId, title) => {
+    pushStatus('thread', 'info', `スレッドタブを開いています: ${title}`);
     await getApi().invoke('view:create-thread-tab', boardUrl, threadId, title);
+    pushStatus('thread', 'success', `スレッドタブを開きました: ${title}`);
   },
 
   closeTab: (tabId) => {
     void getApi().invoke('view:close-thread-tab', tabId);
+    pushStatus('thread', 'info', 'スレッドタブを閉じました');
   },
 
   closeBoardTab: (tabId) => {
     void getApi().invoke('view:close-board-tab', tabId);
+    pushStatus('board', 'info', '板タブを閉じました');
   },
 
   setActiveTab: (tabId) => {
