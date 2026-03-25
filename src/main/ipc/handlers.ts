@@ -107,8 +107,8 @@ import {
   loadUserAgentAsync,
   saveUserAgentAsync,
 } from '../services/user-agent-store';
-import { getViewManager } from '../view-manager-ref';
-import { getPanelWindowManager } from '../panel-window-ref';
+import { getViewManager, getViewManagerOrNull } from '../view-manager-ref';
+import { getPanelWindowManager, getPanelWindowManagerOrNull } from '../panel-window-ref';
 import type {
   ContentBounds,
   BoardTabInitData,
@@ -1001,7 +1001,9 @@ export async function registerIpcHandlers(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   handle('view:layout-update', (bounds: ContentBounds) => {
-    getViewManager().updateLayout(bounds);
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.updateLayout(bounds);
   });
 
   handle('view:create-board-tab', (boardUrl: string, _boardTitle: string, _boardType) => {
@@ -1068,7 +1070,21 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handleWithEvent('view:report-scroll-position', (event, scrollTop: number) => {
-    getViewManager().updateScrollPosition(event.sender.id, scrollTop);
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.updateScrollPosition(event.sender.id, scrollTop);
+  });
+
+  handle('view:hide-tab-views', () => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.hideAllTabViews();
+  });
+
+  handle('view:show-tab-views', () => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.showAllTabViews();
   });
 
   // ---------------------------------------------------------------------------
@@ -1076,18 +1092,15 @@ export async function registerIpcHandlers(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   handle('panel:open', (panelType, boardUrl, threadId, title, initialMessage, hasExposedIps) => {
-    getPanelWindowManager().openPanel(
-      panelType,
-      boardUrl,
-      threadId,
-      title,
-      initialMessage,
-      hasExposedIps,
-    );
+    const mgr = getPanelWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.openPanel(panelType, boardUrl, threadId, title, initialMessage, hasExposedIps);
   });
 
   handle('panel:close', (panelType, boardUrl, threadId) => {
-    getPanelWindowManager().closePanel(panelType, boardUrl, threadId);
+    const mgr = getPanelWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.closePanel(panelType, boardUrl, threadId);
   });
 
   handleWithEvent('panel:ready', (event): PanelWindowInitData => {

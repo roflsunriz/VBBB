@@ -173,6 +173,14 @@ export interface ViewIpcChannelMap {
     args: [scrollTop: number];
     result: void;
   };
+  'view:hide-tab-views': {
+    args: [];
+    result: void;
+  };
+  'view:show-tab-views': {
+    args: [];
+    result: void;
+  };
   'panel:open': {
     args: [
       panelType: PanelType,

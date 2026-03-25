@@ -155,10 +155,10 @@ export function ShellApp(): React.JSX.Element {
   );
 
   // Tab orientations
-  const [_isVerticalBoardTabs, toggleBoardTabOrientation] = useTabOrientation(
+  const [isVerticalBoardTabs, toggleBoardTabOrientation] = useTabOrientation(
     'vbbb-board-tab-orientation',
   );
-  const [_isVerticalThreadTabs, toggleThreadTabOrientation] = useTabOrientation(
+  const [isVerticalThreadTabs, toggleThreadTabOrientation] = useTabOrientation(
     'vbbb-thread-tab-orientation',
   );
 
@@ -392,6 +392,14 @@ export function ShellApp(): React.JSX.Element {
   const handleThemeChange = useCallback((newTheme: ThemeName) => {
     setTheme(newTheme);
   }, []);
+
+  useEffect(() => {
+    if (activeModal !== null) {
+      void window.electronApi.invoke('view:hide-tab-views');
+    } else {
+      void window.electronApi.invoke('view:show-tab-views');
+    }
+  }, [activeModal]);
 
   const closeModal = useCallback(() => {
     setActiveModal(null);
@@ -657,15 +665,32 @@ export function ShellApp(): React.JSX.Element {
         <ResizeHandle onResize={handleLeftResize} onResizeEnd={handleLeftResizeEnd} />
 
         {/* Center pane: Board tab bar + content placeholder */}
-        <div className="flex shrink-0 flex-col" style={{ width: centerWidth }}>
+        <div
+          className={`flex shrink-0 ${isVerticalBoardTabs === 'vertical' ? 'flex-row' : 'flex-col'}`}
+          style={{ width: centerWidth }}
+        >
           {/* Board tab bar */}
           {boardTabs.length > 0 && (
-            <div className="flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-              <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
+            <div
+              className={
+                isVerticalBoardTabs === 'vertical'
+                  ? 'flex w-28 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]'
+                  : 'flex h-7 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]'
+              }
+            >
+              <div
+                className={
+                  isVerticalBoardTabs === 'vertical'
+                    ? 'flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 py-1'
+                    : 'flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1'
+                }
+              >
                 {boardTabs.map((bt, i) => (
                   <div
                     key={bt.id}
-                    className={`group flex max-w-40 cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs ${
+                    className={`group flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs ${
+                      isVerticalBoardTabs === 'vertical' ? 'w-full' : 'max-w-40'
+                    } ${
                       bt.id === activeBoardTabId
                         ? 'bg-[var(--color-bg-active)] font-medium text-[var(--color-text-primary)]'
                         : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
@@ -675,7 +700,7 @@ export function ShellApp(): React.JSX.Element {
                     }}
                     {...getBoardTabDragProps(i)}
                   >
-                    <span className="truncate">{bt.title}</span>
+                    <span className="min-w-0 flex-1 truncate">{bt.title}</span>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -692,8 +717,12 @@ export function ShellApp(): React.JSX.Element {
               <button
                 type="button"
                 onClick={toggleBoardTabOrientation}
-                className="mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-                title="タブを縦に表示"
+                className={
+                  isVerticalBoardTabs === 'vertical'
+                    ? 'shrink-0 self-center rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+                    : 'mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+                }
+                title={isVerticalBoardTabs === 'vertical' ? 'タブを横に表示' : 'タブを縦に表示'}
               >
                 <MdiIcon path={mdiViewSequential} size={12} />
               </button>
@@ -706,14 +735,30 @@ export function ShellApp(): React.JSX.Element {
         <ResizeHandle onResize={handleCenterResize} onResizeEnd={handleCenterResizeEnd} />
 
         {/* Right pane: Thread tab bar + content placeholder */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div
+          className={`flex min-w-0 flex-1 ${isVerticalThreadTabs === 'vertical' ? 'flex-row' : 'flex-col'}`}
+        >
           {/* Thread tab bar */}
-          <div className="flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1">
+          <div
+            className={
+              isVerticalThreadTabs === 'vertical'
+                ? 'flex w-32 shrink-0 flex-col border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]'
+                : 'flex h-8 items-center border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]'
+            }
+          >
+            <div
+              className={
+                isVerticalThreadTabs === 'vertical'
+                  ? 'flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1 py-1'
+                  : 'flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1'
+              }
+            >
               {threadTabs.map((tab, i) => (
                 <div
                   key={tab.id}
-                  className={`group flex max-w-48 cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs ${
+                  className={`group flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs ${
+                    isVerticalThreadTabs === 'vertical' ? 'w-full' : 'max-w-48'
+                  } ${
                     tab.id === activeThreadTabId
                       ? 'bg-[var(--color-bg-active)] font-medium text-[var(--color-text-primary)]'
                       : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-secondary)]'
@@ -723,7 +768,7 @@ export function ShellApp(): React.JSX.Element {
                   }}
                   {...getThreadTabDragProps(i)}
                 >
-                  <span className="truncate">{tab.title}</span>
+                  <span className="min-w-0 flex-1 truncate">{tab.title}</span>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -740,8 +785,12 @@ export function ShellApp(): React.JSX.Element {
             <button
               type="button"
               onClick={toggleThreadTabOrientation}
-              className="mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-              title="タブを縦に表示"
+              className={
+                isVerticalThreadTabs === 'vertical'
+                  ? 'shrink-0 self-center rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+                  : 'mr-1 shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]'
+              }
+              title={isVerticalThreadTabs === 'vertical' ? 'タブを横に表示' : 'タブを縦に表示'}
             >
               <MdiIcon path={mdiViewSequential} size={12} />
             </button>

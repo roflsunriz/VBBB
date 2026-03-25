@@ -12,3 +12,7 @@ export function getPanelWindowManager(): PanelWindowManager {
   }
   return instance;
 }
+
+export function getPanelWindowManagerOrNull(): PanelWindowManager | null {
+  return instance;
+}

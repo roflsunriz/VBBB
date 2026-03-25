@@ -28,12 +28,16 @@ import {
   mdiEye,
   mdiVolumeHigh,
 } from '@mdi/js';
+import { createPortal } from 'react-dom';
 import type { Res } from '@shared/domain';
 import {
   type NgRule,
   type NgFilterResult,
   type NgMatchContext,
+  type NgStringField,
   AbonType,
+  NgStringField as NgStringFieldEnum,
+  NgStringMatchMode,
   NgTarget,
   NgFilterResult as NgFilterResultEnum,
 } from '@shared/ng';
@@ -57,7 +61,10 @@ import { ImageThumbnail } from '../components/thread-view/ImageThumbnail';
 import { InlineVideo } from '../components/thread-view/InlineVideo';
 import { InlineAudio } from '../components/thread-view/InlineAudio';
 import { isAsciiArt } from '../utils/aa-detect';
+import { extractId, extractWatchoi, extractKotehan } from '../utils/thread-analysis';
+import { extractIps } from '../utils/ip-detect';
 import { useScrollKeyboard } from '../hooks/use-scroll-keyboard';
+import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
 import type { ThreadTabInitData } from '@shared/view-ipc';
 
 const ThreadAnalysis = lazy(() =>
@@ -141,6 +148,37 @@ function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.Re
   );
 }
 
+function CountBadge({
+  count,
+  resNumbers,
+  onClick,
+  onHover,
+  onLeave,
+}: {
+  readonly count: number;
+  readonly resNumbers: readonly number[];
+  readonly onClick: () => void;
+  readonly onHover: (nums: readonly number[], x: number, y: number) => void;
+  readonly onLeave: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className="ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-link)] hover:underline"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onMouseEnter={(e) => {
+        onHover(resNumbers, e.clientX, e.clientY);
+      }}
+      onMouseLeave={onLeave}
+    >
+      ({count})
+    </button>
+  );
+}
+
 export function ThreadTabApp(): React.JSX.Element {
   const boardUrl = useThreadTabStore((s) => s.boardUrl);
   const threadId = useThreadTabStore((s) => s.threadId);
@@ -169,6 +207,16 @@ export function ThreadTabApp(): React.JSX.Element {
   const [popup, setPopup] = useState<PopupState | null>(null);
   const popupCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popupEnteredRef = useRef(false);
+  const [filterKey, setFilterKey] = useState<{
+    type: 'id' | 'watchoi' | 'kotehan';
+    value: string;
+  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    resNumber: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [openContextSubMenu, setOpenContextSubMenu] = useState<string | null>(null);
 
   const [inlineVideoInitialVolumePercent, setInlineVideoInitialVolumePercent] = useState(() => {
     try {
@@ -253,6 +301,19 @@ export function ThreadTabApp(): React.JSX.Element {
     };
   }, []);
 
+  // Close context menu on click outside
+  useEffect(() => {
+    if (contextMenu === null) return;
+    const handler = (): void => {
+      setContextMenu(null);
+      setOpenContextSubMenu(null);
+    };
+    document.addEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+    };
+  }, [contextMenu]);
+
   // Build reply map for popup navigation
   const replyMap = useMemo(() => {
     const map = new Map<number, number[]>();
@@ -274,6 +335,46 @@ export function ThreadTabApp(): React.JSX.Element {
 
   // Build ID count map
   const idCountMap = useMemo(() => buildIdCountMap(responses), [responses]);
+
+  const idResMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const res of responses) {
+      const id = extractId(res);
+      if (id !== null) {
+        const arr = map.get(id);
+        if (arr !== undefined) arr.push(res.number);
+        else map.set(id, [res.number]);
+      }
+    }
+    return map;
+  }, [responses]);
+
+  const watchoiResMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const res of responses) {
+      const w = extractWatchoi(res);
+      if (w !== null) {
+        const key = w.label;
+        const arr = map.get(key);
+        if (arr !== undefined) arr.push(res.number);
+        else map.set(key, [res.number]);
+      }
+    }
+    return map;
+  }, [responses]);
+
+  const kotehanResMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const res of responses) {
+      const k = extractKotehan(res);
+      if (k !== null) {
+        const arr = map.get(k);
+        if (arr !== undefined) arr.push(res.number);
+        else map.set(k, [res.number]);
+      }
+    }
+    return map;
+  }, [responses]);
 
   const postedResNumbers = useMemo(() => {
     const matched = new Set<number>();
@@ -392,14 +493,24 @@ export function ThreadTabApp(): React.JSX.Element {
     return matched;
   }, [deferredSearchQuery, responses, searchField]);
 
-  // Display responses (apply NG filter + search filter)
+  // Display responses (apply NG filter + search filter + filterKey)
   const displayResponses = useMemo(() => {
     let result = [...responses];
     if (searchFilteredResNumbers !== null) {
       result = result.filter((r) => searchFilteredResNumbers.has(r.number));
     }
+    if (filterKey !== null) {
+      const filterNums = new Set(
+        filterKey.type === 'id'
+          ? (idResMap.get(filterKey.value) ?? [])
+          : filterKey.type === 'watchoi'
+            ? (watchoiResMap.get(filterKey.value) ?? [])
+            : (kotehanResMap.get(filterKey.value) ?? []),
+      );
+      result = result.filter((r) => filterNums.has(r.number));
+    }
     return result;
-  }, [responses, searchFilteredResNumbers]);
+  }, [responses, searchFilteredResNumbers, filterKey, idResMap, watchoiResMap, kotehanResMap]);
 
   const allThreadImageUrls = useMemo(() => {
     const urls: string[] = [];
@@ -502,6 +613,92 @@ export function ThreadTabApp(): React.JSX.Element {
     }
   }, [inlineVideoInitialVolumeInput, inlineVideoInitialVolumePercent]);
 
+  const handleBodyMouseOver = useCallback((e: React.MouseEvent) => {
+    const target = e.target;
+    if (!(target instanceof HTMLAnchorElement)) return;
+    const numsAttr = target.dataset['anchorNums'];
+    if (numsAttr === undefined) return;
+    const nums = numsAttr
+      .split(',')
+      .map(Number)
+      .filter((n) => !Number.isNaN(n));
+    if (nums.length === 0) return;
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
+    popupEnteredRef.current = false;
+    setPopup({ resNumbers: nums, x: e.clientX, y: e.clientY, expandReplies: false });
+  }, []);
+
+  const handleBodyMouseOut = useCallback(() => {
+    if (popupEnteredRef.current) return;
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+    }
+    popupCloseTimerRef.current = setTimeout(() => {
+      if (!popupEnteredRef.current) {
+        setPopup(null);
+      }
+      popupCloseTimerRef.current = null;
+    }, 300);
+  }, []);
+
+  const handleAnchorHover = useCallback((nums: readonly number[], x: number, y: number) => {
+    if (popupCloseTimerRef.current !== null) {
+      clearTimeout(popupCloseTimerRef.current);
+      popupCloseTimerRef.current = null;
+    }
+    popupEnteredRef.current = false;
+    setPopup({ resNumbers: nums, x, y, expandReplies: false });
+  }, []);
+
+  const handleContextMenuAction = useCallback((resNumber: number, x: number, y: number) => {
+    setOpenContextSubMenu(null);
+    setContextMenu({ resNumber, x, y });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+    setOpenContextSubMenu(null);
+  }, []);
+
+  const handleAddNgFromRes = useCallback(
+    (field: NgStringField, token: string) => {
+      const normalizedToken = token.trim();
+      if (normalizedToken.length === 0) return;
+      let boardId = '';
+      try {
+        boardId =
+          new URL(boardUrl).pathname
+            .split('/')
+            .filter((s) => s.length > 0)
+            .pop() ?? '';
+      } catch {
+        /* ignore */
+      }
+      const rule: NgRule = {
+        id: crypto.randomUUID(),
+        condition: {
+          type: 'string',
+          matchMode: NgStringMatchMode.Plain,
+          fields: [field],
+          tokens: [normalizedToken],
+          negate: false,
+        },
+        target: NgTarget.Response,
+        abonType: AbonType.Normal,
+        boardId: boardId.length > 0 ? boardId : undefined,
+        threadId,
+        enabled: true,
+      };
+      void window.electronApi.invoke('ng:add-rule', rule);
+      setContextMenu(null);
+      setOpenContextSubMenu(null);
+    },
+    [boardUrl, threadId],
+  );
+
   // Render a single response
   const renderResponse = useCallback(
     (res: Res) => {
@@ -522,6 +719,14 @@ export function ThreadTabApp(): React.JSX.Element {
       const videoUrls = inlineMediaEnabled ? detectVideoUrls(res.body) : [];
       const audioUrls = inlineMediaEnabled ? detectAudioUrls(res.body) : [];
 
+      const resId = extractId(res);
+      const resWatchoi = extractWatchoi(res);
+      const resKotehan = extractKotehan(res);
+      const resIps = extractIps(res);
+      const idNums = resId !== null ? (idResMap.get(resId) ?? []) : [];
+      const watchoiNums = resWatchoi !== null ? (watchoiResMap.get(resWatchoi.label) ?? []) : [];
+      const kotehanNums = resKotehan !== null ? (kotehanResMap.get(resKotehan) ?? []) : [];
+
       if (isNormalAbon) {
         return (
           <div
@@ -540,30 +745,133 @@ export function ThreadTabApp(): React.JSX.Element {
           className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${
             isOwnPost ? 'bg-[var(--color-own-post-bg)]' : ''
           } ${ngResult !== undefined && revealAbon ? 'opacity-50' : ''}`}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            handleContextMenuAction(res.number, e.clientX, e.clientY);
+          }}
         >
           {/* Response header */}
-          <div className="mb-1 flex items-baseline gap-2 text-xs">
-            <span className="font-bold text-[var(--color-res-number)]">{res.number}</span>
-            <span
-              className="text-[var(--color-res-name)]"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
-            />
-            <span className="text-[var(--color-text-muted)]">
-              {renderDateTimeWithBe(res.dateTime, showRelativeTime)}
-            </span>
+          <div className="mb-1 flex flex-wrap items-baseline gap-2 text-xs">
             {replyCount > 0 && (
               <button
                 type="button"
-                className="text-[var(--color-accent)] hover:underline"
+                className="cursor-pointer rounded border-none bg-transparent p-0 text-[10px] font-semibold text-[var(--color-link)] hover:underline"
+                onMouseEnter={(e) => {
+                  if (replies !== undefined) {
+                    if (popupCloseTimerRef.current !== null) {
+                      clearTimeout(popupCloseTimerRef.current);
+                      popupCloseTimerRef.current = null;
+                    }
+                    popupEnteredRef.current = false;
+                    setPopup({
+                      resNumbers: replies,
+                      x: e.clientX,
+                      y: e.clientY,
+                      expandReplies: true,
+                    });
+                  }
+                }}
+                onMouseLeave={handleBodyMouseOut}
                 onClick={(e) => {
+                  e.stopPropagation();
                   if (replies !== undefined) {
                     handleAnchorClick(e, replies);
                   }
                 }}
+                title={`${String(replyCount)}件の返信`}
               >
-                返信({replyCount})
+                +{replyCount}
               </button>
             )}
+            <button
+              type="button"
+              className="cursor-pointer border-none bg-transparent p-0 font-bold text-[var(--color-res-number)] hover:underline"
+              onClick={() => {
+                void window.electronApi.invoke(
+                  'panel:open',
+                  'post-editor',
+                  boardUrl,
+                  threadId,
+                  title,
+                  `>>${String(res.number)}\n`,
+                );
+              }}
+              title={`>>${String(res.number)} を引用`}
+            >
+              {res.number}
+            </button>
+            <span className="inline-flex items-baseline gap-0.5">
+              <span
+                className="text-[var(--color-res-name)]"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
+              />
+              {resKotehan !== null && (
+                <CountBadge
+                  count={kotehanNums.length}
+                  resNumbers={kotehanNums}
+                  onClick={() => {
+                    setFilterKey({ type: 'kotehan', value: resKotehan });
+                  }}
+                  onHover={handleAnchorHover}
+                  onLeave={handleBodyMouseOut}
+                />
+              )}
+              {resWatchoi !== null && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterKey({ type: 'watchoi', value: resWatchoi.label });
+                    }}
+                    className="ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-link)] hover:underline"
+                    title="クリックでワッチョイ絞り込み"
+                  >
+                    {resWatchoi.prefix.normalize('NFKC')}
+                  </button>
+                  <CountBadge
+                    count={watchoiNums.length}
+                    resNumbers={watchoiNums}
+                    onClick={() => {
+                      setFilterKey({ type: 'watchoi', value: resWatchoi.label });
+                    }}
+                    onHover={handleAnchorHover}
+                    onLeave={handleBodyMouseOut}
+                  />
+                </>
+              )}
+            </span>
+            <span className="inline-flex items-baseline gap-0.5 text-[var(--color-text-muted)]">
+              {renderDateTimeWithBe(res.dateTime, showRelativeTime)}
+              {resId !== null && (
+                <>
+                  <span className="ml-0.5">ID:{resId}</span>
+                  <CountBadge
+                    count={idNums.length}
+                    resNumbers={idNums}
+                    onClick={() => {
+                      setFilterKey({ type: 'id', value: resId });
+                    }}
+                    onHover={handleAnchorHover}
+                    onLeave={handleBodyMouseOut}
+                  />
+                </>
+              )}
+            </span>
+            {resIps.length > 0 &&
+              resIps.map((ip) => (
+                <button
+                  key={ip}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void navigator.clipboard.writeText(ip);
+                  }}
+                  className="rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-warning)] hover:underline"
+                  title={`IP: ${ip} (クリックでコピー)`}
+                >
+                  {ip}
+                </button>
+              ))}
             <button
               type="button"
               className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
@@ -588,11 +896,16 @@ export function ThreadTabApp(): React.JSX.Element {
           <div
             className={`text-sm leading-relaxed text-[var(--color-text-primary)] ${isAA ? 'aa-font' : ''}`}
             dangerouslySetInnerHTML={{ __html: withUrls }}
+            onMouseOver={handleBodyMouseOver}
+            onMouseOut={handleBodyMouseOut}
             onClick={(e) => {
               const target = e.target;
-              if (target instanceof HTMLAnchorElement && target.dataset['anchor'] !== undefined) {
+              if (
+                target instanceof HTMLAnchorElement &&
+                target.dataset['anchorNums'] !== undefined
+              ) {
                 e.preventDefault();
-                const nums = target.dataset['anchor']
+                const nums = target.dataset['anchorNums']
                   .split(',')
                   .map(Number)
                   .filter((n) => !Number.isNaN(n));
@@ -653,6 +966,13 @@ export function ThreadTabApp(): React.JSX.Element {
       inlineVideoInitialVolumePercent,
       allThreadImageUrls,
       handleAnchorClick,
+      handleAnchorHover,
+      handleBodyMouseOver,
+      handleBodyMouseOut,
+      handleContextMenuAction,
+      idResMap,
+      watchoiResMap,
+      kotehanResMap,
       boardUrl,
       threadId,
       title,
@@ -873,6 +1193,30 @@ export function ThreadTabApp(): React.JSX.Element {
         )}
       </div>
 
+      {/* Filter banner */}
+      {filterKey !== null && (
+        <div className="flex items-center gap-2 border-b border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-3 py-1 text-xs">
+          <span className="text-[var(--color-text-muted)]">
+            フィルタ:{' '}
+            {filterKey.type === 'id'
+              ? 'ID'
+              : filterKey.type === 'watchoi'
+                ? 'ワッチョイ'
+                : 'コテハン'}{' '}
+            = {filterKey.value}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterKey(null);
+            }}
+            className="rounded px-1.5 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+          >
+            <MdiIcon path={mdiClose} size={12} />
+          </button>
+        </div>
+      )}
+
       {/* Responses — no virtual scrolling */}
       <div
         ref={scrollRef}
@@ -913,6 +1257,146 @@ export function ThreadTabApp(): React.JSX.Element {
           allThreadImageUrls={allThreadImageUrls}
         />
       )}
+
+      {/* Context menu */}
+      {contextMenu !== null &&
+        (() => {
+          const ctxRes = responses.find((r) => r.number === contextMenu.resNumber);
+          if (ctxRes === undefined) return null;
+          const ctxId = extractId(ctxRes);
+          const ctxWatchoi = extractWatchoi(ctxRes);
+          const ctxPlainName = stripHtml(ctxRes.name);
+          const ctxPlainBody = stripHtml(ctxRes.body.replace(/<br\s*\/?>/gi, '\n'));
+          const ngOptions: Array<{
+            key: string;
+            label: string;
+            field: NgStringField;
+            token: string;
+          }> = [];
+          if (ctxPlainName.length > 0) {
+            ngOptions.push({
+              key: 'name',
+              label: `名前: ${ctxPlainName}`,
+              field: NgStringFieldEnum.Name,
+              token: ctxPlainName,
+            });
+          }
+          if (ctxId !== null) {
+            ngOptions.push({
+              key: 'id',
+              label: `ID: ${ctxId}`,
+              field: NgStringFieldEnum.Id,
+              token: ctxId,
+            });
+          }
+          if (ctxWatchoi !== null) {
+            ngOptions.push({
+              key: 'watchoi',
+              label: `ワッチョイ: ${ctxWatchoi.label}`,
+              field: NgStringFieldEnum.Watchoi,
+              token: ctxWatchoi.label,
+            });
+          }
+          if (ctxPlainBody.length > 0) {
+            const bodyPreview =
+              ctxPlainBody.length > 40 ? `${ctxPlainBody.slice(0, 40)}…` : ctxPlainBody;
+            ngOptions.push({
+              key: 'body',
+              label: `本文: ${bodyPreview}`,
+              field: NgStringFieldEnum.Body,
+              token: ctxPlainBody,
+            });
+          }
+
+          return createPortal(
+            <ContextMenuContainer
+              x={contextMenu.x}
+              y={contextMenu.y}
+              className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+              onClick={handleCloseContextMenu}
+              role="menu"
+            >
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                onClick={() => {
+                  void window.electronApi.invoke('bbs:update-thread-index', boardUrl, threadId, {
+                    kokomade: ctxRes.number,
+                  });
+                  setContextMenu(null);
+                }}
+                role="menuitem"
+              >
+                ここまで読んだ
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                onClick={() => {
+                  void window.electronApi.invoke(
+                    'panel:open',
+                    'post-editor',
+                    boardUrl,
+                    threadId,
+                    title,
+                    `>>${String(ctxRes.number)}\n`,
+                  );
+                  setContextMenu(null);
+                }}
+                role="menuitem"
+              >
+                レスを引用 (&gt;&gt;{ctxRes.number})
+              </button>
+              <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  setOpenContextSubMenu('ng');
+                }}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  role="menuitem"
+                >
+                  NG追加
+                  <span className="ml-2 text-[9px]">▶</span>
+                </button>
+                {openContextSubMenu === 'ng' && (
+                  <div
+                    className="absolute top-0 left-full z-10 min-w-56 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+                    onMouseEnter={() => {
+                      setOpenContextSubMenu('ng');
+                    }}
+                  >
+                    {ngOptions.length > 0 ? (
+                      ngOptions.map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          className="w-full truncate px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                          title={opt.label}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddNgFromRes(opt.field, opt.token);
+                          }}
+                          role="menuitem"
+                        >
+                          {opt.label}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="block px-3 py-1.5 text-xs text-[var(--color-text-muted)]">
+                        追加可能なNG項目がありません
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </ContextMenuContainer>,
+            document.body,
+          );
+        })()}
     </section>
   );
 }

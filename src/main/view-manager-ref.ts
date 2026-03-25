@@ -16,3 +16,7 @@ export function getViewManager(): ViewManager {
   }
   return viewManager;
 }
+
+export function getViewManagerOrNull(): ViewManager | null {
+  return viewManager;
+}

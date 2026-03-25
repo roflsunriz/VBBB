@@ -113,27 +113,30 @@ export class PanelWindowManager {
       hasExposedIps,
     };
 
+    const webContentsId = win.webContents.id;
     this.panels.set(keyStr, win);
-    this.panelInitData.set(win.webContents.id, initData);
+    this.panelInitData.set(webContentsId, initData);
 
     win.once('ready-to-show', () => {
       win.show();
     });
 
     win.on('close', () => {
-      const bounds = win.getBounds();
-      this.panelStates[stateKey] = {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-      };
-      this.saveStates();
+      if (!win.isDestroyed()) {
+        const bounds = win.getBounds();
+        this.panelStates[stateKey] = {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        };
+        this.saveStates();
+      }
     });
 
     win.on('closed', () => {
       this.panels.delete(keyStr);
-      this.panelInitData.delete(win.webContents.id);
+      this.panelInitData.delete(webContentsId);
     });
 
     const page = `panel-${panelType}.html`;
@@ -162,7 +165,7 @@ export class PanelWindowManager {
   destroyAll(): void {
     for (const win of this.panels.values()) {
       if (!win.isDestroyed()) {
-        win.close();
+        win.destroy();
       }
     }
     this.panels.clear();

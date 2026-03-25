@@ -471,6 +471,20 @@ export class ViewManager {
     }
   }
 
+  private tabViewsHidden = false;
+
+  hideAllTabViews(): void {
+    this.tabViewsHidden = true;
+    this.hideActiveBoardTab();
+    this.hideActiveThreadTab();
+  }
+
+  showAllTabViews(): void {
+    this.tabViewsHidden = false;
+    this.positionActiveBoardTab();
+    this.positionActiveThreadTab();
+  }
+
   private hideActiveBoardTab(): void {
     if (this.activeBoardTabId === null) return;
     const entry = this.boardTabs.get(this.activeBoardTabId);
@@ -488,6 +502,7 @@ export class ViewManager {
   }
 
   private positionActiveBoardTab(): void {
+    if (this.tabViewsHidden) return;
     if (this.activeBoardTabId === null || this.layoutBounds === null) return;
     const entry = this.boardTabs.get(this.activeBoardTabId);
     if (entry?.view === undefined || entry.view === null) return;
@@ -495,6 +510,7 @@ export class ViewManager {
   }
 
   private positionActiveThreadTab(): void {
+    if (this.tabViewsHidden) return;
     if (this.activeThreadTabId === null || this.layoutBounds === null) return;
     const entry = this.threadTabs.get(this.activeThreadTabId);
     if (entry?.view === undefined || entry.view === null) return;
