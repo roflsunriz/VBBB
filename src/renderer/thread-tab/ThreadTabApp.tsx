@@ -61,11 +61,12 @@ import { ImageThumbnail } from '../components/thread-view/ImageThumbnail';
 import { InlineVideo } from '../components/thread-view/InlineVideo';
 import { InlineAudio } from '../components/thread-view/InlineAudio';
 import { isAsciiArt } from '../utils/aa-detect';
-import { extractId, extractWatchoi, extractKotehan } from '../utils/thread-analysis';
+import { extractId, extractWatchoi, extractKotehan, type WatchoiInfo } from '../utils/thread-analysis';
 import { extractIps } from '../utils/ip-detect';
 import { useScrollKeyboard } from '../hooks/use-scroll-keyboard';
 import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
 import type { ThreadTabInitData } from '@shared/view-ipc';
+import type { IpLookupResult } from '@shared/ipc';
 
 const ThreadAnalysis = lazy(() =>
   import('../components/thread-view/ThreadAnalysis').then((m) => ({
@@ -148,34 +149,181 @@ function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.Re
   );
 }
 
-function CountBadge({
+function FilterLink({
+  children,
   count,
   resNumbers,
-  onClick,
+  onFilter,
   onHover,
   onLeave,
+  className,
 }: {
+  readonly children: React.ReactNode;
   readonly count: number;
   readonly resNumbers: readonly number[];
-  readonly onClick: () => void;
+  readonly onFilter: () => void;
   readonly onHover: (nums: readonly number[], x: number, y: number) => void;
   readonly onLeave: () => void;
+  readonly className?: string;
 }): React.JSX.Element {
   return (
     <button
       type="button"
-      className="ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-link)] hover:underline"
+      className={`cursor-pointer border-none bg-transparent p-0 hover:underline ${className ?? ''}`}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onFilter();
       }}
       onMouseEnter={(e) => {
         onHover(resNumbers, e.clientX, e.clientY);
       }}
       onMouseLeave={onLeave}
+      title={`${String(count)}件 — クリックで絞り込み`}
     >
-      ({count})
+      {children}
+      {count > 1 && (
+        <span className="ml-0.5 text-[10px] opacity-60">({count})</span>
+      )}
     </button>
+  );
+}
+
+/**
+ * Render the name field decomposed into clickable FilterLink segments.
+ *
+ * Input `res.name` is HTML like:
+ *   `ゴンザレス (ﾜｯﾁｮｲW eb80-pWbN [240f:7e:9d00:1:*])`
+ *
+ * Each extracted part (kotehan, watchoi, IP) becomes a FilterLink;
+ * non-linkable punctuation is rendered as plain text.
+ */
+function renderNameField(
+  res: Res,
+  kotehan: string | null,
+  kotehanNums: readonly number[],
+  watchoi: WatchoiInfo | null,
+  watchoiNums: readonly number[],
+  ips: readonly string[],
+  ipNumsMap: ReadonlyMap<string, readonly number[]>,
+  setFilterKey: (key: { type: 'kotehan' | 'watchoi' | 'ip'; value: string }) => void,
+  onHover: (nums: readonly number[], x: number, y: number) => void,
+  onLeave: () => void,
+  onIpLookup: (ip: string) => void,
+): React.JSX.Element {
+  const plain = res.name.replace(/<[^>]+>/g, '');
+  const namePart = plain.replace(/\([^)]*\)/g, '').trim();
+
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-0.5 text-xs">
+      {kotehan !== null ? (
+        <FilterLink
+          count={kotehanNums.length}
+          resNumbers={kotehanNums}
+          onFilter={() => {
+            setFilterKey({ type: 'kotehan', value: kotehan });
+          }}
+          onHover={onHover}
+          onLeave={onLeave}
+          className="text-[var(--color-res-name)]"
+        >
+          {namePart}
+        </FilterLink>
+      ) : (
+        <span className="text-[var(--color-res-name)]">{namePart}</span>
+      )}
+      {watchoi !== null && (
+        <>
+          <span className="text-[var(--color-text-muted)]">(</span>
+          <FilterLink
+            count={watchoiNums.length}
+            resNumbers={watchoiNums}
+            onFilter={() => {
+              setFilterKey({ type: 'watchoi', value: watchoi.label });
+            }}
+            onHover={onHover}
+            onLeave={onLeave}
+            className="text-[var(--color-link)]"
+          >
+            {watchoi.prefix} {watchoi.ipHash}-{watchoi.uaHash}
+          </FilterLink>
+          {ips.length > 0 && (
+            <>
+              <span className="text-[var(--color-text-muted)]"> [</span>
+              {ips.map((ip, idx) => {
+                const nums = ipNumsMap.get(ip) ?? [];
+                return (
+                  <span key={ip} className="inline-flex items-baseline">
+                    {idx > 0 && <span className="text-[var(--color-text-muted)]">, </span>}
+                    <FilterLink
+                      count={nums.length}
+                      resNumbers={nums}
+                      onFilter={() => {
+                        setFilterKey({ type: 'ip', value: ip });
+                      }}
+                      onHover={onHover}
+                      onLeave={onLeave}
+                      className="text-[var(--color-warning)]"
+                    >
+                      {ip}
+                    </FilterLink>
+                    <button
+                      type="button"
+                      className="ml-0.5 cursor-pointer border-none bg-transparent p-0 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIpLookup(ip);
+                      }}
+                      title={`${ip} の逆引き`}
+                    >
+                      🔍
+                    </button>
+                  </span>
+                );
+              })}
+              <span className="text-[var(--color-text-muted)]">]</span>
+            </>
+          )}
+          <span className="text-[var(--color-text-muted)]">)</span>
+        </>
+      )}
+      {watchoi === null && ips.length > 0 && (
+        <>
+          <span className="text-[var(--color-text-muted)]">[</span>
+          {ips.map((ip, idx) => {
+            const nums = ipNumsMap.get(ip) ?? [];
+            return (
+              <span key={ip} className="inline-flex items-baseline">
+                {idx > 0 && <span className="text-[var(--color-text-muted)]">, </span>}
+                <FilterLink
+                  count={nums.length}
+                  resNumbers={nums}
+                  onFilter={() => {
+                    setFilterKey({ type: 'ip', value: ip });
+                  }}
+                  onHover={onHover}
+                  onLeave={onLeave}
+                  className="text-[var(--color-warning)]"
+                >
+                  {ip}
+                </FilterLink>
+                <button
+                  type="button"
+                  className="ml-0.5 cursor-pointer border-none bg-transparent p-0 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onIpLookup(ip);
+                  }}
+                  title={`${ip} の逆引き`}
+                >
+                  🔍
+                </button>
+              </span>
+            );
+          })}
+          <span className="text-[var(--color-text-muted)]">]</span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -208,7 +356,7 @@ export function ThreadTabApp(): React.JSX.Element {
   const popupCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popupEnteredRef = useRef(false);
   const [filterKey, setFilterKey] = useState<{
-    type: 'id' | 'watchoi' | 'kotehan';
+    type: 'id' | 'watchoi' | 'kotehan' | 'ip';
     value: string;
   } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -217,6 +365,18 @@ export function ThreadTabApp(): React.JSX.Element {
     y: number;
   } | null>(null);
   const [openContextSubMenu, setOpenContextSubMenu] = useState<string | null>(null);
+  const [ipLookupPopup, setIpLookupPopup] = useState<{
+    ip: string;
+    result: IpLookupResult | null;
+    loading: boolean;
+  } | null>(null);
+
+  const handleIpLookup = useCallback((ip: string) => {
+    setIpLookupPopup({ ip, result: null, loading: true });
+    void window.electronApi.invoke('ip:lookup', ip).then((result) => {
+      setIpLookupPopup({ ip, result, loading: false });
+    });
+  }, []);
 
   const [inlineVideoInitialVolumePercent, setInlineVideoInitialVolumePercent] = useState(() => {
     try {
@@ -376,6 +536,18 @@ export function ThreadTabApp(): React.JSX.Element {
     return map;
   }, [responses]);
 
+  const ipResMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const res of responses) {
+      for (const ip of extractIps(res)) {
+        const arr = map.get(ip);
+        if (arr !== undefined) arr.push(res.number);
+        else map.set(ip, [res.number]);
+      }
+    }
+    return map;
+  }, [responses]);
+
   const postedResNumbers = useMemo(() => {
     const matched = new Set<number>();
     if (!highlightSettings.highlightOwnPosts || postHistory.length === 0) return matched;
@@ -505,12 +677,14 @@ export function ThreadTabApp(): React.JSX.Element {
           ? (idResMap.get(filterKey.value) ?? [])
           : filterKey.type === 'watchoi'
             ? (watchoiResMap.get(filterKey.value) ?? [])
-            : (kotehanResMap.get(filterKey.value) ?? []),
+            : filterKey.type === 'ip'
+              ? (ipResMap.get(filterKey.value) ?? [])
+              : (kotehanResMap.get(filterKey.value) ?? []),
       );
       result = result.filter((r) => filterNums.has(r.number));
     }
     return result;
-  }, [responses, searchFilteredResNumbers, filterKey, idResMap, watchoiResMap, kotehanResMap]);
+  }, [responses, searchFilteredResNumbers, filterKey, idResMap, watchoiResMap, kotehanResMap, ipResMap]);
 
   const allThreadImageUrls = useMemo(() => {
     const urls: string[] = [];
@@ -726,6 +900,7 @@ export function ThreadTabApp(): React.JSX.Element {
       const idNums = resId !== null ? (idResMap.get(resId) ?? []) : [];
       const watchoiNums = resWatchoi !== null ? (watchoiResMap.get(resWatchoi.label) ?? []) : [];
       const kotehanNums = resKotehan !== null ? (kotehanResMap.get(resKotehan) ?? []) : [];
+      const ipNumsMap = new Map(resIps.map((ip) => [ip, ipResMap.get(ip) ?? []] as const));
 
       if (isNormalAbon) {
         return (
@@ -800,96 +975,36 @@ export function ThreadTabApp(): React.JSX.Element {
             >
               {res.number}
             </button>
-            <span className="inline-flex items-baseline gap-0.5">
-              <span
-                className="text-[var(--color-res-name)]"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(res.name) }}
-              />
-              {resKotehan !== null && (
-                <CountBadge
-                  count={kotehanNums.length}
-                  resNumbers={kotehanNums}
-                  onClick={() => {
-                    setFilterKey({ type: 'kotehan', value: resKotehan });
-                  }}
-                  onHover={handleAnchorHover}
-                  onLeave={handleBodyMouseOut}
-                />
-              )}
-              {resWatchoi !== null && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilterKey({ type: 'watchoi', value: resWatchoi.label });
-                    }}
-                    className="ml-0.5 cursor-pointer rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-link)] hover:underline"
-                    title="クリックでワッチョイ絞り込み"
-                  >
-                    {resWatchoi.prefix.normalize('NFKC')}
-                  </button>
-                  <CountBadge
-                    count={watchoiNums.length}
-                    resNumbers={watchoiNums}
-                    onClick={() => {
-                      setFilterKey({ type: 'watchoi', value: resWatchoi.label });
-                    }}
-                    onHover={handleAnchorHover}
-                    onLeave={handleBodyMouseOut}
-                  />
-                </>
-              )}
-            </span>
+            {renderNameField(
+              res,
+              resKotehan,
+              kotehanNums,
+              resWatchoi,
+              watchoiNums,
+              resIps,
+              ipNumsMap,
+              setFilterKey,
+              handleAnchorHover,
+              handleBodyMouseOut,
+              handleIpLookup,
+            )}
             <span className="inline-flex items-baseline gap-0.5 text-[var(--color-text-muted)]">
               {renderDateTimeWithBe(res.dateTime, showRelativeTime)}
               {resId !== null && (
-                <>
-                  <span className="ml-0.5">ID:{resId}</span>
-                  <CountBadge
-                    count={idNums.length}
-                    resNumbers={idNums}
-                    onClick={() => {
-                      setFilterKey({ type: 'id', value: resId });
-                    }}
-                    onHover={handleAnchorHover}
-                    onLeave={handleBodyMouseOut}
-                  />
-                </>
+                <FilterLink
+                  count={idNums.length}
+                  resNumbers={idNums}
+                  onFilter={() => {
+                    setFilterKey({ type: 'id', value: resId });
+                  }}
+                  onHover={handleAnchorHover}
+                  onLeave={handleBodyMouseOut}
+                  className="ml-0.5 text-[var(--color-text-muted)]"
+                >
+                  ID:{resId}
+                </FilterLink>
               )}
             </span>
-            {resIps.length > 0 &&
-              resIps.map((ip) => (
-                <button
-                  key={ip}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void navigator.clipboard.writeText(ip);
-                  }}
-                  className="rounded bg-[var(--color-bg-tertiary)] px-1 py-0 text-[10px] text-[var(--color-warning)] hover:underline"
-                  title={`IP: ${ip} (クリックでコピー)`}
-                >
-                  {ip}
-                </button>
-              ))}
-            <button
-              type="button"
-              className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
-              onClick={() => {
-                const quoteMsg = `>>${String(res.number)}\n`;
-                void window.electronApi.invoke(
-                  'panel:open',
-                  'post-editor',
-                  boardUrl,
-                  threadId,
-                  title,
-                  quoteMsg,
-                );
-              }}
-              title="引用レス"
-            >
-              &gt;&gt;
-            </button>
           </div>
 
           {/* Response body */}
@@ -970,9 +1085,11 @@ export function ThreadTabApp(): React.JSX.Element {
       handleBodyMouseOver,
       handleBodyMouseOut,
       handleContextMenuAction,
+      handleIpLookup,
       idResMap,
       watchoiResMap,
       kotehanResMap,
+      ipResMap,
       boardUrl,
       threadId,
       title,
@@ -1202,7 +1319,9 @@ export function ThreadTabApp(): React.JSX.Element {
               ? 'ID'
               : filterKey.type === 'watchoi'
                 ? 'ワッチョイ'
-                : 'コテハン'}{' '}
+                : filterKey.type === 'ip'
+                  ? 'IP'
+                  : 'コテハン'}{' '}
             = {filterKey.value}
           </span>
           <button
@@ -1397,6 +1516,62 @@ export function ThreadTabApp(): React.JSX.Element {
             document.body,
           );
         })()}
+
+      {/* IP lookup popup */}
+      {ipLookupPopup !== null &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={() => {
+              setIpLookupPopup(null);
+            }}
+            role="presentation"
+          >
+            <div
+              className="min-w-64 max-w-sm rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-4 shadow-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              role="dialog"
+            >
+              <h3 className="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                IP逆引き: {ipLookupPopup.ip}
+              </h3>
+              {ipLookupPopup.loading ? (
+                <p className="text-xs text-[var(--color-text-muted)]">読み込み中…</p>
+              ) : ipLookupPopup.result !== null ? (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt className="font-medium text-[var(--color-text-muted)]">IP</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.ip}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">国</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.country}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">地域</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.region}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">都市</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.city}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">ISP</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.isp}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">組織</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.org}</dd>
+                  <dt className="font-medium text-[var(--color-text-muted)]">AS</dt>
+                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.as}</dd>
+                </dl>
+              ) : (
+                <p className="text-xs text-[var(--color-text-muted)]">逆引きに失敗しました</p>
+              )}
+              <button
+                type="button"
+                className="mt-3 w-full rounded bg-[var(--color-bg-tertiary)] px-3 py-1.5 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                onClick={() => {
+                  setIpLookupPopup(null);
+                }}
+              >
+                閉じる
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 }
