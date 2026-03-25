@@ -12,10 +12,8 @@ import { test, expect } from './fixtures/electron-fixture';
 
 test.describe('アプリ起動', () => {
   test('ウィンドウタイトルに VBBB が含まれる', async ({ electronApp, window: _window }) => {
-    // _window を要求することで window フィクスチャが起動し、
-    // header が表示されるまで待機してからタイトルを取得する
-    const title = await electronApp.evaluate(({ BrowserWindow }) => {
-      return BrowserWindow.getAllWindows()[0]?.getTitle() ?? '';
+    const title = await electronApp.evaluate(({ BaseWindow }) => {
+      return BaseWindow.getAllWindows()[0]?.getTitle() ?? '';
     });
     expect(title).toContain('VBBB');
   });
