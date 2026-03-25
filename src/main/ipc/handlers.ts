@@ -108,7 +108,13 @@ import {
   saveUserAgentAsync,
 } from '../services/user-agent-store';
 import { getViewManager } from '../view-manager-ref';
-import type { ContentBounds, BoardTabInitData, ThreadTabInitData } from '@shared/view-ipc';
+import { getPanelWindowManager } from '../panel-window-ref';
+import type {
+  ContentBounds,
+  BoardTabInitData,
+  ThreadTabInitData,
+  PanelWindowInitData,
+} from '@shared/view-ipc';
 
 const logger = createLogger('ipc');
 const BBS_MENU_URLS_FILE = 'bbs-menu-urls.json';
@@ -165,7 +171,7 @@ const boardCache = new Map<string, Board>();
 let bbsMenuUrls: readonly string[] = [...DEFAULT_BBS_MENU_URLS];
 let fivechDomain: string = DEFAULT_5CH_DOMAIN;
 
-function lookupBoard(boardUrl: string): Board {
+export function lookupBoard(boardUrl: string): Board {
   const cached = boardCache.get(boardUrl);
   if (cached !== undefined) return cached;
   // Fallback: construct minimal Board from URL
@@ -1059,6 +1065,37 @@ export async function registerIpcHandlers(): Promise<void> {
 
   handle('view:update-thread-tab-title', (tabId: string, title: string) => {
     getViewManager().updateThreadTabTitle(tabId, title);
+  });
+
+  handleWithEvent('view:report-scroll-position', (event, scrollTop: number) => {
+    getViewManager().updateScrollPosition(event.sender.id, scrollTop);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Panel window IPC handlers
+  // ---------------------------------------------------------------------------
+
+  handle('panel:open', (panelType, boardUrl, threadId, title, initialMessage, hasExposedIps) => {
+    getPanelWindowManager().openPanel(
+      panelType,
+      boardUrl,
+      threadId,
+      title,
+      initialMessage,
+      hasExposedIps,
+    );
+  });
+
+  handle('panel:close', (panelType, boardUrl, threadId) => {
+    getPanelWindowManager().closePanel(panelType, boardUrl, threadId);
+  });
+
+  handleWithEvent('panel:ready', (event): PanelWindowInitData => {
+    const data = getPanelWindowManager().getInitData(event.sender.id);
+    if (data === null) {
+      throw new Error(`No panel init data for webContents ${String(event.sender.id)}`);
+    }
+    return data;
   });
 
   logger.info('IPC handlers registered');

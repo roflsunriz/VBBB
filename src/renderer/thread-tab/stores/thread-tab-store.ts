@@ -50,6 +50,7 @@ interface ThreadTabState {
   loading: boolean;
   error: string | null;
   scrollTop: number;
+  initialScrollTop: number;
   kokomade: number;
   isDatFallen: boolean;
 
@@ -91,6 +92,7 @@ export const useThreadTabStore = create<ThreadTabState>((set, get) => ({
   loading: false,
   error: null,
   scrollTop: 0,
+  initialScrollTop: 0,
   kokomade: 0,
   isDatFallen: false,
 
@@ -112,6 +114,7 @@ export const useThreadTabStore = create<ThreadTabState>((set, get) => ({
       boardUrl: initData.boardUrl,
       threadId: initData.threadId,
       title: initData.title,
+      initialScrollTop: initData.scrollTop ?? 0,
     });
 
     // Fetch thread data and supporting data in parallel

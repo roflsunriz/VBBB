@@ -20,6 +20,7 @@ import type {
   RectBounds,
 } from '@shared/view-ipc';
 import type { Board } from '@shared/domain';
+import type { SavedTab, SessionState } from '@shared/history';
 
 interface BoardTabEntry {
   readonly meta: BoardTabMeta;
@@ -59,6 +60,7 @@ export class ViewManager {
 
   private readonly webContentsToTabId = new Map<number, string>();
   private readonly webContentsToTabType = new Map<number, 'board' | 'thread'>();
+  private readonly scrollPositions = new Map<string, number>();
 
   constructor(window: BaseWindow) {
     this.window = window;
@@ -256,11 +258,13 @@ export class ViewManager {
     if (tabId === undefined) return null;
     const entry = this.threadTabs.get(tabId);
     if (entry === undefined) return null;
+    const scrollTop = this.scrollPositions.get(tabId) ?? 0;
     return {
       tabId,
       boardUrl: entry.meta.boardUrl,
       threadId: entry.meta.threadId,
       title: entry.meta.title,
+      ...(scrollTop > 0 ? { scrollTop } : {}),
     };
   }
 
@@ -379,7 +383,7 @@ export class ViewManager {
       boardUrl: e.meta.boardUrl,
       threadId: e.meta.threadId,
       title: e.meta.title,
-      scrollTop: 0,
+      scrollTop: this.scrollPositions.get(e.meta.id) ?? 0,
     }));
   }
 
@@ -394,6 +398,38 @@ export class ViewManager {
 
   getActiveThreadTabId(): string | null {
     return this.activeThreadTabId;
+  }
+
+  updateScrollPosition(webContentsId: number, scrollTop: number): void {
+    const tabId = this.webContentsToTabId.get(webContentsId);
+    if (tabId === undefined) return;
+    this.scrollPositions.set(tabId, scrollTop);
+  }
+
+  restoreTabs(
+    savedTabs: readonly SavedTab[],
+    session: SessionState,
+    lookupBoard: (url: string) => Board,
+  ): void {
+    const boardUrls = session.boardTabUrls ?? [];
+    for (const url of boardUrls) {
+      const board = lookupBoard(url);
+      this.createBoardTab(board);
+    }
+
+    for (const tab of savedTabs) {
+      const tabId = this.createThreadTab(tab.boardUrl, tab.threadId, tab.title);
+      if (tab.scrollTop !== undefined && tab.scrollTop > 0) {
+        this.scrollPositions.set(tabId, tab.scrollTop);
+      }
+    }
+
+    if (session.activeBoardTabId !== undefined) {
+      this.switchBoardTab(session.activeBoardTabId);
+    }
+    if (session.activeThreadTabId !== undefined) {
+      this.switchThreadTab(session.activeThreadTabId);
+    }
   }
 
   // ---------------------------------------------------------------------------

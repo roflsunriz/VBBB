@@ -60,21 +60,10 @@ import { isAsciiArt } from '../utils/aa-detect';
 import { useScrollKeyboard } from '../hooks/use-scroll-keyboard';
 import type { ThreadTabInitData } from '@shared/view-ipc';
 
-const PostEditor = lazy(() =>
-  import('../components/post-editor/PostEditor').then((m) => ({ default: m.PostEditor })),
-);
-const ProgrammaticPost = lazy(() =>
-  import('../components/post-editor/ProgrammaticPost').then((m) => ({
-    default: m.ProgrammaticPost,
-  })),
-);
 const ThreadAnalysis = lazy(() =>
   import('../components/thread-view/ThreadAnalysis').then((m) => ({
     default: m.ThreadAnalysis,
   })),
-);
-const NgEditor = lazy(() =>
-  import('../components/ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
 );
 
 type SearchField = 'all' | 'name' | 'id' | 'body' | 'watchoi';
@@ -159,28 +148,21 @@ export function ThreadTabApp(): React.JSX.Element {
   const responses = useThreadTabStore((s) => s.responses);
   const loading = useThreadTabStore((s) => s.loading);
   const isDatFallen = useThreadTabStore((s) => s.isDatFallen);
-  const postEditorOpen = useThreadTabStore((s) => s.postEditorOpen);
   const postEditorInitialMessage = useThreadTabStore((s) => s.postEditorInitialMessage);
   const analysisOpen = useThreadTabStore((s) => s.analysisOpen);
-  const progPostOpen = useThreadTabStore((s) => s.progPostOpen);
   const ngRules = useThreadTabStore((s) => s.ngRules);
   const highlightSettings = useThreadTabStore((s) => s.highlightSettings);
   const postHistory = useThreadTabStore((s) => s.postHistory);
+  const initialScrollTop = useThreadTabStore((s) => s.initialScrollTop);
   const initialize = useThreadTabStore((s) => s.initialize);
   const refreshThread = useThreadTabStore((s) => s.refreshThread);
-  const togglePostEditor = useThreadTabStore((s) => s.togglePostEditor);
-  const closePostEditor = useThreadTabStore((s) => s.closePostEditor);
-  const openPostEditorWithQuote = useThreadTabStore((s) => s.openPostEditorWithQuote);
   const toggleAnalysis = useThreadTabStore((s) => s.toggleAnalysis);
-  const toggleProgPost = useThreadTabStore((s) => s.toggleProgPost);
-  const closeProgPost = useThreadTabStore((s) => s.closeProgPost);
   const setHighlightSettings = useThreadTabStore((s) => s.setHighlightSettings);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchField, setSearchField] = useState<SearchField>('all');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [revealAbon, setRevealAbon] = useState(false);
-  const [ngEditorOpen, setNgEditorOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showRelativeTime, setShowRelativeTime] = useState(false);
   const [inlineMediaEnabled, setInlineMediaEnabled] = useState(true);
@@ -209,6 +191,8 @@ export function ThreadTabApp(): React.JSX.Element {
   const handleScrollKeyboard = useScrollKeyboard(scrollRef);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
+  const scrollReportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRestoredRef = useRef(false);
 
   // Initialize on mount
   const initRef = useRef(false);
@@ -221,6 +205,18 @@ export function ThreadTabApp(): React.JSX.Element {
       await initialize(initData);
     })();
   }, [initialize]);
+
+  // Restore scroll position after responses load
+  useEffect(() => {
+    if (scrollRestoredRef.current) return;
+    if (initialScrollTop <= 0 || responses.length === 0) return;
+    scrollRestoredRef.current = true;
+    requestAnimationFrame(() => {
+      if (scrollRef.current !== null) {
+        scrollRef.current.scrollTop = initialScrollTop;
+      }
+    });
+  }, [initialScrollTop, responses.length]);
 
   // Listen for push events
   useEffect(() => {
@@ -250,6 +246,9 @@ export function ThreadTabApp(): React.JSX.Element {
     return () => {
       if (edgeRefreshUnlockTimerRef.current !== null) {
         clearTimeout(edgeRefreshUnlockTimerRef.current);
+      }
+      if (scrollReportTimerRef.current !== null) {
+        clearTimeout(scrollReportTimerRef.current);
       }
     };
   }, []);
@@ -421,6 +420,17 @@ export function ThreadTabApp(): React.JSX.Element {
     }
   }, [refreshThread]);
 
+  const handleScroll = useCallback(() => {
+    if (scrollReportTimerRef.current !== null) {
+      clearTimeout(scrollReportTimerRef.current);
+    }
+    scrollReportTimerRef.current = setTimeout(() => {
+      if (scrollRef.current !== null) {
+        void window.electronApi.invoke('view:report-scroll-position', scrollRef.current.scrollTop);
+      }
+    }, 500);
+  }, []);
+
   const handleThreadWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
       const container = scrollRef.current;
@@ -558,7 +568,15 @@ export function ThreadTabApp(): React.JSX.Element {
               type="button"
               className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
               onClick={() => {
-                openPostEditorWithQuote(res.number);
+                const quoteMsg = `>>${String(res.number)}\n`;
+                void window.electronApi.invoke(
+                  'panel:open',
+                  'post-editor',
+                  boardUrl,
+                  threadId,
+                  title,
+                  quoteMsg,
+                );
               }}
               title="引用レス"
             >
@@ -635,7 +653,9 @@ export function ThreadTabApp(): React.JSX.Element {
       inlineVideoInitialVolumePercent,
       allThreadImageUrls,
       handleAnchorClick,
-      openPostEditorWithQuote,
+      boardUrl,
+      threadId,
+      title,
     ],
   );
 
@@ -729,9 +749,9 @@ export function ThreadTabApp(): React.JSX.Element {
         <button
           type="button"
           onClick={() => {
-            setNgEditorOpen((prev) => !prev);
+            void window.electronApi.invoke('panel:open', 'ng-editor', boardUrl, threadId, title);
           }}
-          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${ngEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-error)]' : ''}`}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="NG管理"
         >
           <MdiIcon path={mdiShieldOff} size={14} />
@@ -748,16 +768,33 @@ export function ThreadTabApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={togglePostEditor}
-          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${postEditorOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''}`}
+          onClick={() => {
+            void window.electronApi.invoke(
+              'panel:open',
+              'post-editor',
+              boardUrl,
+              threadId,
+              title,
+              postEditorInitialMessage,
+            );
+          }}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="書き込み"
         >
           <MdiIcon path={mdiPencil} size={14} />
         </button>
         <button
           type="button"
-          onClick={toggleProgPost}
-          className={`rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${progPostOpen ? 'bg-[var(--color-bg-active)] text-[var(--color-accent)]' : ''}`}
+          onClick={() => {
+            void window.electronApi.invoke(
+              'panel:open',
+              'programmatic-post',
+              boardUrl,
+              threadId,
+              title,
+            );
+          }}
+          className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="プログラマティック書き込み"
         >
           <MdiIcon path={mdiRobot} size={14} />
@@ -837,37 +874,19 @@ export function ThreadTabApp(): React.JSX.Element {
       </div>
 
       {/* Responses — no virtual scrolling */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto" onWheel={handleThreadWheel}>
+      <div
+        ref={scrollRef}
+        className="relative flex-1 overflow-y-auto"
+        onWheel={handleThreadWheel}
+        onScroll={handleScroll}
+      >
         {displayResponses.map(renderResponse)}
       </div>
 
       {/* Edge refresh overlay */}
       {refreshing && <RefreshOverlay />}
 
-      {/* Post editor */}
-      {postEditorOpen && (
-        <div className="border-t border-[var(--color-border-primary)]">
-          <Suspense fallback={null}>
-            <PostEditor
-              boardUrl={boardUrl}
-              threadId={threadId}
-              initialMessage={postEditorInitialMessage}
-              onClose={closePostEditor}
-            />
-          </Suspense>
-        </div>
-      )}
-
-      {/* Programmatic post */}
-      {progPostOpen && (
-        <div className="border-t border-[var(--color-border-primary)]">
-          <Suspense fallback={null}>
-            <ProgrammaticPost boardUrl={boardUrl} threadId={threadId} onClose={closeProgPost} />
-          </Suspense>
-        </div>
-      )}
-
-      {/* Thread analysis */}
+      {/* Thread analysis (still inline — read-only viewer) */}
       {analysisOpen && (
         <div className="border-t border-[var(--color-border-primary)]">
           <Suspense fallback={null}>
@@ -877,21 +896,6 @@ export function ThreadTabApp(): React.JSX.Element {
               onScrollToRes={handleScrollToRes}
             />
           </Suspense>
-        </div>
-      )}
-
-      {/* NG Editor */}
-      {ngEditorOpen && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-h-[70vh] w-full max-w-2xl overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-            <Suspense fallback={null}>
-              <NgEditor
-                onClose={() => {
-                  setNgEditorOpen(false);
-                }}
-              />
-            </Suspense>
-          </div>
         </div>
       )}
 

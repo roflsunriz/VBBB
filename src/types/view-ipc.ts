@@ -61,6 +61,29 @@ export interface ThreadTabInitData {
   readonly boardUrl: string;
   readonly threadId: string;
   readonly title: string;
+  readonly scrollTop?: number | undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Panel window init data (for BrowserWindow-based panels)
+// ---------------------------------------------------------------------------
+
+export type PanelType = 'post-editor' | 'programmatic-post' | 'ng-editor';
+
+export interface PanelWindowInitData {
+  readonly panelType: PanelType;
+  readonly boardUrl: string;
+  readonly threadId: string;
+  readonly title: string;
+  readonly initialMessage?: string | undefined;
+  readonly hasExposedIps?: boolean | undefined;
+}
+
+export interface PanelWindowState {
+  readonly x?: number | undefined;
+  readonly y?: number | undefined;
+  readonly width: number;
+  readonly height: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +100,11 @@ export interface ViewPushEventMap {
   'view:refresh-board': undefined;
   'view:refresh-thread': undefined;
   'view:thread-tab-title-updated': { readonly tabId: string; readonly title: string };
+  'panel:closed': {
+    readonly panelType: PanelType;
+    readonly boardUrl: string;
+    readonly threadId: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -140,5 +168,28 @@ export interface ViewIpcChannelMap {
   'view:update-thread-tab-title': {
     args: [tabId: string, title: string];
     result: void;
+  };
+  'view:report-scroll-position': {
+    args: [scrollTop: number];
+    result: void;
+  };
+  'panel:open': {
+    args: [
+      panelType: PanelType,
+      boardUrl: string,
+      threadId: string,
+      title: string,
+      initialMessage?: string,
+      hasExposedIps?: boolean,
+    ];
+    result: void;
+  };
+  'panel:close': {
+    args: [panelType: PanelType, boardUrl: string, threadId: string];
+    result: void;
+  };
+  'panel:ready': {
+    args: [];
+    result: PanelWindowInitData;
   };
 }

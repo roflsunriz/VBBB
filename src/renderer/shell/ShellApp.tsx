@@ -272,7 +272,7 @@ export function ShellApp(): React.JSX.Element {
     const api = window.electronApi;
 
     const init = async (): Promise<void> => {
-      const [, , , , timerConfig] = await Promise.all([
+      const [menuResult, favResult, ngResult, , timerConfig] = await Promise.all([
         fetchMenu(),
         fetchFavorites(),
         fetchNgRules(),
@@ -281,10 +281,18 @@ export function ShellApp(): React.JSX.Element {
       ]);
       setRoundTimerEnabled(timerConfig.enabled);
 
-      // Also initialize useBBSStore menu/favorites/ng for shared components
-      void useBBSStore.getState().fetchMenu();
-      void useBBSStore.getState().fetchFavorites();
-      void useBBSStore.getState().fetchNgRules();
+      // Inject fetched data directly into bbs-store for shared components (no second IPC call)
+      const bbsUpdate: Record<string, unknown> = { menuLoading: false };
+      if (menuResult !== null && menuResult.categories.length > 0) {
+        bbsUpdate['menu'] = menuResult;
+      }
+      if (favResult !== null) {
+        bbsUpdate['favorites'] = favResult;
+      }
+      if (ngResult !== null) {
+        bbsUpdate['ngRules'] = ngResult;
+      }
+      useBBSStore.setState(bbsUpdate);
 
       // Load initial tab registry
       const registry = await api.invoke('view:get-tab-registry');
@@ -315,9 +323,13 @@ export function ShellApp(): React.JSX.Element {
           if (cancelled) break;
 
           switch (action.type) {
-            case 'refresh-boards':
-              void useShellStore.getState().fetchMenu();
+            case 'refresh-boards': {
+              const menu = await useShellStore.getState().fetchMenu();
+              if (menu !== null && menu.categories.length > 0) {
+                useBBSStore.setState({ menu, menuLoading: false });
+              }
               break;
+            }
             case 'switch-tab':
               if (
                 action.tab === 'boards' ||
@@ -392,7 +404,11 @@ export function ShellApp(): React.JSX.Element {
   }, []);
 
   const handleRefreshBoards = useCallback(() => {
-    void fetchMenu();
+    void fetchMenu().then((menu) => {
+      if (menu !== null && menu.categories.length > 0) {
+        useBBSStore.setState({ menu, menuLoading: false });
+      }
+    });
   }, [fetchMenu]);
 
   const openAuth = useCallback(() => {

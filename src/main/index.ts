@@ -2,12 +2,20 @@ import { join } from 'node:path';
 import { app, BaseWindow, session, shell } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { performance } from 'node:perf_hooks';
-import { registerIpcHandlers } from './ipc/handlers';
+import { lookupBoard, registerIpcHandlers } from './ipc/handlers';
 import { buildAppMenu } from './menu';
 import { createLogger } from './logger';
 import { loadWindowState, saveWindowState } from './services/window-state';
+import {
+  loadSavedTabs,
+  loadSessionState,
+  saveSessionStateSync,
+  saveTabsSync,
+} from './services/tab-persistence';
 import { ViewManager } from './view-manager';
 import { setViewManager } from './view-manager-ref';
+import { PanelWindowManager } from './panel-window-manager';
+import { setPanelWindowManager } from './panel-window-ref';
 
 const startupLogger = createLogger('startup');
 const rendererLogger = createLogger('renderer');
@@ -40,9 +48,18 @@ function createWindow(): BaseWindow {
   const vm = new ViewManager(mainWindow);
   setViewManager(vm);
 
+  const panelMgr = new PanelWindowManager(mainWindow, dataDir);
+  setPanelWindowManager(panelMgr);
+
+  const savedTabs = loadSavedTabs(dataDir);
+  const session = loadSessionState(dataDir);
+
   const shellView = vm.createShellView();
 
   shellView.webContents.on('did-finish-load', () => {
+    if (savedTabs.length > 0 || (session.boardTabUrls ?? []).length > 0) {
+      vm.restoreTabs(savedTabs, session, lookupBoard);
+    }
     if (windowState.isMaximized) {
       mainWindow.maximize();
     }
@@ -50,6 +67,18 @@ function createWindow(): BaseWindow {
   });
 
   mainWindow.on('close', () => {
+    const savedThreadTabs = vm.getSavedThreadTabs();
+    const boardUrls = vm.getSavedBoardTabUrls();
+    const activeBoardTabId = vm.getActiveBoardTabId();
+    const activeThreadTabId = vm.getActiveThreadTabId();
+    saveTabsSync(dataDir, savedThreadTabs);
+    saveSessionStateSync(dataDir, {
+      selectedBoardUrl: boardUrls[0] ?? null,
+      boardTabUrls: boardUrls,
+      activeBoardTabId: activeBoardTabId ?? undefined,
+      activeThreadTabId: activeThreadTabId ?? undefined,
+    });
+
     const isMaximized = mainWindow.isMaximized();
     if (isMaximized) {
       mainWindow.unmaximize();
@@ -65,6 +94,8 @@ function createWindow(): BaseWindow {
   });
 
   mainWindow.on('closed', () => {
+    panelMgr.destroyAll();
+    setPanelWindowManager(null);
     vm.destroyAll();
     setViewManager(null);
   });

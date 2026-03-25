@@ -50,9 +50,9 @@ interface ShellState {
   statusMessage: string;
 
   // Actions
-  fetchMenu: () => Promise<void>;
-  fetchFavorites: () => Promise<void>;
-  fetchNgRules: () => Promise<void>;
+  fetchMenu: () => Promise<BBSMenu | null>;
+  fetchFavorites: () => Promise<FavTree>;
+  fetchNgRules: () => Promise<readonly NgRule[]>;
   loadPostHistory: () => Promise<void>;
   addFavorite: (node: FavNode) => Promise<void>;
   removeFavorite: (nodeId: string) => Promise<void>;
@@ -154,19 +154,23 @@ export const useShellStore = create<ShellState>((set, get) => ({
     try {
       const menu = await getApi().invoke('bbs:fetch-menu');
       set({ menu, menuLoading: false });
+      return menu;
     } catch (err) {
       set({ menuError: String(err), menuLoading: false });
+      return null;
     }
   },
 
   fetchFavorites: async () => {
     const tree = await getApi().invoke('fav:load');
     set({ favorites: tree });
+    return tree;
   },
 
   fetchNgRules: async () => {
     const rules = await getApi().invoke('ng:get-rules');
     set({ ngRules: rules });
+    return rules;
   },
 
   loadPostHistory: async () => {

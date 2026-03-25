@@ -35,12 +35,12 @@ const PROJECT_ROOT = resolve(__dirname, '../..');
 
 // ---------------------------------------------------------------------------
 // Feature 1: タイトルバー修正
-// BrowserWindow がウィンドウタイトルを上書きしないよう、
-// index.html の <title> を空にし、page-title-updated イベントをキャンセルする。
+// BaseWindow がウィンドウタイトルを上書きしないよう、
+// 各レンダラーHTMLの <title> を空にする。
 // ---------------------------------------------------------------------------
 describe('feature 1: fix-titlebar', () => {
-  it('index.html has an empty <title> tag (prevents BrowserWindow title override)', () => {
-    const html = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/index.html'), 'utf-8');
+  it('shell.html has an empty <title> tag (prevents BaseWindow title override)', () => {
+    const html = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/shell.html'), 'utf-8');
     expect(html).toContain('<title></title>');
   });
 });
@@ -355,7 +355,7 @@ describe('feature 9: remote-search-replace', () => {
   });
 
   it('CSP no longer requires frame-src for ff5ch.syoboi.jp', () => {
-    const html = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/index.html'), 'utf-8');
+    const html = readFileSync(resolve(PROJECT_ROOT, 'src/renderer/shell.html'), 'utf-8');
     expect(html).not.toContain('frame-src https://ff5ch.syoboi.jp');
   });
 

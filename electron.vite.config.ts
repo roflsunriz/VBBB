@@ -46,6 +46,9 @@ export default defineConfig({
           shell: resolve('src/renderer/shell.html'),
           'board-tab': resolve('src/renderer/board-tab.html'),
           'thread-tab': resolve('src/renderer/thread-tab.html'),
+          'panel-post-editor': resolve('src/renderer/panel-post-editor.html'),
+          'panel-programmatic-post': resolve('src/renderer/panel-programmatic-post.html'),
+          'panel-ng-editor': resolve('src/renderer/panel-ng-editor.html'),
         },
         output: {
           manualChunks: (id) => {
