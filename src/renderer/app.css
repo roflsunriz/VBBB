@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 @import './themes/theme-vars.css';
 
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 /* Anchor link styling for >>N references */
 .anchor-link {
   color: var(--color-anchor);

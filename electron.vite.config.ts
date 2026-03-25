@@ -42,6 +42,14 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
+        input: {
+          shell: resolve('src/renderer/shell.html'),
+          'board-tab': resolve('src/renderer/board-tab.html'),
+          'thread-tab': resolve('src/renderer/thread-tab.html'),
+          'panel-post-editor': resolve('src/renderer/panel-post-editor.html'),
+          'panel-programmatic-post': resolve('src/renderer/panel-programmatic-post.html'),
+          'panel-ng-editor': resolve('src/renderer/panel-ng-editor.html'),
+        },
         output: {
           manualChunks: (id) => {
             if (!id.includes('node_modules')) return undefined;
@@ -53,7 +61,6 @@ export default defineConfig({
               return 'vendor-react';
             }
             if (id.includes('/zustand/')) return 'vendor-state';
-            if (id.includes('/@tanstack/')) return 'vendor-virtual';
             if (id.includes('/dompurify/')) return 'vendor-sanitize';
             return undefined;
           },

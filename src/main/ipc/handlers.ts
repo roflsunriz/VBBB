@@ -2,7 +2,7 @@
  * IPC handler registration.
  * Connects renderer requests to main process services.
  */
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BaseWindow, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '@shared/domain';
@@ -94,7 +94,12 @@ import {
   saveTabs,
   saveTabsSync,
 } from '../services/tab-persistence';
-import { upliftLogin, upliftLogout, getUpliftSession, setActiveDomain } from '../services/uplift-auth';
+import {
+  upliftLogin,
+  upliftLogout,
+  getUpliftSession,
+  setActiveDomain,
+} from '../services/uplift-auth';
 import { DEFAULT_5CH_DOMAIN, DEFAULT_BBS_MENU_URLS } from '@shared/file-format';
 import { checkForUpdate, downloadAndInstall } from '../services/updater';
 import {
@@ -102,6 +107,14 @@ import {
   loadUserAgentAsync,
   saveUserAgentAsync,
 } from '../services/user-agent-store';
+import { getViewManager, getViewManagerOrNull } from '../view-manager-ref';
+import { getPanelWindowManager, getPanelWindowManagerOrNull } from '../panel-window-ref';
+import type {
+  ContentBounds,
+  BoardTabInitData,
+  ThreadTabInitData,
+  PanelWindowInitData,
+} from '@shared/view-ipc';
 
 const logger = createLogger('ipc');
 const BBS_MENU_URLS_FILE = 'bbs-menu-urls.json';
@@ -129,10 +142,27 @@ function parseBbsMenuUrlsConfig(raw: string): readonly string[] {
  */
 function handle<K extends keyof IpcChannelMap>(
   channel: K,
-  handler: (...args: IpcChannelMap[K]['args']) => Promise<IpcChannelMap[K]['result']>,
+  handler: (
+    ...args: IpcChannelMap[K]['args']
+  ) => Promise<IpcChannelMap[K]['result']> | IpcChannelMap[K]['result'],
 ): void {
   ipcMain.handle(channel, (_event, ...args: unknown[]) => {
     return handler(...(args as IpcChannelMap[K]['args']));
+  });
+}
+
+/**
+ * Typed wrapper that also passes the IPC event (needed for sender identification).
+ */
+function handleWithEvent<K extends keyof IpcChannelMap>(
+  channel: K,
+  handler: (
+    event: Electron.IpcMainInvokeEvent,
+    ...args: IpcChannelMap[K]['args']
+  ) => Promise<IpcChannelMap[K]['result']> | IpcChannelMap[K]['result'],
+): void {
+  ipcMain.handle(channel, (event, ...args: unknown[]) => {
+    return handler(event, ...(args as IpcChannelMap[K]['args']));
   });
 }
 
@@ -141,7 +171,7 @@ const boardCache = new Map<string, Board>();
 let bbsMenuUrls: readonly string[] = [...DEFAULT_BBS_MENU_URLS];
 let fivechDomain: string = DEFAULT_5CH_DOMAIN;
 
-function lookupBoard(boardUrl: string): Board {
+export function lookupBoard(boardUrl: string): Board {
   const cached = boardCache.get(boardUrl);
   if (cached !== undefined) return cached;
   // Fallback: construct minimal Board from URL
@@ -216,7 +246,10 @@ export async function registerIpcHandlers(): Promise<void> {
 
   const saveFivechDomainAsync = async (domain: string): Promise<void> => {
     // Sanitize: remove protocol prefix and trailing slashes
-    const sanitized = domain.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    const sanitized = domain
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/$/, '');
     if (sanitized.length === 0 || sanitized.includes('/') || sanitized.includes(':')) {
       throw new Error(`Invalid domain: "${domain}"`);
     }
@@ -612,9 +645,11 @@ export async function registerIpcHandlers(): Promise<void> {
         logger.warn(`Round: failed to fetch dat for ${item.url}/${item.fileName}`);
       }
     }
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win !== undefined) {
-      win.webContents.send('round:completed', { updatedBoards, updatedThreads });
+    try {
+      const vm = getViewManager();
+      vm.broadcastToAll('round:completed', { updatedBoards, updatedThreads });
+    } catch {
+      // ViewManager not initialized yet
     }
     logger.info(
       `Round completed: ${String(updatedBoards.length)} boards, ${String(updatedThreads.length)} threads`,
@@ -743,7 +778,7 @@ export async function registerIpcHandlers(): Promise<void> {
 
   // Image save via dialog
   handle('image:save', async (imageUrl: string, suggestedName: string) => {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = BaseWindow.getFocusedWindow();
     if (win === null) return { saved: false, path: '' };
 
     const ext = suggestedName.split('.').pop() ?? 'jpg';
@@ -764,7 +799,7 @@ export async function registerIpcHandlers(): Promise<void> {
 
   // Bulk image save — select folder, then download all URLs
   handle('image:save-bulk', async (urls: readonly string[]) => {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = BaseWindow.getFocusedWindow();
     if (win === null) return { saved: 0, folder: '' };
 
     const result = await dialog.showOpenDialog(win, {
@@ -857,7 +892,7 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('diag:save-logs', async (content: string) => {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = BaseWindow.getFocusedWindow();
     if (win === null) return { saved: false, path: '' };
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
@@ -878,7 +913,7 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('dsl:save-file', async (content: string, suggestedName: string) => {
-    const win = BrowserWindow.getFocusedWindow();
+    const win = BaseWindow.getFocusedWindow();
     if (win === null) return { saved: false, path: '' };
 
     const result = await dialog.showSaveDialog(win, {
@@ -929,10 +964,12 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('update:download-and-install', async () => {
-    const windows = BrowserWindow.getAllWindows();
     await downloadAndInstall((progress) => {
-      for (const win of windows) {
-        win.webContents.send('update:progress', progress);
+      try {
+        const vm = getViewManager();
+        vm.broadcastToAll('update:progress', progress);
+      } catch {
+        // ViewManager not initialized
       }
     });
   });
@@ -958,6 +995,121 @@ export async function registerIpcHandlers(): Promise<void> {
   if (!timerConfig.enabled) {
     stopRoundTimer();
   }
+
+  // ---------------------------------------------------------------------------
+  // View management IPC handlers
+  // ---------------------------------------------------------------------------
+
+  handle('view:layout-update', (bounds: ContentBounds) => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.updateLayout(bounds);
+  });
+
+  handle('view:create-board-tab', (boardUrl: string, _boardTitle: string, _boardType) => {
+    const board = lookupBoard(boardUrl);
+    return getViewManager().createBoardTab(board);
+  });
+
+  handle('view:close-board-tab', (tabId: string) => {
+    getViewManager().closeBoardTab(tabId);
+  });
+
+  handle('view:switch-board-tab', (tabId: string) => {
+    getViewManager().switchBoardTab(tabId);
+  });
+
+  handle('view:create-thread-tab', (boardUrl: string, threadId: string, title: string) => {
+    return getViewManager().createThreadTab(boardUrl, threadId, title);
+  });
+
+  handle('view:close-thread-tab', (tabId: string) => {
+    getViewManager().closeThreadTab(tabId);
+  });
+
+  handle('view:switch-thread-tab', (tabId: string) => {
+    getViewManager().switchThreadTab(tabId);
+  });
+
+  handle('view:reorder-board-tabs', (fromIndex: number, toIndex: number) => {
+    getViewManager().reorderBoardTabs(fromIndex, toIndex);
+  });
+
+  handle('view:reorder-thread-tabs', (fromIndex: number, toIndex: number) => {
+    getViewManager().reorderThreadTabs(fromIndex, toIndex);
+  });
+
+  handle('view:get-tab-registry', () => {
+    return getViewManager().getTabRegistry();
+  });
+
+  handleWithEvent('view:board-tab-ready', (event): BoardTabInitData => {
+    const vm = getViewManager();
+    const initData = vm.getBoardTabInitData(event.sender.id);
+    if (initData === null) {
+      throw new Error(`No board tab found for webContents ${String(event.sender.id)}`);
+    }
+    return initData;
+  });
+
+  handleWithEvent('view:thread-tab-ready', (event): ThreadTabInitData => {
+    const vm = getViewManager();
+    const initData = vm.getThreadTabInitData(event.sender.id);
+    if (initData === null) {
+      throw new Error(`No thread tab found for webContents ${String(event.sender.id)}`);
+    }
+    return initData;
+  });
+
+  handle('view:open-thread-request', (boardUrl: string, threadId: string, title: string) => {
+    getViewManager().createThreadTab(boardUrl, threadId, title);
+  });
+
+  handle('view:update-thread-tab-title', (tabId: string, title: string) => {
+    getViewManager().updateThreadTabTitle(tabId, title);
+  });
+
+  handleWithEvent('view:report-scroll-position', (event, scrollTop: number) => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.updateScrollPosition(event.sender.id, scrollTop);
+  });
+
+  handle('view:hide-tab-views', () => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.hideAllTabViews();
+  });
+
+  handle('view:show-tab-views', () => {
+    const vm = getViewManagerOrNull();
+    if (vm === null) return;
+    vm.showAllTabViews();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Panel window IPC handlers
+  // ---------------------------------------------------------------------------
+
+  handle('panel:open', (panelType, boardUrl, threadId, title, initialMessage, hasExposedIps) => {
+    const mgr = getPanelWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.openPanel(panelType, boardUrl, threadId, title, initialMessage, hasExposedIps);
+  });
+
+  handle('panel:close', (panelType, boardUrl, threadId) => {
+    const mgr = getPanelWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.closePanel(panelType, boardUrl, threadId);
+  });
+
+  handleWithEvent('panel:ready', (event): PanelWindowInitData => {
+    const data = getPanelWindowManager().getInitData(event.sender.id);
+    if (data === null) {
+      throw new Error(`No panel init data for webContents ${String(event.sender.id)}`);
+    }
+    return data;
+  });
 
   logger.info('IPC handlers registered');
 }

@@ -135,9 +135,9 @@ describe('fetchBBSMenu', () => {
   it('throws when all sources fail', async () => {
     mockHttpFetch.mockRejectedValue(new Error('Network error'));
 
-    await expect(
-      fetchBBSMenu(['https://menu.example.com/'], TEST_DOMAIN),
-    ).rejects.toThrow('Failed to fetch all BBS menu sources');
+    await expect(fetchBBSMenu(['https://menu.example.com/'], TEST_DOMAIN)).rejects.toThrow(
+      'Failed to fetch all BBS menu sources',
+    );
   });
 
   it('succeeds with partial source failure (at least one succeeds)', async () => {

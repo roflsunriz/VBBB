@@ -25,7 +25,7 @@ export const test = base.extend<ElectronFixtures>({
     /**
      * Build an env map without ELECTRON_RENDERER_URL so electron-toolkit/utils
      * treats this as a production launch and loads the built renderer file
-     * (out/renderer/index.html) instead of a dev server URL.
+     * (out/renderer/shell.html) instead of a dev server URL.
      */
     const env: Record<string, string> = Object.fromEntries(
       Object.entries(process.env).filter(

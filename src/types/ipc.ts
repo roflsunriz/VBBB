@@ -31,8 +31,9 @@ import type {
 } from './search';
 import type { UpdateCheckResult } from './update';
 import type { RemoteSearchResult } from './remote-search';
+import type { ViewIpcChannelMap } from './view-ipc';
 
-export interface IpcChannelMap {
+export interface IpcChannelMap extends ViewIpcChannelMap {
   /** Fetch BBS menu (板一覧) */
   'bbs:fetch-menu': {
     args: [];

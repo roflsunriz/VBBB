@@ -588,10 +588,8 @@ export async function postResponse(params: PostParams, board: Board): Promise<Po
       return { success: true, resultType, message: html };
     }
 
-    const isCookieRetryable =
-      resultType === PostResultType.Cookie && attempt < MAX_COOKIE_RETRIES;
-    const isCheckRetryable =
-      resultType === PostResultType.Check && attempt < MAX_POST_RETRIES;
+    const isCookieRetryable = resultType === PostResultType.Cookie && attempt < MAX_COOKIE_RETRIES;
+    const isCheckRetryable = resultType === PostResultType.Check && attempt < MAX_POST_RETRIES;
 
     if (isCookieRetryable || isCheckRetryable) {
       // Diagnostic: log full confirmation page HTML for debugging
