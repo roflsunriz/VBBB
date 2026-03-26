@@ -34,7 +34,7 @@ const AboutPanel = lazy(() =>
 );
 
 const onClose = (): void => {
-  window.close();
+  void window.electronApi.invoke('modal:close-self');
 };
 
 function renderModal(modalType: ModalWindowType): React.JSX.Element {
@@ -78,7 +78,7 @@ export function ModalHostApp(): React.JSX.Element {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
-        window.close();
+        void window.electronApi.invoke('modal:close-self');
       }
     };
     document.addEventListener('keydown', handleKeyDown);

@@ -2,7 +2,7 @@
  * IPC handler registration.
  * Connects renderer requests to main process services.
  */
-import { app, BaseWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
+import { app, BaseWindow, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '@shared/domain';
@@ -1179,6 +1179,13 @@ export async function registerIpcHandlers(): Promise<void> {
       throw new Error(`No modal init data for webContents ${String(event.sender.id)}`);
     }
     return data;
+  });
+
+  handleWithEvent('modal:close-self', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win !== null && !win.isDestroyed()) {
+      win.close();
+    }
   });
 
   logger.info('IPC handlers registered');

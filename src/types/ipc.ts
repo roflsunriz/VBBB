@@ -458,6 +458,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
     args: [];
     result: ModalWindowInitData;
   };
+  /** Close the sender's BrowserWindow (used by modal-host to close itself) */
+  'modal:close-self': {
+    args: [];
+    result: void;
+  };
 }
 
 /** IP WhoIs/geolocation lookup result */

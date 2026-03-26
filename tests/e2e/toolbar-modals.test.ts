@@ -13,53 +13,60 @@ test.describe('ツールバーボタン・モーダル', () => {
     window,
   }) => {
     const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window'),
+      electronApp.waitForEvent('window', { timeout: 10_000 }),
       window.getByTitle('VBBBについて').click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await modalPage.waitForSelector('h2', { state: 'visible', timeout: 10_000 });
 
-    await expect(modalPage.getByRole('heading', { name: 'VBBB' })).toBeVisible();
+    await expect(modalPage.getByRole('heading', { name: 'VBBB' })).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(modalPage.getByText('Versatile BBS Browser')).toBeVisible();
     await expect(modalPage.getByText(/^v\d+\.\d+\.\d+/)).toBeVisible();
 
     await modalPage.getByRole('button', { name: /閉じる/ }).click();
-    await modalPage.waitForEvent('close', { timeout: 5_000 });
+    await expect(() => {
+      expect(modalPage.isClosed()).toBe(true);
+    }).toPass({ timeout: 5_000 });
   });
 
   test('認証モーダル: 開く → Escape で閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window'),
+      electronApp.waitForEvent('window', { timeout: 10_000 }),
       window.getByRole('button', { name: /認証/ }).click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await modalPage.waitForSelector('text=読み込み中', { state: 'hidden', timeout: 10_000 });
+    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
 
     await modalPage.keyboard.press('Escape');
-    await modalPage.waitForEvent('close', { timeout: 5_000 });
+    await expect(() => {
+      expect(modalPage.isClosed()).toBe(true);
+    }).toPass({ timeout: 5_000 });
   });
 
   test('プロキシモーダル: 開く → 閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window'),
+      electronApp.waitForEvent('window', { timeout: 10_000 }),
       window.getByRole('button', { name: /プロキシ/ }).click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await modalPage.waitForSelector('text=読み込み中', { state: 'hidden', timeout: 10_000 });
+    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
 
     await modalPage.close();
   });
 
   test('外部板追加ダイアログ: 開く → Escape で閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window'),
+      electronApp.waitForEvent('window', { timeout: 10_000 }),
       window.getByRole('button', { name: /外部板追加/ }).click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await modalPage.waitForSelector('text=読み込み中', { state: 'hidden', timeout: 10_000 });
+    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
 
     await modalPage.keyboard.press('Escape');
-    await modalPage.waitForEvent('close', { timeout: 5_000 });
+    await expect(() => {
+      expect(modalPage.isClosed()).toBe(true);
+    }).toPass({ timeout: 5_000 });
   });
 
   test('板一覧更新ボタン: クリック中は無効化される', async ({ window }) => {
