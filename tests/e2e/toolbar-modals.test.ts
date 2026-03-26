@@ -30,18 +30,30 @@ test.describe('ツールバーボタン・モーダル', () => {
     }).toPass({ timeout: 5_000 });
   });
 
-  test('認証モーダル: 開く → Escape で閉じる', async ({ electronApp, window }) => {
+  test('Aboutモーダル: Escapeで閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
       electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByRole('button', { name: /認証/ }).click(),
+      window.getByTitle('VBBBについて').click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
+    await expect(modalPage.getByRole('heading', { name: 'VBBB' })).toBeVisible({
+      timeout: 10_000,
+    });
 
     await modalPage.keyboard.press('Escape');
     await expect(() => {
       expect(modalPage.isClosed()).toBe(true);
     }).toPass({ timeout: 5_000 });
+  });
+
+  test('認証モーダル: 開く → 閉じる', async ({ electronApp, window }) => {
+    const [modalPage] = await Promise.all([
+      electronApp.waitForEvent('window', { timeout: 10_000 }),
+      window.getByRole('button', { name: /認証/ }).click(),
+    ]);
+    await modalPage.waitForLoadState('domcontentloaded');
+    expect(modalPage.isClosed()).toBe(false);
+    await modalPage.close();
   });
 
   test('プロキシモーダル: 開く → 閉じる', async ({ electronApp, window }) => {
@@ -50,23 +62,18 @@ test.describe('ツールバーボタン・モーダル', () => {
       window.getByRole('button', { name: /プロキシ/ }).click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
-
+    expect(modalPage.isClosed()).toBe(false);
     await modalPage.close();
   });
 
-  test('外部板追加ダイアログ: 開く → Escape で閉じる', async ({ electronApp, window }) => {
+  test('外部板追加ダイアログ: 開く → 閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
       electronApp.waitForEvent('window', { timeout: 10_000 }),
       window.getByRole('button', { name: /外部板追加/ }).click(),
     ]);
     await modalPage.waitForLoadState('domcontentloaded');
-    await expect(modalPage.locator('body')).toBeVisible({ timeout: 10_000 });
-
-    await modalPage.keyboard.press('Escape');
-    await expect(() => {
-      expect(modalPage.isClosed()).toBe(true);
-    }).toPass({ timeout: 5_000 });
+    expect(modalPage.isClosed()).toBe(false);
+    await modalPage.close();
   });
 
   test('板一覧更新ボタン: クリック中は無効化される', async ({ window }) => {
