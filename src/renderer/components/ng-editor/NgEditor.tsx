@@ -841,7 +841,7 @@ export function NgEditor({ onClose }: NgEditorProps = {}): React.JSX.Element {
     <>
       {isInline && <TopResizeHandle onResize={handlePanelResize} />}
       <div
-        className={`flex flex-col overflow-hidden border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]${isInline ? '' : ' h-80 min-h-48 max-h-[70vh]'}`}
+        className={`flex flex-col overflow-hidden border-l border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]${isInline ? '' : ' h-full'}`}
         style={isInline ? { height: panelHeight } : undefined}
       >
         {/* Header */}

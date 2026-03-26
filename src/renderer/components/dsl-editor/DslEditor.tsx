@@ -481,7 +481,7 @@ export function DslEditor({ onClose }: DslEditorProps): React.JSX.Element {
                             handleUpdatePost(post.id, 'message', e.target.value);
                           }}
                           placeholder="投稿本文を入力"
-                          rows={3}
+                          rows={6}
                           className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2 py-1 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                         />
                       </label>

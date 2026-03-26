@@ -3,11 +3,14 @@
  *
  * Each modal (auth, proxy, console, etc.) opens as an independent OS-level
  * child window. Only one instance per modal type is allowed at a time.
+ * Window bounds are persisted to modal-state.json so resizable modals
+ * remember their size and position across sessions.
  */
 import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
-import type { ModalWindowType, ModalWindowInitData } from '@shared/view-ipc';
+import type { ModalWindowType, ModalWindowInitData, ModalWindowState } from '@shared/view-ipc';
 import { createLogger } from './logger';
 
 const logger = createLogger('modal-window');
@@ -45,10 +48,21 @@ const MODAL_CONFIGS: Record<ModalWindowType, ModalConfig> = {
   'dsl-editor': { width: 800, height: 600, title: 'DSLエディタ', resizable: true },
 };
 
+const MODAL_STATE_FILE = 'modal-state.json';
+
+type ModalStateMap = Record<string, ModalWindowState>;
+
 export class ModalWindowManager {
+  private readonly dataDir: string;
   private readonly modals = new Map<ModalWindowType, BrowserWindow>();
   private readonly modalInitData = new Map<number, ModalWindowInitData>();
+  private modalStates: ModalStateMap = {};
   private onModalClosed: ((modalType: ModalWindowType) => void) | null = null;
+
+  constructor(dataDir: string) {
+    this.dataDir = dataDir;
+    this.loadStates();
+  }
 
   setOnModalClosed(callback: (modalType: ModalWindowType) => void): void {
     this.onModalClosed = callback;
@@ -62,10 +76,13 @@ export class ModalWindowManager {
     }
 
     const config = MODAL_CONFIGS[modalType];
+    const saved = config.resizable ? this.modalStates[modalType] : undefined;
+    const width = saved?.width ?? config.width;
+    const height = saved?.height ?? config.height;
 
-    const win = new BrowserWindow({
-      width: config.width,
-      height: config.height,
+    const winOptions: Electron.BrowserWindowConstructorOptions = {
+      width,
+      height,
       minWidth: 300,
       minHeight: 200,
       show: false,
@@ -79,7 +96,14 @@ export class ModalWindowManager {
         contextIsolation: true,
         nodeIntegration: false,
       },
-    });
+    };
+
+    if (saved?.x !== undefined && saved.y !== undefined) {
+      winOptions.x = saved.x;
+      winOptions.y = saved.y;
+    }
+
+    const win = new BrowserWindow(winOptions);
 
     const webContentsId = win.webContents.id;
     this.modals.set(modalType, win);
@@ -88,6 +112,21 @@ export class ModalWindowManager {
     win.once('ready-to-show', () => {
       win.show();
     });
+
+    if (config.resizable) {
+      win.on('close', () => {
+        if (!win.isDestroyed()) {
+          const bounds = win.getBounds();
+          this.modalStates[modalType] = {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+          };
+          this.saveStates();
+        }
+      });
+    }
 
     win.on('closed', () => {
       this.modals.delete(modalType);
@@ -119,5 +158,29 @@ export class ModalWindowManager {
     }
     this.modals.clear();
     this.modalInitData.clear();
+  }
+
+  private loadStates(): void {
+    try {
+      const filePath = join(this.dataDir, MODAL_STATE_FILE);
+      if (existsSync(filePath)) {
+        const raw = readFileSync(filePath, 'utf-8');
+        this.modalStates = JSON.parse(raw) as ModalStateMap;
+      }
+    } catch {
+      this.modalStates = {};
+    }
+  }
+
+  private saveStates(): void {
+    try {
+      const filePath = join(this.dataDir, MODAL_STATE_FILE);
+      if (!existsSync(this.dataDir)) {
+        mkdirSync(this.dataDir, { recursive: true });
+      }
+      writeFileSync(filePath, JSON.stringify(this.modalStates, null, 2));
+    } catch (err) {
+      logger.info(`Failed to save modal states: ${String(err)}`);
+    }
   }
 }

@@ -102,6 +102,13 @@ export interface PanelWindowState {
   readonly height: number;
 }
 
+export interface ModalWindowState {
+  readonly x?: number | undefined;
+  readonly y?: number | undefined;
+  readonly width: number;
+  readonly height: number;
+}
+
 // ---------------------------------------------------------------------------
 // Push event payloads (main → renderer via webContents.send)
 // ---------------------------------------------------------------------------

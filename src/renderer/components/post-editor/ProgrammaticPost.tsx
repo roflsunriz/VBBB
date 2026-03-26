@@ -24,6 +24,7 @@ interface ProgrammaticPostProps {
   readonly boardUrl: string;
   readonly threadId: string;
   readonly onClose: () => void;
+  readonly standalone?: boolean | undefined;
 }
 
 interface BatchEntry {
@@ -48,6 +49,7 @@ export function ProgrammaticPost({
   boardUrl,
   threadId,
   onClose,
+  standalone = false,
 }: ProgrammaticPostProps): React.JSX.Element {
   const [mode, setMode] = useState<PanelMode>('manual');
 
@@ -391,10 +393,10 @@ export function ProgrammaticPost({
 
   return (
     <>
-      <TopResizeHandle onResize={handlePanelResize} />
+      {!standalone && <TopResizeHandle onResize={handlePanelResize} />}
       <div
-        className="flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]"
-        style={{ height: panelHeight }}
+        className={`flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]${standalone ? ' flex-1 min-h-0' : ''}`}
+        style={standalone ? undefined : { height: panelHeight }}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between px-3 py-1">
@@ -589,7 +591,7 @@ export function ProgrammaticPost({
                       setMessage(e.target.value);
                     }}
                     placeholder="本文"
-                    rows={2}
+                    rows={30}
                     className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-0.5 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                   />
                 </div>

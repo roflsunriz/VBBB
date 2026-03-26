@@ -25,6 +25,7 @@ interface PostEditorProps {
   readonly hasExposedIps?: boolean | undefined;
   readonly onClose: () => void;
   readonly initialMessage: string;
+  readonly standalone?: boolean | undefined;
 }
 
 const AUTO_CLOSE_KEY = 'vbbb-post-auto-close';
@@ -63,6 +64,7 @@ export function PostEditor({
   hasExposedIps,
   onClose,
   initialMessage,
+  standalone = false,
 }: PostEditorProps): React.JSX.Element {
   const kotehan = useBBSStore((s) => s.kotehan);
   const sambaInfo = useBBSStore((s) => s.sambaInfo);
@@ -334,10 +336,10 @@ export function PostEditor({
 
   return (
     <>
-      <TopResizeHandle onResize={handlePanelResize} />
+      {!standalone && <TopResizeHandle onResize={handlePanelResize} />}
       <div
-        className="flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]"
-        style={{ height: panelHeight }}
+        className={`flex flex-col overflow-hidden bg-[var(--color-bg-secondary)]${standalone ? ' flex-1 min-h-0' : ''}`}
+        style={standalone ? undefined : { height: panelHeight }}
       >
         <div className="flex shrink-0 items-center justify-between px-3 py-1">
           <span className="text-xs font-semibold text-[var(--color-text-secondary)]">書き込み</span>
@@ -679,7 +681,7 @@ export function PostEditor({
             }}
             onKeyDown={handleKeyDown}
             placeholder="本文を入力 (Ctrl+Enter で送信)"
-            rows={4}
+            rows={35}
             className="w-full resize-y rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-2 py-1 text-xs leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none"
           />
           {resultMessage.length > 0 && (

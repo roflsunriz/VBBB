@@ -27,6 +27,7 @@ export function PanelProgrammaticPostApp(): React.JSX.Element {
       <ProgrammaticPost
         boardUrl={initData.boardUrl}
         threadId={initData.threadId}
+        standalone
         onClose={() => {
           window.close();
         }}

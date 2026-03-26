@@ -53,7 +53,7 @@ function createWindow(): BaseWindow {
   const panelMgr = new PanelWindowManager(mainWindow, dataDir);
   setPanelWindowManager(panelMgr);
 
-  const modalMgr = new ModalWindowManager();
+  const modalMgr = new ModalWindowManager(dataDir);
   modalMgr.setOnModalClosed((modalType) => {
     const vm = getViewManagerOrNull();
     if (vm !== null) {

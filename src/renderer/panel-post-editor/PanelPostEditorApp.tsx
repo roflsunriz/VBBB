@@ -30,6 +30,7 @@ export function PanelPostEditorApp(): React.JSX.Element {
         threadId={initData.threadId}
         initialMessage={initData.initialMessage ?? ''}
         hasExposedIps={initData.hasExposedIps}
+        standalone
         onClose={() => {
           window.close();
         }}
