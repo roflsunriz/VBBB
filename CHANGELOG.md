@@ -5,6 +5,18 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] - 2026-03-27
+
+### Fixed
+
+- **アップデート確認ダイアログのコンテンツがウィンドウからはみ出す問題を修正**
+  - `UpdateDialog` の固定幅 `w-[420px]` を `w-full overflow-y-auto` に変更し、ウィンドウサイズに追従するよう修正
+  - モーダルウィンドウサイズを `384×300` から `450×340` に拡大し、コンテンツが余裕を持って表示されるよう調整
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.2.2` に更新
+
 ## [3.2.1] - 2026-03-27
 
 ### Fixed

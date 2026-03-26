@@ -97,7 +97,7 @@ export function UpdateDialog({ onClose }: Props): React.JSX.Element {
   const showProgress = status === 'downloading' || status === 'complete';
 
   return (
-    <div className="flex flex-col gap-5 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-6 w-[420px]">
+    <div className="flex flex-col gap-5 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-6 w-full overflow-y-auto">
       <h2 className="text-base font-bold text-[var(--color-text-primary)]">アップデート</h2>
 
       {/* Version info */}
