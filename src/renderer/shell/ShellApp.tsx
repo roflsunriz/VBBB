@@ -768,17 +768,6 @@ export function ShellApp(): React.JSX.Element {
     setBoardTabCtx(null);
   }, [boardTabCtx]);
 
-  // Hide native WebContentsViews when any overlay (modal / context menu) is open
-  const anyOverlayOpen =
-    activeModal !== null || threadTabCtx !== null || boardTabCtx !== null;
-  useEffect(() => {
-    if (anyOverlayOpen) {
-      void window.electronApi.invoke('view:hide-tab-views');
-    } else {
-      void window.electronApi.invoke('view:show-tab-views');
-    }
-  }, [anyOverlayOpen]);
-
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       {/* Toolbar */}
