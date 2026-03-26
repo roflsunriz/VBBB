@@ -45,6 +45,7 @@ import type { FavItem, FavNode } from '@shared/favorite';
 import type { RoundItemEntry, RoundBoardEntry } from '@shared/round';
 import { BoardType } from '@shared/domain';
 import { buildResPermalink, detectBoardTypeByHost } from '@shared/url-parser';
+import { boundedLevenshtein } from '../utils/levenshtein';
 import { useBBSStore } from '../stores/bbs-store';
 
 const FavoriteTree = lazy(() =>
@@ -402,14 +403,6 @@ export function ShellApp(): React.JSX.Element {
     setTheme(newTheme);
   }, []);
 
-  useEffect(() => {
-    if (activeModal !== null) {
-      void window.electronApi.invoke('view:hide-tab-views');
-    } else {
-      void window.electronApi.invoke('view:show-tab-views');
-    }
-  }, [activeModal]);
-
   const closeModal = useCallback(() => {
     setActiveModal(null);
   }, []);
@@ -500,6 +493,12 @@ export function ShellApp(): React.JSX.Element {
     threadPageUrl: string;
   } | null>(null);
   const [threadTabCopySubOpen, setThreadTabCopySubOpen] = useState(false);
+  const [threadTabRelatedSubOpen, setThreadTabRelatedSubOpen] = useState(false);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [relatedError, setRelatedError] = useState<string | null>(null);
+  const [relatedThreads, setRelatedThreads] = useState<
+    readonly { threadId: string; title: string; similarity: number }[]
+  >([]);
 
   const favoriteUrlToId = useMemo(() => {
     const map = new Map<string, string>();
@@ -522,6 +521,7 @@ export function ShellApp(): React.JSX.Element {
     const handler = (): void => {
       setThreadTabCtx(null);
       setThreadTabCopySubOpen(false);
+      setThreadTabRelatedSubOpen(false);
     };
     document.addEventListener('click', handler);
     return () => {
@@ -619,6 +619,79 @@ export function ShellApp(): React.JSX.Element {
     setThreadTabCtx(null);
   }, [threadTabCtx]);
 
+  const handleOpenRelatedSubMenu = useCallback(() => {
+    if (threadTabCtx === null) return;
+    if (threadTabRelatedSubOpen) return;
+    setThreadTabRelatedSubOpen(true);
+    setRelatedLoading(true);
+    setRelatedError(null);
+    setRelatedThreads([]);
+    const { tab } = threadTabCtx;
+    const threshold = relatedThreadSimilarity / 100;
+    void (async () => {
+      try {
+        const result = await window.electronApi.invoke('bbs:fetch-subject', tab.boardUrl);
+        const currentFileName = `${tab.threadId}.dat`;
+        const baseTitle = tab.title
+          .toLowerCase()
+          .replace(/\s+/g, '')
+          .replace(/★+/g, '');
+        if (baseTitle.length === 0) {
+          setRelatedThreads([]);
+          setRelatedLoading(false);
+          return;
+        }
+        const matches: { threadId: string; title: string; similarity: number }[] = [];
+        for (const s of result.threads) {
+          if (s.fileName === currentFileName) continue;
+          const normalized = s.title
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/★+/g, '');
+          if (normalized.length === 0) continue;
+          const maxLen = Math.max(baseTitle.length, normalized.length);
+          const maxDist = Math.floor(maxLen * (1 - threshold));
+          const dist = boundedLevenshtein(baseTitle, normalized, maxDist);
+          if (dist !== null) {
+            const sim = 1 - dist / maxLen;
+            if (sim >= threshold) {
+              matches.push({
+                threadId: s.fileName.replace('.dat', ''),
+                title: s.title,
+                similarity: sim,
+              });
+            }
+          }
+        }
+        matches.sort((a, b) => b.similarity - a.similarity);
+        setRelatedThreads(matches.slice(0, 12));
+      } catch (err) {
+        setRelatedError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setRelatedLoading(false);
+      }
+    })();
+  }, [threadTabCtx, threadTabRelatedSubOpen, relatedThreadSimilarity]);
+
+  const handleRelatedSubMenuClose = useCallback(() => {
+    setThreadTabRelatedSubOpen(false);
+  }, []);
+
+  const handleOpenRelatedThread = useCallback(
+    (threadId: string, title: string) => {
+      if (threadTabCtx === null) return;
+      void window.electronApi.invoke(
+        'view:create-thread-tab',
+        threadTabCtx.tab.boardUrl,
+        threadId,
+        title,
+      );
+      setThreadTabCtx(null);
+      setThreadTabRelatedSubOpen(false);
+    },
+    [threadTabCtx],
+  );
+
   // ---- Board tab context menu ----
   const [boardTabCtx, setBoardTabCtx] = useState<{
     x: number;
@@ -694,6 +767,17 @@ export function ShellApp(): React.JSX.Element {
     }
     setBoardTabCtx(null);
   }, [boardTabCtx]);
+
+  // Hide native WebContentsViews when any overlay (modal / context menu) is open
+  const anyOverlayOpen =
+    activeModal !== null || threadTabCtx !== null || boardTabCtx !== null;
+  useEffect(() => {
+    if (anyOverlayOpen) {
+      void window.electronApi.invoke('view:hide-tab-views');
+    } else {
+      void window.electronApi.invoke('view:show-tab-views');
+    }
+  }, [anyOverlayOpen]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
@@ -1091,6 +1175,55 @@ export function ShellApp(): React.JSX.Element {
                 >
                   タイトル+URLをコピー
                 </button>
+              </div>
+            )}
+          </div>
+          <div
+            className="relative"
+            onMouseEnter={handleOpenRelatedSubMenu}
+            onMouseLeave={handleRelatedSubMenuClose}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              role="menuitem"
+            >
+              関連スレッド
+              <MdiIcon path={mdiChevronRight} size={12} />
+            </button>
+            {threadTabRelatedSubOpen && (
+              <div className="absolute top-0 left-full z-10 min-w-60 max-w-80 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
+                {relatedLoading && (
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-text-muted)]">
+                    <MdiIcon path={mdiLoading} size={12} className="animate-spin" />
+                    読み込み中...
+                  </div>
+                )}
+                {relatedError !== null && (
+                  <div className="px-3 py-2 text-xs text-[var(--color-error)]">{relatedError}</div>
+                )}
+                {!relatedLoading && relatedError === null && relatedThreads.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-[var(--color-text-muted)]">
+                    関連スレッドが見つかりません
+                  </div>
+                )}
+                {relatedThreads.map((rt) => (
+                  <button
+                    key={rt.threadId}
+                    type="button"
+                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                    onClick={() => {
+                      handleOpenRelatedThread(rt.threadId, rt.title);
+                    }}
+                    role="menuitem"
+                    title={`類似度: ${String(Math.round(rt.similarity * 100))}%`}
+                  >
+                    <span className="block truncate">{rt.title}</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                      {String(Math.round(rt.similarity * 100))}%
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
