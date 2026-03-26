@@ -75,6 +75,18 @@ export function ModalHostApp(): React.JSX.Element {
     });
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        window.close();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   if (initData === null) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--color-bg-primary)] text-sm text-[var(--color-text-muted)]">
