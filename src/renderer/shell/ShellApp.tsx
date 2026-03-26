@@ -4,7 +4,7 @@
  * Content areas (board tab content, thread tab content) are rendered by
  * separate WebContentsViews positioned over placeholder regions.
  */
-import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   mdiBulletinBoard,
   mdiStar,
@@ -23,6 +23,7 @@ import {
   mdiGithub,
   mdiScriptText,
   mdiViewSequential,
+  mdiChevronRight,
 } from '@mdi/js';
 import { useShellStore } from './stores/shell-store';
 import { BoardTree } from '../components/board-tree/BoardTree';
@@ -30,6 +31,7 @@ import { StatusConsole } from '../components/status-console/StatusConsole';
 import { MdiIcon } from '../components/common/MdiIcon';
 import { Modal } from '../components/common/Modal';
 import { ResizeHandle } from '../components/common/ResizeHandle';
+import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
 import {
   type ThemeName,
   ThemeSelector,
@@ -38,7 +40,11 @@ import {
 } from '../components/settings/ThemeSelector';
 import { useDragReorder } from '../hooks/use-drag-reorder';
 import { useTabOrientation } from '../hooks/use-tab-orientation';
-import type { ContentBounds } from '@shared/view-ipc';
+import type { ContentBounds, ThreadTabMeta, BoardTabMeta } from '@shared/view-ipc';
+import type { FavItem, FavNode } from '@shared/favorite';
+import type { RoundItemEntry, RoundBoardEntry } from '@shared/round';
+import { BoardType } from '@shared/domain';
+import { buildResPermalink, detectBoardTypeByHost } from '@shared/url-parser';
 import { useBBSStore } from '../stores/bbs-store';
 
 const FavoriteTree = lazy(() =>
@@ -141,6 +147,9 @@ export function ShellApp(): React.JSX.Element {
   const reorderBoardTabs = useShellStore((s) => s.reorderBoardTabs);
   const reorderThreadTabs = useShellStore((s) => s.reorderThreadTabs);
   const updateTabRegistry = useShellStore((s) => s.updateTabRegistry);
+  const favorites = useShellStore((s) => s.favorites);
+  const addFavorite = useShellStore((s) => s.addFavorite);
+  const removeFavorite = useShellStore((s) => s.removeFavorite);
 
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
@@ -481,6 +490,211 @@ export function ShellApp(): React.JSX.Element {
     [closeTab],
   );
 
+  // ---- Thread tab context menu ----
+  const [threadTabCtx, setThreadTabCtx] = useState<{
+    x: number;
+    y: number;
+    tab: ThreadTabMeta;
+    isFavorite: boolean;
+    isRoundItem: boolean;
+    threadPageUrl: string;
+  } | null>(null);
+  const [threadTabCopySubOpen, setThreadTabCopySubOpen] = useState(false);
+
+  const favoriteUrlToId = useMemo(() => {
+    const map = new Map<string, string>();
+    const walk = (nodes: readonly FavNode[]): void => {
+      for (const node of nodes) {
+        if (node.kind === 'item' && node.type === 'thread') {
+          map.set(node.url, node.id);
+        }
+        if (node.kind === 'folder') {
+          walk(node.children);
+        }
+      }
+    };
+    walk(favorites.children);
+    return map;
+  }, [favorites]);
+
+  useEffect(() => {
+    if (threadTabCtx === null) return;
+    const handler = (): void => {
+      setThreadTabCtx(null);
+      setThreadTabCopySubOpen(false);
+    };
+    document.addEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+    };
+  }, [threadTabCtx]);
+
+  const handleThreadTabContextMenu = useCallback(
+    (e: React.MouseEvent, tab: ThreadTabMeta) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
+      const threadPageUrl = buildResPermalink(tab.boardUrl, tab.threadId, 1).replace(/1$/, '');
+      void (async () => {
+        let isRoundItem = false;
+        try {
+          const roundItems = await window.electronApi.invoke('round:get-items');
+          const fileName = `${tab.threadId}.dat`;
+          isRoundItem = roundItems.some(
+            (item: RoundItemEntry) => item.url === tab.boardUrl && item.fileName === fileName,
+          );
+        } catch {
+          isRoundItem = false;
+        }
+        setThreadTabCtx({
+          x: e.clientX,
+          y: e.clientY,
+          tab,
+          isFavorite: favoriteUrlToId.has(threadUrl),
+          isRoundItem,
+          threadPageUrl,
+        });
+      })();
+    },
+    [favoriteUrlToId],
+  );
+
+  const handleThreadTabCtxRefresh = useCallback(() => {
+    if (threadTabCtx === null) return;
+    setActiveTab(threadTabCtx.tab.id);
+    void window.electronApi.invoke('view:switch-thread-tab', threadTabCtx.tab.id);
+    setThreadTabCtx(null);
+  }, [threadTabCtx, setActiveTab]);
+
+  const handleThreadTabCtxToggleRound = useCallback(() => {
+    if (threadTabCtx === null) return;
+    const { tab } = threadTabCtx;
+    const fileName = `${tab.threadId}.dat`;
+    if (threadTabCtx.isRoundItem) {
+      void window.electronApi.invoke('round:remove-item', tab.boardUrl, fileName);
+    } else {
+      void window.electronApi.invoke('round:add-item', {
+        url: tab.boardUrl,
+        boardTitle: '',
+        fileName,
+        threadTitle: tab.title,
+        roundName: '',
+      } satisfies RoundItemEntry);
+    }
+    setThreadTabCtx(null);
+  }, [threadTabCtx]);
+
+  const handleThreadTabCtxToggleFav = useCallback(() => {
+    if (threadTabCtx === null) return;
+    const { tab } = threadTabCtx;
+    const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
+    const existingFavId = favoriteUrlToId.get(threadUrl);
+    if (existingFavId !== undefined) {
+      void removeFavorite(existingFavId);
+    } else {
+      let boardType: BoardType;
+      try {
+        boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
+      } catch {
+        boardType = BoardType.Type2ch;
+      }
+      const node: FavItem = {
+        id: `fav-${tab.threadId}-${String(Date.now())}`,
+        kind: 'item',
+        type: 'thread',
+        boardType,
+        url: threadUrl,
+        title: tab.title,
+      };
+      void addFavorite(node);
+    }
+    setThreadTabCtx(null);
+  }, [threadTabCtx, favoriteUrlToId, addFavorite, removeFavorite]);
+
+  const handleThreadTabCtxOpenExternal = useCallback(() => {
+    if (threadTabCtx === null) return;
+    if (threadTabCtx.threadPageUrl.length > 0) {
+      void window.electronApi.invoke('shell:open-external', threadTabCtx.threadPageUrl);
+    }
+    setThreadTabCtx(null);
+  }, [threadTabCtx]);
+
+  // ---- Board tab context menu ----
+  const [boardTabCtx, setBoardTabCtx] = useState<{
+    x: number;
+    y: number;
+    tab: BoardTabMeta;
+    isRoundBoard: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (boardTabCtx === null) return;
+    const handler = (): void => {
+      setBoardTabCtx(null);
+    };
+    document.addEventListener('click', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+    };
+  }, [boardTabCtx]);
+
+  const handleBoardTabContextMenu = useCallback((e: React.MouseEvent, tab: BoardTabMeta) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void (async () => {
+      let isRoundBoard = false;
+      try {
+        const roundBoards = await window.electronApi.invoke('round:get-boards');
+        isRoundBoard = roundBoards.some((board: RoundBoardEntry) => board.url === tab.boardUrl);
+      } catch {
+        isRoundBoard = false;
+      }
+      setBoardTabCtx({ x: e.clientX, y: e.clientY, tab, isRoundBoard });
+    })();
+  }, []);
+
+  const handleBoardTabCtxRefresh = useCallback(() => {
+    if (boardTabCtx === null) return;
+    setActiveBoardTab(boardTabCtx.tab.id);
+    setBoardTabCtx(null);
+  }, [boardTabCtx, setActiveBoardTab]);
+
+  const handleBoardTabCtxAddFav = useCallback(() => {
+    if (boardTabCtx === null) return;
+    const { tab } = boardTabCtx;
+    let boardType: BoardType;
+    try {
+      boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
+    } catch {
+      boardType = BoardType.Type2ch;
+    }
+    const node: FavItem = {
+      id: `fav-board-${String(Date.now())}`,
+      kind: 'item',
+      type: 'board',
+      boardType,
+      url: tab.boardUrl,
+      title: tab.title,
+    };
+    void addFavorite(node);
+    setBoardTabCtx(null);
+  }, [boardTabCtx, addFavorite]);
+
+  const handleBoardTabCtxToggleRound = useCallback(() => {
+    if (boardTabCtx === null) return;
+    const { tab } = boardTabCtx;
+    if (boardTabCtx.isRoundBoard) {
+      void window.electronApi.invoke('round:remove-board', tab.boardUrl);
+    } else {
+      void window.electronApi.invoke('round:add-board', {
+        url: tab.boardUrl,
+        boardTitle: tab.title,
+        roundName: '',
+      } satisfies RoundBoardEntry);
+    }
+    setBoardTabCtx(null);
+  }, [boardTabCtx]);
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       {/* Toolbar */}
@@ -698,6 +912,9 @@ export function ShellApp(): React.JSX.Element {
                     onClick={() => {
                       setActiveBoardTab(bt.id);
                     }}
+                    onContextMenu={(e) => {
+                      handleBoardTabContextMenu(e, bt);
+                    }}
                     {...getBoardTabDragProps(i)}
                   >
                     <span className="min-w-0 flex-1 truncate">{bt.title}</span>
@@ -766,6 +983,9 @@ export function ShellApp(): React.JSX.Element {
                   onClick={() => {
                     setActiveTab(tab.id);
                   }}
+                  onContextMenu={(e) => {
+                    handleThreadTabContextMenu(e, tab);
+                  }}
                   {...getThreadTabDragProps(i)}
                 >
                   <span className="min-w-0 flex-1 truncate">{tab.title}</span>
@@ -799,6 +1019,135 @@ export function ShellApp(): React.JSX.Element {
           <div ref={threadTabAreaRef} className="min-h-0 flex-1 bg-[var(--color-bg-primary)]" />
         </div>
       </div>
+
+      {/* Thread tab context menu */}
+      {threadTabCtx !== null && (
+        <ContextMenuContainer
+          x={threadTabCtx.x}
+          y={threadTabCtx.y}
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleThreadTabCtxRefresh}
+            role="menuitem"
+          >
+            更新
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleThreadTabCtxToggleRound}
+            role="menuitem"
+          >
+            {threadTabCtx.isRoundItem ? '巡回から削除' : '巡回に追加'}
+          </button>
+          <div
+            className="relative"
+            onMouseEnter={() => {
+              setThreadTabCopySubOpen(true);
+            }}
+            onMouseLeave={() => {
+              setThreadTabCopySubOpen(false);
+            }}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              role="menuitem"
+            >
+              コピー
+              <MdiIcon path={mdiChevronRight} size={12} />
+            </button>
+            {threadTabCopySubOpen && (
+              <div className="absolute top-0 left-full z-10 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
+                <button
+                  type="button"
+                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  onClick={() => {
+                    if (threadTabCtx.threadPageUrl.length > 0) {
+                      void navigator.clipboard.writeText(threadTabCtx.threadPageUrl);
+                    }
+                    setThreadTabCtx(null);
+                  }}
+                  role="menuitem"
+                >
+                  スレッドのURLをコピー
+                </button>
+                <button
+                  type="button"
+                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  onClick={() => {
+                    if (threadTabCtx.threadPageUrl.length > 0) {
+                      void navigator.clipboard.writeText(
+                        `${threadTabCtx.tab.title}\n${threadTabCtx.threadPageUrl}`,
+                      );
+                    }
+                    setThreadTabCtx(null);
+                  }}
+                  role="menuitem"
+                >
+                  タイトル+URLをコピー
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleThreadTabCtxOpenExternal}
+            role="menuitem"
+          >
+            外部ブラウザで開く
+          </button>
+          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleThreadTabCtxToggleFav}
+            role="menuitem"
+          >
+            {threadTabCtx.isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
+          </button>
+        </ContextMenuContainer>
+      )}
+
+      {/* Board tab context menu */}
+      {boardTabCtx !== null && (
+        <ContextMenuContainer
+          x={boardTabCtx.x}
+          y={boardTabCtx.y}
+          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+          role="menu"
+        >
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleBoardTabCtxRefresh}
+            role="menuitem"
+          >
+            更新
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleBoardTabCtxAddFav}
+            role="menuitem"
+          >
+            お気に入りに追加
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+            onClick={handleBoardTabCtxToggleRound}
+            role="menuitem"
+          >
+            {boardTabCtx.isRoundBoard ? '巡回から削除' : '巡回に追加'}
+          </button>
+        </ContextMenuContainer>
+      )}
 
       {/* Status bar */}
       <footer className="flex h-6 shrink-0 items-center justify-between border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4">

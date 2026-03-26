@@ -27,6 +27,7 @@ import {
   mdiImage,
   mdiEye,
   mdiVolumeHigh,
+  mdiChevronRight,
 } from '@mdi/js';
 import { createPortal } from 'react-dom';
 import type { Res } from '@shared/domain';
@@ -61,10 +62,16 @@ import { ImageThumbnail } from '../components/thread-view/ImageThumbnail';
 import { InlineVideo } from '../components/thread-view/InlineVideo';
 import { InlineAudio } from '../components/thread-view/InlineAudio';
 import { isAsciiArt } from '../utils/aa-detect';
-import { extractId, extractWatchoi, extractKotehan, type WatchoiInfo } from '../utils/thread-analysis';
+import {
+  extractId,
+  extractWatchoi,
+  extractKotehan,
+  type WatchoiInfo,
+} from '../utils/thread-analysis';
 import { extractIps } from '../utils/ip-detect';
 import { useScrollKeyboard } from '../hooks/use-scroll-keyboard';
 import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
+import { buildResPermalink } from '@shared/url-parser';
 import type { ThreadTabInitData } from '@shared/view-ipc';
 import type { IpLookupResult } from '@shared/ipc';
 
@@ -181,9 +188,7 @@ function FilterLink({
       title={`${String(count)}件 — クリックで絞り込み`}
     >
       {children}
-      {count > 1 && (
-        <span className="ml-0.5 text-[10px] opacity-60">({count})</span>
-      )}
+      {count > 1 && <span className="ml-0.5 text-[10px] opacity-60">({count})</span>}
     </button>
   );
 }
@@ -365,6 +370,8 @@ export function ThreadTabApp(): React.JSX.Element {
     y: number;
   } | null>(null);
   const [openContextSubMenu, setOpenContextSubMenu] = useState<string | null>(null);
+  const [contextSelectedText, setContextSelectedText] = useState('');
+  const [aaOverrides, setAaOverrides] = useState(() => new Map<number, boolean>());
   const [ipLookupPopup, setIpLookupPopup] = useState<{
     ip: string;
     result: IpLookupResult | null;
@@ -684,7 +691,15 @@ export function ThreadTabApp(): React.JSX.Element {
       result = result.filter((r) => filterNums.has(r.number));
     }
     return result;
-  }, [responses, searchFilteredResNumbers, filterKey, idResMap, watchoiResMap, kotehanResMap, ipResMap]);
+  }, [
+    responses,
+    searchFilteredResNumbers,
+    filterKey,
+    idResMap,
+    watchoiResMap,
+    kotehanResMap,
+    ipResMap,
+  ]);
 
   const allThreadImageUrls = useMemo(() => {
     const urls: string[] = [];
@@ -828,6 +843,8 @@ export function ThreadTabApp(): React.JSX.Element {
   }, []);
 
   const handleContextMenuAction = useCallback((resNumber: number, x: number, y: number) => {
+    const selection = window.getSelection();
+    setContextSelectedText(selection !== null ? selection.toString().trim() : '');
     setOpenContextSubMenu(null);
     setContextMenu({ resNumber, x, y });
   }, []);
@@ -873,6 +890,14 @@ export function ThreadTabApp(): React.JSX.Element {
     [boardUrl, threadId],
   );
 
+  const handleToggleAaFont = useCallback((resNumber: number, forceAa: boolean) => {
+    setAaOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(resNumber, forceAa);
+      return next;
+    });
+  }, []);
+
   // Render a single response
   const renderResponse = useCallback(
     (res: Res) => {
@@ -887,7 +912,8 @@ export function ThreadTabApp(): React.JSX.Element {
       const sanitized = sanitizeHtml(res.body);
       const withAnchors = convertAnchorsToLinks(sanitized);
       const withUrls = linkifyUrls(withAnchors);
-      const isAA = isAsciiArt(res.body);
+      const isAutoAa = isAsciiArt(res.body);
+      const isAA = aaOverrides.get(res.number) ?? isAutoAa;
 
       const imageUrls = inlineMediaEnabled ? detectImageUrls(res.body) : [];
       const videoUrls = inlineMediaEnabled ? detectVideoUrls(res.body) : [];
@@ -1093,6 +1119,7 @@ export function ThreadTabApp(): React.JSX.Element {
       boardUrl,
       threadId,
       title,
+      aaOverrides,
     ],
   );
 
@@ -1386,45 +1413,82 @@ export function ThreadTabApp(): React.JSX.Element {
           const ctxWatchoi = extractWatchoi(ctxRes);
           const ctxPlainName = stripHtml(ctxRes.name);
           const ctxPlainBody = stripHtml(ctxRes.body.replace(/<br\s*\/?>/gi, '\n'));
+          const ctxPermalink = buildResPermalink(boardUrl, threadId, ctxRes.number);
+          const ctxHeader = `${String(ctxRes.number)} ${ctxPlainName}${ctxRes.mail.length > 0 ? ` [${ctxRes.mail}]` : ''} ${ctxRes.dateTime}`;
+          const ctxIsAaFinal = aaOverrides.get(ctxRes.number) ?? isAsciiArt(ctxRes.body);
+
+          const fields = extractStringFields(ctxRes, '');
+          const ctxIps = extractIps(ctxRes);
+
+          const copyOptions = [
+            { label: '名前をコピー', value: ctxHeader },
+            { label: '本文をコピー', value: ctxPlainBody },
+            { label: 'URLをコピー', value: ctxPermalink },
+            { label: '名前+本文+URL', value: `${ctxHeader}\n${ctxPlainBody}\n${ctxPermalink}` },
+            { label: '本文+URL', value: `${ctxPlainBody}\n${ctxPermalink}` },
+          ] as const;
+
           const ngOptions: Array<{
             key: string;
             label: string;
             field: NgStringField;
             token: string;
           }> = [];
-          if (ctxPlainName.length > 0) {
-            ngOptions.push({
-              key: 'name',
-              label: `名前: ${ctxPlainName}`,
-              field: NgStringFieldEnum.Name,
-              token: ctxPlainName,
-            });
-          }
+          const pushNg = (
+            key: string,
+            label: string,
+            field: NgStringField,
+            token: string,
+          ): void => {
+            const normalized = token.trim();
+            if (normalized.length === 0) return;
+            ngOptions.push({ key, label, field, token: normalized });
+          };
+          pushNg('name', `名前: ${ctxPlainName}`, NgStringFieldEnum.Name, ctxPlainName);
+          pushNg(
+            'body',
+            `本文: ${ctxPlainBody.length > 40 ? `${ctxPlainBody.slice(0, 40)}…` : ctxPlainBody}`,
+            NgStringFieldEnum.Body,
+            ctxPlainBody,
+          );
+          pushNg('mail', `メール: ${ctxRes.mail}`, NgStringFieldEnum.Mail, ctxRes.mail);
           if (ctxId !== null) {
-            ngOptions.push({
-              key: 'id',
-              label: `ID: ${ctxId}`,
-              field: NgStringFieldEnum.Id,
-              token: ctxId,
-            });
+            pushNg('id', `ID: ${ctxId}`, NgStringFieldEnum.Id, ctxId);
           }
+          pushNg(
+            'trip',
+            `トリップ: ${fields[NgStringFieldEnum.Trip]}`,
+            NgStringFieldEnum.Trip,
+            fields[NgStringFieldEnum.Trip],
+          );
           if (ctxWatchoi !== null) {
-            ngOptions.push({
-              key: 'watchoi',
-              label: `ワッチョイ: ${ctxWatchoi.label}`,
-              field: NgStringFieldEnum.Watchoi,
-              token: ctxWatchoi.label,
-            });
+            pushNg(
+              'watchoi',
+              `ワッチョイ: ${ctxWatchoi.label}`,
+              NgStringFieldEnum.Watchoi,
+              ctxWatchoi.label,
+            );
           }
-          if (ctxPlainBody.length > 0) {
-            const bodyPreview =
-              ctxPlainBody.length > 40 ? `${ctxPlainBody.slice(0, 40)}…` : ctxPlainBody;
-            ngOptions.push({
-              key: 'body',
-              label: `本文: ${bodyPreview}`,
-              field: NgStringFieldEnum.Body,
-              token: ctxPlainBody,
-            });
+          for (const [index, ip] of ctxIps.entries()) {
+            pushNg(`ip-${String(index)}`, `IP: ${ip}`, NgStringFieldEnum.Ip, ip);
+          }
+          pushNg(
+            'be',
+            `BE: ${fields[NgStringFieldEnum.Be]}`,
+            NgStringFieldEnum.Be,
+            fields[NgStringFieldEnum.Be],
+          );
+          const urls = fields[NgStringFieldEnum.Url].split('\n').filter((u) => u.length > 0);
+          for (const [index, url] of urls.entries()) {
+            pushNg(`url-${String(index)}`, `URL: ${url}`, NgStringFieldEnum.Url, url);
+          }
+          if (contextSelectedText.length > 0) {
+            pushNg(
+              'selected-all',
+              `選択テキスト（全項目）: ${contextSelectedText}`,
+              NgStringFieldEnum.All,
+              contextSelectedText,
+            );
           }
 
           return createPortal(
@@ -1467,6 +1531,48 @@ export function ThreadTabApp(): React.JSX.Element {
                 レスを引用 (&gt;&gt;{ctxRes.number})
               </button>
               <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+              {/* Copy submenu */}
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  setOpenContextSubMenu('copy');
+                }}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                  role="menuitem"
+                >
+                  コピー
+                  <MdiIcon path={mdiChevronRight} size={12} />
+                </button>
+                {openContextSubMenu === 'copy' && (
+                  <div
+                    className="absolute top-0 left-full z-10 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+                    onMouseEnter={() => {
+                      setOpenContextSubMenu('copy');
+                    }}
+                  >
+                    {copyOptions.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void navigator.clipboard.writeText(opt.value.trim());
+                          setContextMenu(null);
+                          setOpenContextSubMenu(null);
+                        }}
+                        role="menuitem"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* NG submenu */}
               <div
                 className="relative"
                 onMouseEnter={() => {
@@ -1479,7 +1585,7 @@ export function ThreadTabApp(): React.JSX.Element {
                   role="menuitem"
                 >
                   NG追加
-                  <span className="ml-2 text-[9px]">▶</span>
+                  <MdiIcon path={mdiChevronRight} size={12} />
                 </button>
                 {openContextSubMenu === 'ng' && (
                   <div
@@ -1512,6 +1618,19 @@ export function ThreadTabApp(): React.JSX.Element {
                   </div>
                 )}
               </div>
+              <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                onClick={() => {
+                  handleToggleAaFont(ctxRes.number, !ctxIsAaFinal);
+                  setContextMenu(null);
+                  setOpenContextSubMenu(null);
+                }}
+                role="menuitem"
+              >
+                {ctxIsAaFinal ? '通常フォントに戻す' : 'AAフォントで表示'}
+              </button>
             </ContextMenuContainer>,
             document.body,
           );
@@ -1544,9 +1663,13 @@ export function ThreadTabApp(): React.JSX.Element {
                   <dt className="font-medium text-[var(--color-text-muted)]">IP</dt>
                   <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.ip}</dd>
                   <dt className="font-medium text-[var(--color-text-muted)]">国</dt>
-                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.country}</dd>
+                  <dd className="text-[var(--color-text-primary)]">
+                    {ipLookupPopup.result.country}
+                  </dd>
                   <dt className="font-medium text-[var(--color-text-muted)]">地域</dt>
-                  <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.region}</dd>
+                  <dd className="text-[var(--color-text-primary)]">
+                    {ipLookupPopup.result.region}
+                  </dd>
                   <dt className="font-medium text-[var(--color-text-muted)]">都市</dt>
                   <dd className="text-[var(--color-text-primary)]">{ipLookupPopup.result.city}</dd>
                   <dt className="font-medium text-[var(--color-text-muted)]">ISP</dt>

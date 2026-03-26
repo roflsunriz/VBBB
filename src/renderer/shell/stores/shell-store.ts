@@ -160,7 +160,11 @@ export const useShellStore = create<ShellState>((set, get) => ({
     pushStatus('board', 'info', '板一覧を取得中...');
     try {
       const menu = await getApi().invoke('bbs:fetch-menu');
-      set({ menu, menuLoading: false, statusMessage: `${String(menu.categories.length)} カテゴリを読み込みました` });
+      set({
+        menu,
+        menuLoading: false,
+        statusMessage: `${String(menu.categories.length)} カテゴリを読み込みました`,
+      });
       pushStatus('board', 'success', `板一覧取得完了: ${String(menu.categories.length)} カテゴリ`);
       return menu;
     } catch (err) {
