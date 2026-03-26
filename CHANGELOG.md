@@ -5,6 +5,17 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-03-26
+
+### Fixed
+
+- 右クリックメニューやモーダル表示時にタブコンテンツ（板一覧・スレッド本文）が非表示になる動作を廃止
+  - `WebContentsView` を常に表示したまま維持するよう変更
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.1.1` に更新
+
 ## [3.1.0] - 2026-03-26
 
 ### Added
