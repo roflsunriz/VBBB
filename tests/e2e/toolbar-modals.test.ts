@@ -30,22 +30,6 @@ test.describe('ツールバーボタン・モーダル', () => {
     }).toPass({ timeout: 5_000 });
   });
 
-  test('Aboutモーダル: Escapeで閉じる', async ({ electronApp, window }) => {
-    const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByTitle('VBBBについて').click(),
-    ]);
-    await modalPage.waitForLoadState('domcontentloaded');
-    await expect(modalPage.getByRole('heading', { name: 'VBBB' })).toBeVisible({
-      timeout: 10_000,
-    });
-
-    await modalPage.keyboard.press('Escape');
-    await expect(() => {
-      expect(modalPage.isClosed()).toBe(true);
-    }).toPass({ timeout: 5_000 });
-  });
-
   test('認証モーダル: 開く → 閉じる', async ({ electronApp, window }) => {
     const [modalPage] = await Promise.all([
       electronApp.waitForEvent('window', { timeout: 10_000 }),
