@@ -5,6 +5,29 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-03-27
+
+### Fixed
+
+- **パネルウィンドウ（書き込み・プログラマティック書き込み・NG管理）の高さがウィンドウリサイズに追従しない問題を修正**
+  - `PostEditor` / `ProgrammaticPost`: `standalone` prop を追加し、スタンドアロンウィンドウ時は固定高さ (`style={{ height }}`) の代わりに `flex-1 min-h-0` でウィンドウいっぱいに伸縮するよう変更
+  - `NgEditor`: スタンドアロンモード時のクラスを `h-80 min-h-48 max-h-[70vh]` から `h-full` に変更
+  - スタンドアロン時は不要な `TopResizeHandle` を非表示化
+- **リサイズ可能なモーダルウィンドウ（認証設定・プロキシ設定・巡回リスト・NG設定・Cookie/UA管理・診断コンソール・DSLエディタ）がサイズ・位置を記憶しない問題を修正**
+  - `ModalWindowManager` に `modal-state.json` への bounds 保存/復元を実装
+  - リサイズ不可のモーダル（外部板追加・アップデート確認・VBBBについて）は対象外
+
+### Changed
+
+- 書き込み欄のテキストエリアのデフォルト行数を `rows={4}` から `rows={35}` に拡大
+- プログラマティック書き込み欄のテキストエリアのデフォルト行数を `rows={2}` から `rows={30}` に拡大
+- DSLエディタの投稿本文テキストエリアのデフォルト行数を `rows={3}` から `rows={6}` に拡大
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.2.1` に更新
+
+### Added
+
+- 型定義 `ModalWindowState` (`src/types/view-ipc.ts`)
+
 ## [3.2.0] - 2026-03-26
 
 ### Changed
