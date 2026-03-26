@@ -44,7 +44,7 @@ const MODAL_CONFIGS: Record<ModalWindowType, ModalConfig> = {
   'cookie-manager': { width: 600, height: 500, title: 'Cookie/UA管理', resizable: true },
   console: { width: 900, height: 600, title: '診断コンソール', resizable: true },
   'add-board': { width: 512, height: 320, title: '外部板追加', resizable: false },
-  update: { width: 450, height: 340, title: 'アップデート確認', resizable: false },
+  update: { width: 450, height: 375, title: 'アップデート確認', resizable: false },
   'dsl-editor': { width: 800, height: 600, title: 'DSLエディタ', resizable: true },
 };
 
