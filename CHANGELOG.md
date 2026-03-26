@@ -5,6 +5,33 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-26
+
+### Added
+
+- スレッドタブの右クリックメニュー (ShellApp)
+  - 更新・巡回追加/削除・コピー (URL / タイトル+URL) サブメニュー・外部ブラウザで開く・お気に入り追加/削除
+- 板タブの右クリックメニュー (ShellApp)
+  - 更新・お気に入りに追加・巡回追加/削除
+- スレッドタブの右クリック「関連スレッド」サブメニュー
+  - Levenshtein距離ベースの類似度計算で同板内の関連スレッドを検出・一覧表示
+  - ツールバーの「関連閾値」設定と連動
+- レス右クリックメニューのコピーサブメニュー (ThreadTabApp)
+  - 名前・本文・URL・名前+本文+URL・本文+URL
+- レス右クリックメニューのNG追加サブメニュー拡充 (ThreadTabApp)
+  - Mail・Trip・IP・BE・URL・選択テキストのNG追加
+- レス右クリックメニューのAAフォント切替 (ThreadTabApp)
+- `boundedLevenshtein` ユーティリティ関数を新規追加 (`src/renderer/utils/levenshtein.ts`)
+
+### Fixed
+
+- タブ右クリックメニューが `WebContentsView` の下に隠れる問題を修正
+  - コンテキストメニュー表示時にネイティブビューを一時的に非表示化するよう制御を追加
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.1.0` に更新
+
 ## [3.0.0] - 2026-03-25
 
 ### BREAKING CHANGES
