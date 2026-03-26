@@ -70,6 +70,22 @@ export interface ThreadTabInitData {
 
 export type PanelType = 'post-editor' | 'programmatic-post' | 'ng-editor';
 
+export type ModalWindowType =
+  | 'auth'
+  | 'proxy'
+  | 'round'
+  | 'ng'
+  | 'about'
+  | 'cookie-manager'
+  | 'console'
+  | 'add-board'
+  | 'update'
+  | 'dsl-editor';
+
+export interface ModalWindowInitData {
+  readonly modalType: ModalWindowType;
+}
+
 export interface PanelWindowInitData {
   readonly panelType: PanelType;
   readonly boardUrl: string;
@@ -104,6 +120,9 @@ export interface ViewPushEventMap {
     readonly panelType: PanelType;
     readonly boardUrl: string;
     readonly threadId: string;
+  };
+  'modal:closed': {
+    readonly modalType: ModalWindowType;
   };
 }
 

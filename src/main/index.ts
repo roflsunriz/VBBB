@@ -13,9 +13,11 @@ import {
   saveTabsSync,
 } from './services/tab-persistence';
 import { ViewManager } from './view-manager';
-import { setViewManager } from './view-manager-ref';
+import { setViewManager, getViewManagerOrNull } from './view-manager-ref';
 import { PanelWindowManager } from './panel-window-manager';
 import { setPanelWindowManager } from './panel-window-ref';
+import { ModalWindowManager } from './modal-window-manager';
+import { setModalWindowManager } from './modal-window-ref';
 
 const startupLogger = createLogger('startup');
 const rendererLogger = createLogger('renderer');
@@ -50,6 +52,15 @@ function createWindow(): BaseWindow {
 
   const panelMgr = new PanelWindowManager(mainWindow, dataDir);
   setPanelWindowManager(panelMgr);
+
+  const modalMgr = new ModalWindowManager();
+  modalMgr.setOnModalClosed((modalType) => {
+    const vm = getViewManagerOrNull();
+    if (vm !== null) {
+      vm.broadcastToShell('modal:closed', { modalType });
+    }
+  });
+  setModalWindowManager(modalMgr);
 
   const savedTabs = loadSavedTabs(dataDir);
   const session = loadSessionState(dataDir);

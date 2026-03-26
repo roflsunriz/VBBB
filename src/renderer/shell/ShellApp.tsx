@@ -20,18 +20,14 @@ import {
   mdiConsoleLine,
   mdiLinkPlus,
   mdiHistory,
-  mdiGithub,
   mdiScriptText,
   mdiViewSequential,
-  mdiChevronRight,
 } from '@mdi/js';
 import { useShellStore } from './stores/shell-store';
 import { BoardTree } from '../components/board-tree/BoardTree';
 import { StatusConsole } from '../components/status-console/StatusConsole';
 import { MdiIcon } from '../components/common/MdiIcon';
-import { Modal } from '../components/common/Modal';
 import { ResizeHandle } from '../components/common/ResizeHandle';
-import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
 import {
   type ThemeName,
   ThemeSelector,
@@ -40,8 +36,9 @@ import {
 } from '../components/settings/ThemeSelector';
 import { useDragReorder } from '../hooks/use-drag-reorder';
 import { useTabOrientation } from '../hooks/use-tab-orientation';
-import type { ContentBounds, ThreadTabMeta, BoardTabMeta } from '@shared/view-ipc';
+import type { ContentBounds, ThreadTabMeta, BoardTabMeta, ModalWindowType } from '@shared/view-ipc';
 import type { FavItem, FavNode } from '@shared/favorite';
+import type { NativeContextMenuItem } from '@shared/ipc';
 import type { RoundItemEntry, RoundBoardEntry } from '@shared/round';
 import { BoardType } from '@shared/domain';
 import { buildResPermalink, detectBoardTypeByHost } from '@shared/url-parser';
@@ -58,47 +55,7 @@ const HistoryPanel = lazy(() =>
   import('../components/history/HistoryPanel').then((m) => ({ default: m.HistoryPanel })),
 );
 
-const NgEditor = lazy(() =>
-  import('../components/ng-editor/NgEditor').then((m) => ({ default: m.NgEditor })),
-);
-const AuthPanel = lazy(() =>
-  import('../components/auth/AuthPanel').then((m) => ({ default: m.AuthPanel })),
-);
-const ProxySettings = lazy(() =>
-  import('../components/settings/ProxySettings').then((m) => ({ default: m.ProxySettings })),
-);
-const RoundPanel = lazy(() =>
-  import('../components/round/RoundPanel').then((m) => ({ default: m.RoundPanel })),
-);
-const CookieManager = lazy(() =>
-  import('../components/settings/CookieManager').then((m) => ({ default: m.CookieManager })),
-);
-const ConsoleModal = lazy(() =>
-  import('../components/console/ConsoleModal').then((m) => ({ default: m.ConsoleModal })),
-);
-const AddBoardDialog = lazy(() =>
-  import('../components/board-tree/AddBoardDialog').then((m) => ({ default: m.AddBoardDialog })),
-);
-const UpdateDialog = lazy(() =>
-  import('../components/update/UpdateDialog').then((m) => ({ default: m.UpdateDialog })),
-);
-const DslEditor = lazy(() =>
-  import('../components/dsl-editor/DslEditor').then((m) => ({ default: m.DslEditor })),
-);
-
 type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
-type ModalType =
-  | 'auth'
-  | 'proxy'
-  | 'round'
-  | 'ng'
-  | 'about'
-  | 'cookie-manager'
-  | 'console'
-  | 'add-board'
-  | 'update'
-  | 'dsl-editor'
-  | null;
 
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
@@ -154,7 +111,6 @@ export function ShellApp(): React.JSX.Element {
 
   const [leftTab, setLeftTab] = useState<LeftPaneTab>('boards');
   const [theme, setTheme] = useState<ThemeName>(getStoredTheme);
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [roundTimerEnabled, setRoundTimerEnabled] = useState(false);
 
   const [leftWidth, setLeftWidth] = useState(() =>
@@ -181,13 +137,9 @@ export function ShellApp(): React.JSX.Element {
 
   // Refs for stale closure avoidance
   const setLeftTabRef = useRef(setLeftTab);
-  const setActiveModalRef = useRef(setActiveModal);
   useEffect(() => {
     setLeftTabRef.current = setLeftTab;
   }, [setLeftTab]);
-  useEffect(() => {
-    setActiveModalRef.current = setActiveModal;
-  }, [setActiveModal]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -351,22 +303,10 @@ export function ShellApp(): React.JSX.Element {
               }
               break;
             case 'open-modal':
-              if (
-                action.modal === 'auth' ||
-                action.modal === 'proxy' ||
-                action.modal === 'round' ||
-                action.modal === 'ng' ||
-                action.modal === 'about' ||
-                action.modal === 'cookie-manager' ||
-                action.modal === 'console' ||
-                action.modal === 'update' ||
-                action.modal === 'dsl-editor'
-              ) {
-                setActiveModalRef.current(action.modal);
-              }
+              void api.invoke('modal:open', action.modal as ModalWindowType);
               break;
             case 'toggle-ng':
-              setActiveModalRef.current((prev) => (prev === 'ng' ? null : 'ng'));
+              void api.invoke('modal:open', 'ng');
               break;
             case 'set-related-thread-similarity':
               useShellStore.getState().setRelatedThreadSimilarity(action.value);
@@ -403,16 +343,6 @@ export function ShellApp(): React.JSX.Element {
     setTheme(newTheme);
   }, []);
 
-  const closeModal = useCallback(() => {
-    setActiveModal(null);
-  }, []);
-  const closeRoundModal = useCallback(() => {
-    setActiveModal(null);
-    void window.electronApi.invoke('round:get-timer').then((cfg) => {
-      setRoundTimerEnabled(cfg.enabled);
-    });
-  }, []);
-
   const handleRefreshBoards = useCallback(() => {
     void fetchMenu().then((menu) => {
       if (menu !== null && menu.categories.length > 0) {
@@ -421,29 +351,21 @@ export function ShellApp(): React.JSX.Element {
     });
   }, [fetchMenu]);
 
-  const openAuth = useCallback(() => {
-    setActiveModal('auth');
+  const openModal = useCallback((type: ModalWindowType) => {
+    void window.electronApi.invoke('modal:open', type);
   }, []);
-  const openProxy = useCallback(() => {
-    setActiveModal('proxy');
-  }, []);
-  const openRound = useCallback(() => {
-    setActiveModal('round');
-  }, []);
-  const openCookieManager = useCallback(() => {
-    setActiveModal('cookie-manager');
-  }, []);
-  const openConsole = useCallback(() => {
-    setActiveModal('console');
-  }, []);
-  const openAbout = useCallback(() => {
-    setActiveModal('about');
-  }, []);
-  const openAddBoard = useCallback(() => {
-    setActiveModal('add-board');
-  }, []);
-  const openDslEditor = useCallback(() => {
-    setActiveModal('dsl-editor');
+
+  // Listen for modal:closed push events
+  useEffect(() => {
+    const unsubscribe = window.electronApi.on('modal:closed', (...args: unknown[]) => {
+      const data = args[0] as { modalType: ModalWindowType };
+      if (data.modalType === 'round') {
+        void window.electronApi.invoke('round:get-timer').then((cfg) => {
+          setRoundTimerEnabled(cfg.enabled);
+        });
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const handleLeftResize = useCallback((delta: number) => {
@@ -483,23 +405,7 @@ export function ShellApp(): React.JSX.Element {
     [closeTab],
   );
 
-  // ---- Thread tab context menu ----
-  const [threadTabCtx, setThreadTabCtx] = useState<{
-    x: number;
-    y: number;
-    tab: ThreadTabMeta;
-    isFavorite: boolean;
-    isRoundItem: boolean;
-    threadPageUrl: string;
-  } | null>(null);
-  const [threadTabCopySubOpen, setThreadTabCopySubOpen] = useState(false);
-  const [threadTabRelatedSubOpen, setThreadTabRelatedSubOpen] = useState(false);
-  const [relatedLoading, setRelatedLoading] = useState(false);
-  const [relatedError, setRelatedError] = useState<string | null>(null);
-  const [relatedThreads, setRelatedThreads] = useState<
-    readonly { threadId: string; title: string; similarity: number }[]
-  >([]);
-
+  // ---- Thread tab context menu (native) ----
   const favoriteUrlToId = useMemo(() => {
     const map = new Map<string, string>();
     const walk = (nodes: readonly FavNode[]): void => {
@@ -516,257 +422,179 @@ export function ShellApp(): React.JSX.Element {
     return map;
   }, [favorites]);
 
-  useEffect(() => {
-    if (threadTabCtx === null) return;
-    const handler = (): void => {
-      setThreadTabCtx(null);
-      setThreadTabCopySubOpen(false);
-      setThreadTabRelatedSubOpen(false);
-    };
-    document.addEventListener('click', handler);
-    return () => {
-      document.removeEventListener('click', handler);
-    };
-  }, [threadTabCtx]);
-
   const handleThreadTabContextMenu = useCallback(
     (e: React.MouseEvent, tab: ThreadTabMeta) => {
       e.preventDefault();
       e.stopPropagation();
-      const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
-      const threadPageUrl = buildResPermalink(tab.boardUrl, tab.threadId, 1).replace(/1$/, '');
+
       void (async () => {
+        const api = window.electronApi;
+        const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
+        const threadPageUrl = buildResPermalink(tab.boardUrl, tab.threadId, 1).replace(/1$/, '');
+
         let isRoundItem = false;
         try {
-          const roundItems = await window.electronApi.invoke('round:get-items');
+          const roundItems = await api.invoke('round:get-items');
           const fileName = `${tab.threadId}.dat`;
           isRoundItem = roundItems.some(
             (item: RoundItemEntry) => item.url === tab.boardUrl && item.fileName === fileName,
           );
-        } catch {
-          isRoundItem = false;
-        }
-        setThreadTabCtx({
-          x: e.clientX,
-          y: e.clientY,
-          tab,
-          isFavorite: favoriteUrlToId.has(threadUrl),
-          isRoundItem,
-          threadPageUrl,
-        });
-      })();
-    },
-    [favoriteUrlToId],
-  );
+        } catch { /* ignore */ }
 
-  const handleThreadTabCtxRefresh = useCallback(() => {
-    if (threadTabCtx === null) return;
-    setActiveTab(threadTabCtx.tab.id);
-    void window.electronApi.invoke('view:switch-thread-tab', threadTabCtx.tab.id);
-    setThreadTabCtx(null);
-  }, [threadTabCtx, setActiveTab]);
+        const isFavorite = favoriteUrlToId.has(threadUrl);
 
-  const handleThreadTabCtxToggleRound = useCallback(() => {
-    if (threadTabCtx === null) return;
-    const { tab } = threadTabCtx;
-    const fileName = `${tab.threadId}.dat`;
-    if (threadTabCtx.isRoundItem) {
-      void window.electronApi.invoke('round:remove-item', tab.boardUrl, fileName);
-    } else {
-      void window.electronApi.invoke('round:add-item', {
-        url: tab.boardUrl,
-        boardTitle: '',
-        fileName,
-        threadTitle: tab.title,
-        roundName: '',
-      } satisfies RoundItemEntry);
-    }
-    setThreadTabCtx(null);
-  }, [threadTabCtx]);
-
-  const handleThreadTabCtxToggleFav = useCallback(() => {
-    if (threadTabCtx === null) return;
-    const { tab } = threadTabCtx;
-    const threadUrl = `${tab.boardUrl}dat/${tab.threadId}.dat`;
-    const existingFavId = favoriteUrlToId.get(threadUrl);
-    if (existingFavId !== undefined) {
-      void removeFavorite(existingFavId);
-    } else {
-      let boardType: BoardType;
-      try {
-        boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
-      } catch {
-        boardType = BoardType.Type2ch;
-      }
-      const node: FavItem = {
-        id: `fav-${tab.threadId}-${String(Date.now())}`,
-        kind: 'item',
-        type: 'thread',
-        boardType,
-        url: threadUrl,
-        title: tab.title,
-      };
-      void addFavorite(node);
-    }
-    setThreadTabCtx(null);
-  }, [threadTabCtx, favoriteUrlToId, addFavorite, removeFavorite]);
-
-  const handleThreadTabCtxOpenExternal = useCallback(() => {
-    if (threadTabCtx === null) return;
-    if (threadTabCtx.threadPageUrl.length > 0) {
-      void window.electronApi.invoke('shell:open-external', threadTabCtx.threadPageUrl);
-    }
-    setThreadTabCtx(null);
-  }, [threadTabCtx]);
-
-  const handleOpenRelatedSubMenu = useCallback(() => {
-    if (threadTabCtx === null) return;
-    if (threadTabRelatedSubOpen) return;
-    setThreadTabRelatedSubOpen(true);
-    setRelatedLoading(true);
-    setRelatedError(null);
-    setRelatedThreads([]);
-    const { tab } = threadTabCtx;
-    const threshold = relatedThreadSimilarity / 100;
-    void (async () => {
-      try {
-        const result = await window.electronApi.invoke('bbs:fetch-subject', tab.boardUrl);
-        const currentFileName = `${tab.threadId}.dat`;
-        const baseTitle = tab.title
-          .toLowerCase()
-          .replace(/\s+/g, '')
-          .replace(/★+/g, '');
-        if (baseTitle.length === 0) {
-          setRelatedThreads([]);
-          setRelatedLoading(false);
-          return;
-        }
-        const matches: { threadId: string; title: string; similarity: number }[] = [];
-        for (const s of result.threads) {
-          if (s.fileName === currentFileName) continue;
-          const normalized = s.title
-            .toLowerCase()
-            .replace(/\s+/g, '')
-            .replace(/★+/g, '');
-          if (normalized.length === 0) continue;
-          const maxLen = Math.max(baseTitle.length, normalized.length);
-          const maxDist = Math.floor(maxLen * (1 - threshold));
-          const dist = boundedLevenshtein(baseTitle, normalized, maxDist);
-          if (dist !== null) {
-            const sim = 1 - dist / maxLen;
-            if (sim >= threshold) {
-              matches.push({
-                threadId: s.fileName.replace('.dat', ''),
-                title: s.title,
-                similarity: sim,
+        const relatedItems: NativeContextMenuItem[] = [];
+        try {
+          const threshold = relatedThreadSimilarity / 100;
+          const result = await api.invoke('bbs:fetch-subject', tab.boardUrl);
+          const currentFileName = `${tab.threadId}.dat`;
+          const baseTitle = tab.title.toLowerCase().replace(/\s+/g, '').replace(/★+/g, '');
+          if (baseTitle.length > 0) {
+            const matches: { threadId: string; title: string; similarity: number }[] = [];
+            for (const s of result.threads) {
+              if (s.fileName === currentFileName) continue;
+              const normalized = s.title.toLowerCase().replace(/\s+/g, '').replace(/★+/g, '');
+              if (normalized.length === 0) continue;
+              const maxLen = Math.max(baseTitle.length, normalized.length);
+              const maxDist = Math.floor(maxLen * (1 - threshold));
+              const dist = boundedLevenshtein(baseTitle, normalized, maxDist);
+              if (dist !== null) {
+                const sim = 1 - dist / maxLen;
+                if (sim >= threshold) {
+                  matches.push({ threadId: s.fileName.replace('.dat', ''), title: s.title, similarity: sim });
+                }
+              }
+            }
+            matches.sort((a, b) => b.similarity - a.similarity);
+            for (const m of matches.slice(0, 12)) {
+              relatedItems.push({
+                id: `related:${m.threadId}`,
+                label: `${m.title} (${String(Math.round(m.similarity * 100))}%)`,
               });
             }
           }
+        } catch { /* ignore */ }
+        if (relatedItems.length === 0) {
+          relatedItems.push({ id: 'related:none', label: '関連スレッドなし', enabled: false });
         }
-        matches.sort((a, b) => b.similarity - a.similarity);
-        setRelatedThreads(matches.slice(0, 12));
-      } catch (err) {
-        setRelatedError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setRelatedLoading(false);
-      }
-    })();
-  }, [threadTabCtx, threadTabRelatedSubOpen, relatedThreadSimilarity]);
 
-  const handleRelatedSubMenuClose = useCallback(() => {
-    setThreadTabRelatedSubOpen(false);
-  }, []);
+        const items: NativeContextMenuItem[] = [
+          { id: 'refresh', label: '更新' },
+          { id: 'toggle-round', label: isRoundItem ? '巡回から削除' : '巡回に追加' },
+          { id: 'copy', label: 'コピー', submenu: [
+            { id: 'copy-url', label: 'スレッドのURLをコピー' },
+            { id: 'copy-title-url', label: 'タイトル+URLをコピー' },
+          ]},
+          { id: 'related', label: '関連スレッド', submenu: relatedItems },
+          { id: 'open-external', label: '外部ブラウザで開く' },
+          { id: 'sep', label: '', type: 'separator' },
+          { id: 'toggle-fav', label: isFavorite ? 'お気に入りから削除' : 'お気に入りに追加' },
+        ];
 
-  const handleOpenRelatedThread = useCallback(
-    (threadId: string, title: string) => {
-      if (threadTabCtx === null) return;
-      void window.electronApi.invoke(
-        'view:create-thread-tab',
-        threadTabCtx.tab.boardUrl,
-        threadId,
-        title,
-      );
-      setThreadTabCtx(null);
-      setThreadTabRelatedSubOpen(false);
+        const action = await api.invoke('shell:popup-context-menu', items);
+        if (action === null) return;
+
+        switch (action) {
+          case 'refresh':
+            setActiveTab(tab.id);
+            void api.invoke('view:switch-thread-tab', tab.id);
+            break;
+          case 'toggle-round': {
+            const fileName = `${tab.threadId}.dat`;
+            if (isRoundItem) {
+              void api.invoke('round:remove-item', tab.boardUrl, fileName);
+            } else {
+              void api.invoke('round:add-item', {
+                url: tab.boardUrl, boardTitle: '', fileName, threadTitle: tab.title, roundName: '',
+              } satisfies RoundItemEntry);
+            }
+            break;
+          }
+          case 'copy-url':
+            void navigator.clipboard.writeText(threadPageUrl);
+            break;
+          case 'copy-title-url':
+            void navigator.clipboard.writeText(`${tab.title}\n${threadPageUrl}`);
+            break;
+          case 'open-external':
+            void api.invoke('shell:open-external', threadPageUrl);
+            break;
+          case 'toggle-fav': {
+            const existingFavId = favoriteUrlToId.get(threadUrl);
+            if (existingFavId !== undefined) {
+              void removeFavorite(existingFavId);
+            } else {
+              let boardType: BoardType;
+              try { boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname); }
+              catch { boardType = BoardType.Type2ch; }
+              void addFavorite({
+                id: `fav-${tab.threadId}-${String(Date.now())}`, kind: 'item', type: 'thread',
+                boardType, url: threadUrl, title: tab.title,
+              } satisfies FavItem);
+            }
+            break;
+          }
+          default:
+            if (action.startsWith('related:')) {
+              const relThreadId = action.slice('related:'.length);
+              const relTitle = relatedItems.find((r) => r.id === action)?.label ?? '';
+              void api.invoke('view:create-thread-tab', tab.boardUrl, relThreadId, relTitle);
+            }
+        }
+      })();
     },
-    [threadTabCtx],
+    [favoriteUrlToId, relatedThreadSimilarity, setActiveTab, addFavorite, removeFavorite],
   );
 
-  // ---- Board tab context menu ----
-  const [boardTabCtx, setBoardTabCtx] = useState<{
-    x: number;
-    y: number;
-    tab: BoardTabMeta;
-    isRoundBoard: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    if (boardTabCtx === null) return;
-    const handler = (): void => {
-      setBoardTabCtx(null);
-    };
-    document.addEventListener('click', handler);
-    return () => {
-      document.removeEventListener('click', handler);
-    };
-  }, [boardTabCtx]);
-
+  // ---- Board tab context menu (native) ----
   const handleBoardTabContextMenu = useCallback((e: React.MouseEvent, tab: BoardTabMeta) => {
     e.preventDefault();
     e.stopPropagation();
+
     void (async () => {
+      const api = window.electronApi;
+
       let isRoundBoard = false;
       try {
-        const roundBoards = await window.electronApi.invoke('round:get-boards');
+        const roundBoards = await api.invoke('round:get-boards');
         isRoundBoard = roundBoards.some((board: RoundBoardEntry) => board.url === tab.boardUrl);
-      } catch {
-        isRoundBoard = false;
+      } catch { /* ignore */ }
+
+      const items: NativeContextMenuItem[] = [
+        { id: 'refresh', label: '更新' },
+        { id: 'add-fav', label: 'お気に入りに追加' },
+        { id: 'toggle-round', label: isRoundBoard ? '巡回から削除' : '巡回に追加' },
+      ];
+
+      const action = await api.invoke('shell:popup-context-menu', items);
+      if (action === null) return;
+
+      switch (action) {
+        case 'refresh':
+          setActiveBoardTab(tab.id);
+          break;
+        case 'add-fav': {
+          let boardType: BoardType;
+          try { boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname); }
+          catch { boardType = BoardType.Type2ch; }
+          void addFavorite({
+            id: `fav-board-${String(Date.now())}`, kind: 'item', type: 'board',
+            boardType, url: tab.boardUrl, title: tab.title,
+          } satisfies FavItem);
+          break;
+        }
+        case 'toggle-round':
+          if (isRoundBoard) {
+            void api.invoke('round:remove-board', tab.boardUrl);
+          } else {
+            void api.invoke('round:add-board', {
+              url: tab.boardUrl, boardTitle: tab.title, roundName: '',
+            } satisfies RoundBoardEntry);
+          }
+          break;
       }
-      setBoardTabCtx({ x: e.clientX, y: e.clientY, tab, isRoundBoard });
     })();
-  }, []);
-
-  const handleBoardTabCtxRefresh = useCallback(() => {
-    if (boardTabCtx === null) return;
-    setActiveBoardTab(boardTabCtx.tab.id);
-    setBoardTabCtx(null);
-  }, [boardTabCtx, setActiveBoardTab]);
-
-  const handleBoardTabCtxAddFav = useCallback(() => {
-    if (boardTabCtx === null) return;
-    const { tab } = boardTabCtx;
-    let boardType: BoardType;
-    try {
-      boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
-    } catch {
-      boardType = BoardType.Type2ch;
-    }
-    const node: FavItem = {
-      id: `fav-board-${String(Date.now())}`,
-      kind: 'item',
-      type: 'board',
-      boardType,
-      url: tab.boardUrl,
-      title: tab.title,
-    };
-    void addFavorite(node);
-    setBoardTabCtx(null);
-  }, [boardTabCtx, addFavorite]);
-
-  const handleBoardTabCtxToggleRound = useCallback(() => {
-    if (boardTabCtx === null) return;
-    const { tab } = boardTabCtx;
-    if (boardTabCtx.isRoundBoard) {
-      void window.electronApi.invoke('round:remove-board', tab.boardUrl);
-    } else {
-      void window.electronApi.invoke('round:add-board', {
-        url: tab.boardUrl,
-        boardTitle: tab.title,
-        roundName: '',
-      } satisfies RoundBoardEntry);
-    }
-    setBoardTabCtx(null);
-  }, [boardTabCtx]);
+  }, [setActiveBoardTab, addFavorite]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
@@ -789,7 +617,7 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={openAddBoard}
+          onClick={() => { openModal('add-board'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="外部掲示板を追加 (したらば/まちBBS)"
         >
@@ -801,7 +629,7 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={openAuth}
+          onClick={() => { openModal('auth'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="認証設定"
         >
@@ -810,7 +638,7 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={openProxy}
+          onClick={() => { openModal('proxy'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="プロキシ設定"
         >
@@ -819,7 +647,7 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={openRound}
+          onClick={() => { openModal('round'); }}
           className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${roundTimerEnabled ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]`}
           title={roundTimerEnabled ? '巡回リスト (自動巡回 ON)' : '巡回リスト'}
         >
@@ -828,7 +656,7 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={openCookieManager}
+          onClick={() => { openModal('cookie-manager'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="Cookie/UA管理"
         >
@@ -837,7 +665,7 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={openConsole}
+          onClick={() => { openModal('console'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="診断コンソール"
         >
@@ -849,7 +677,7 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={openDslEditor}
+          onClick={() => { openModal('dsl-editor'); }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="DSLエディタ"
         >
@@ -883,7 +711,7 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={openAbout}
+          onClick={() => { openModal('about'); }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="VBBBについて"
         >
@@ -1093,313 +921,11 @@ export function ShellApp(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Thread tab context menu */}
-      {threadTabCtx !== null && (
-        <ContextMenuContainer
-          x={threadTabCtx.x}
-          y={threadTabCtx.y}
-          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          role="menu"
-        >
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleThreadTabCtxRefresh}
-            role="menuitem"
-          >
-            更新
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleThreadTabCtxToggleRound}
-            role="menuitem"
-          >
-            {threadTabCtx.isRoundItem ? '巡回から削除' : '巡回に追加'}
-          </button>
-          <div
-            className="relative"
-            onMouseEnter={() => {
-              setThreadTabCopySubOpen(true);
-            }}
-            onMouseLeave={() => {
-              setThreadTabCopySubOpen(false);
-            }}
-          >
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-              role="menuitem"
-            >
-              コピー
-              <MdiIcon path={mdiChevronRight} size={12} />
-            </button>
-            {threadTabCopySubOpen && (
-              <div className="absolute top-0 left-full z-10 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
-                <button
-                  type="button"
-                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                  onClick={() => {
-                    if (threadTabCtx.threadPageUrl.length > 0) {
-                      void navigator.clipboard.writeText(threadTabCtx.threadPageUrl);
-                    }
-                    setThreadTabCtx(null);
-                  }}
-                  role="menuitem"
-                >
-                  スレッドのURLをコピー
-                </button>
-                <button
-                  type="button"
-                  className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                  onClick={() => {
-                    if (threadTabCtx.threadPageUrl.length > 0) {
-                      void navigator.clipboard.writeText(
-                        `${threadTabCtx.tab.title}\n${threadTabCtx.threadPageUrl}`,
-                      );
-                    }
-                    setThreadTabCtx(null);
-                  }}
-                  role="menuitem"
-                >
-                  タイトル+URLをコピー
-                </button>
-              </div>
-            )}
-          </div>
-          <div
-            className="relative"
-            onMouseEnter={handleOpenRelatedSubMenu}
-            onMouseLeave={handleRelatedSubMenuClose}
-          >
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-              role="menuitem"
-            >
-              関連スレッド
-              <MdiIcon path={mdiChevronRight} size={12} />
-            </button>
-            {threadTabRelatedSubOpen && (
-              <div className="absolute top-0 left-full z-10 min-w-60 max-w-80 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg">
-                {relatedLoading && (
-                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-text-muted)]">
-                    <MdiIcon path={mdiLoading} size={12} className="animate-spin" />
-                    読み込み中...
-                  </div>
-                )}
-                {relatedError !== null && (
-                  <div className="px-3 py-2 text-xs text-[var(--color-error)]">{relatedError}</div>
-                )}
-                {!relatedLoading && relatedError === null && relatedThreads.length === 0 && (
-                  <div className="px-3 py-2 text-xs text-[var(--color-text-muted)]">
-                    関連スレッドが見つかりません
-                  </div>
-                )}
-                {relatedThreads.map((rt) => (
-                  <button
-                    key={rt.threadId}
-                    type="button"
-                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-                    onClick={() => {
-                      handleOpenRelatedThread(rt.threadId, rt.title);
-                    }}
-                    role="menuitem"
-                    title={`類似度: ${String(Math.round(rt.similarity * 100))}%`}
-                  >
-                    <span className="block truncate">{rt.title}</span>
-                    <span className="text-[10px] text-[var(--color-text-muted)]">
-                      {String(Math.round(rt.similarity * 100))}%
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleThreadTabCtxOpenExternal}
-            role="menuitem"
-          >
-            外部ブラウザで開く
-          </button>
-          <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleThreadTabCtxToggleFav}
-            role="menuitem"
-          >
-            {threadTabCtx.isFavorite ? 'お気に入りから削除' : 'お気に入りに追加'}
-          </button>
-        </ContextMenuContainer>
-      )}
-
-      {/* Board tab context menu */}
-      {boardTabCtx !== null && (
-        <ContextMenuContainer
-          x={boardTabCtx.x}
-          y={boardTabCtx.y}
-          className="fixed z-50 min-w-40 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
-          role="menu"
-        >
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleBoardTabCtxRefresh}
-            role="menuitem"
-          >
-            更新
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleBoardTabCtxAddFav}
-            role="menuitem"
-          >
-            お気に入りに追加
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
-            onClick={handleBoardTabCtxToggleRound}
-            role="menuitem"
-          >
-            {boardTabCtx.isRoundBoard ? '巡回から削除' : '巡回に追加'}
-          </button>
-        </ContextMenuContainer>
-      )}
-
       {/* Status bar */}
       <footer className="flex h-6 shrink-0 items-center justify-between border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4">
         <span className="text-xs text-[var(--color-text-muted)]">{statusMessage}</span>
         <ThemeSelector currentTheme={theme} onThemeChange={handleThemeChange} />
       </footer>
-
-      {/* Modals */}
-      <Modal
-        open={activeModal === 'auth'}
-        onClose={closeModal}
-        resizable
-        initialWidth={500}
-        initialHeight={400}
-      >
-        <Suspense fallback={null}>
-          <AuthPanel onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal
-        open={activeModal === 'proxy'}
-        onClose={closeModal}
-        resizable
-        initialWidth={520}
-        initialHeight={480}
-      >
-        <Suspense fallback={null}>
-          <ProxySettings onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal open={activeModal === 'ng'} onClose={closeModal} width="max-w-2xl">
-        <div className="max-h-[70vh] overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-          <Suspense fallback={null}>
-            <NgEditor onClose={closeModal} />
-          </Suspense>
-        </div>
-      </Modal>
-      <Modal
-        open={activeModal === 'round'}
-        onClose={closeRoundModal}
-        resizable
-        initialWidth={480}
-        initialHeight={500}
-      >
-        <div className="h-full overflow-hidden rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
-          <Suspense fallback={null}>
-            <RoundPanel onClose={closeRoundModal} />
-          </Suspense>
-        </div>
-      </Modal>
-      <Modal
-        open={activeModal === 'cookie-manager'}
-        onClose={closeModal}
-        resizable
-        initialWidth={600}
-        initialHeight={500}
-      >
-        <Suspense fallback={null}>
-          <CookieManager onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal
-        open={activeModal === 'console'}
-        onClose={closeModal}
-        resizable
-        initialWidth={900}
-        initialHeight={600}
-      >
-        <Suspense fallback={null}>
-          <ConsoleModal onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal open={activeModal === 'add-board'} onClose={closeModal} width="max-w-lg">
-        <Suspense fallback={null}>
-          <AddBoardDialog onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal open={activeModal === 'update'} onClose={closeModal} width="max-w-sm">
-        <Suspense fallback={null}>
-          <UpdateDialog onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal
-        open={activeModal === 'dsl-editor'}
-        onClose={closeModal}
-        resizable
-        initialWidth={800}
-        initialHeight={600}
-      >
-        <Suspense fallback={null}>
-          <DslEditor onClose={closeModal} />
-        </Suspense>
-      </Modal>
-      <Modal open={activeModal === 'about'} onClose={closeModal} width="max-w-sm">
-        <div className="flex flex-col items-center gap-3 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] p-6">
-          <MdiIcon path={mdiBulletinBoard} size={48} className="text-[var(--color-accent)]" />
-          <h2 className="text-lg font-bold text-[var(--color-text-primary)]">VBBB</h2>
-          <p className="text-center text-sm font-medium text-[var(--color-text-secondary)]">
-            Versatile BBS Browser
-          </p>
-          <p className="text-center text-xs text-[var(--color-text-muted)]">v{__APP_VERSION__}</p>
-          <p className="text-center text-xs text-[var(--color-text-muted)]">
-            2ch/5ch互換BBSブラウザ
-          </p>
-          <p className="text-center text-xs text-[var(--color-text-muted)]">
-            Electron + React + TypeScript
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              void window.electronApi.invoke(
-                'shell:open-external',
-                'https://github.com/roflsunriz/VBBB',
-              );
-            }}
-            className="flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-3 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
-          >
-            <MdiIcon path={mdiGithub} size={14} />
-            https://github.com/roflsunriz/VBBB
-          </button>
-          <button
-            type="button"
-            onClick={closeModal}
-            className="flex items-center gap-1 rounded bg-[var(--color-accent)] px-4 py-1.5 text-xs text-white hover:opacity-90"
-          >
-            <MdiIcon path={mdiClose} size={12} />
-            閉じる
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }

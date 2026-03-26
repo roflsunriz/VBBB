@@ -5,6 +5,36 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-03-26
+
+### Changed
+
+- **タブ右クリックメニューをElectronネイティブ `Menu.popup()` に移行**
+  - DOM ベースのカスタムコンテキストメニューを廃止し、OS 標準のネイティブメニューに変換
+  - `WebContentsView` の上に常に表示されるため z-index の問題が完全に解消
+  - スレッドタブ：更新・巡回追加/削除・コピー (URL / タイトル+URL)・関連スレッド・外部ブラウザで開く・お気に入り追加/削除
+  - 板タブ：更新・お気に入りに追加・巡回追加/削除
+- **モーダル（設定画面等）を子 `BrowserWindow` に移行**
+  - 認証設定・プロキシ設定・巡回リスト・NG 設定・Cookie/UA 管理・診断コンソール・外部板追加・アップデート確認・DSL エディタ・VBBBについて の全10画面
+  - 独立した OS ウィンドウとして表示されるため `WebContentsView` の上に確実に描画
+  - 新規レンダラーエントリポイント `modal-host` による動的コンポーネント読み込み
+  - `ModalWindowManager` による一元管理（同じモーダルの二重表示防止・閉じイベントの IPC 通知）
+- `AboutPanel` コンポーネントを `ShellApp.tsx` のインライン JSX から独立コンポーネントに抽出
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.2.0` に更新
+
+### Added
+
+- IPC チャネル `shell:popup-context-menu` — レンダラーからネイティブコンテキストメニューを表示
+- IPC チャネル `modal:open` / `modal:host-ready` — モーダルウィンドウのライフサイクル管理
+- プッシュイベント `modal:closed` — モーダル閉じ通知（巡回タイマー再取得等に使用）
+- 型定義 `NativeContextMenuItem` / `ModalWindowType` / `ModalWindowInitData`
+
+### Removed
+
+- Shell DOM 上の `ContextMenuContainer` によるタブ右クリックメニュー（ネイティブメニューに置換）
+- Shell DOM 上の `<Modal>` による全モーダル描画（子 BrowserWindow に置換）
+- 関連する状態変数 (`threadTabCtx`, `boardTabCtx`, `activeModal` 等)
+
 ## [3.1.1] - 2026-03-26
 
 ### Fixed

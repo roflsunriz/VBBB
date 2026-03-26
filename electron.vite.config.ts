@@ -49,6 +49,7 @@ export default defineConfig({
           'panel-post-editor': resolve('src/renderer/panel-post-editor.html'),
           'panel-programmatic-post': resolve('src/renderer/panel-programmatic-post.html'),
           'panel-ng-editor': resolve('src/renderer/panel-ng-editor.html'),
+          'modal-host': resolve('src/renderer/modal-host.html'),
         },
         output: {
           manualChunks: (id) => {

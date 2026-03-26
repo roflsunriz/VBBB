@@ -2,11 +2,11 @@
  * IPC handler registration.
  * Connects renderer requests to main process services.
  */
-import { app, BaseWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BaseWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '@shared/domain';
-import type { IpcChannelMap, IpLookupResult } from '@shared/ipc';
+import type { IpcChannelMap, IpLookupResult, NativeContextMenuItem } from '@shared/ipc';
 import { PostParamsSchema } from '@shared/zod-schemas';
 import type { MenuAction } from '@shared/menu';
 import { clearLogBuffer, createLogger, getLogBuffer, pushEntry } from '../logger';
@@ -109,11 +109,13 @@ import {
 } from '../services/user-agent-store';
 import { getViewManager, getViewManagerOrNull } from '../view-manager-ref';
 import { getPanelWindowManager, getPanelWindowManagerOrNull } from '../panel-window-ref';
+import { getModalWindowManager, getModalWindowManagerOrNull } from '../modal-window-ref';
 import type {
   ContentBounds,
   BoardTabInitData,
   ThreadTabInitData,
   PanelWindowInitData,
+  ModalWindowInitData,
 } from '@shared/view-ipc';
 
 const logger = createLogger('ipc');
@@ -1107,6 +1109,74 @@ export async function registerIpcHandlers(): Promise<void> {
     const data = getPanelWindowManager().getInitData(event.sender.id);
     if (data === null) {
       throw new Error(`No panel init data for webContents ${String(event.sender.id)}`);
+    }
+    return data;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Native context menu
+  // ---------------------------------------------------------------------------
+
+  handle(
+    'shell:popup-context-menu',
+    async (items: readonly NativeContextMenuItem[]): Promise<string | null> => {
+      return new Promise<string | null>((resolve) => {
+        let resolved = false;
+
+        function buildTemplate(
+          menuItems: readonly NativeContextMenuItem[],
+        ): MenuItemConstructorOptions[] {
+          return menuItems.map((item): MenuItemConstructorOptions => {
+            if (item.type === 'separator') {
+              return { type: 'separator' };
+            }
+            const hasSubmenu =
+              item.submenu !== undefined && item.submenu.length > 0;
+            const base: MenuItemConstructorOptions = {
+              label: item.label,
+              enabled: item.enabled ?? true,
+            };
+            if (hasSubmenu) {
+              base.submenu = buildTemplate(item.submenu ?? []);
+            } else {
+              base.click = () => {
+                if (!resolved) {
+                  resolved = true;
+                  resolve(item.id);
+                }
+              };
+            }
+            return base;
+          });
+        }
+
+        const menu = Menu.buildFromTemplate(buildTemplate(items));
+        menu.popup({
+          callback: () => {
+            if (!resolved) {
+              resolved = true;
+              resolve(null);
+            }
+          },
+        });
+      });
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Modal window IPC handlers
+  // ---------------------------------------------------------------------------
+
+  handle('modal:open', (modalType) => {
+    const mgr = getModalWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.openModal(modalType);
+  });
+
+  handleWithEvent('modal:host-ready', (event): ModalWindowInitData => {
+    const data = getModalWindowManager().getInitData(event.sender.id);
+    if (data === null) {
+      throw new Error(`No modal init data for webContents ${String(event.sender.id)}`);
     }
     return data;
   });

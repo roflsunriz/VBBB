@@ -31,7 +31,16 @@ import type {
 } from './search';
 import type { UpdateCheckResult } from './update';
 import type { RemoteSearchResult } from './remote-search';
-import type { ViewIpcChannelMap } from './view-ipc';
+import type { ModalWindowInitData, ModalWindowType, ViewIpcChannelMap } from './view-ipc';
+
+/** Serializable context menu item for native Electron Menu.popup() */
+export interface NativeContextMenuItem {
+  readonly id: string;
+  readonly label: string;
+  readonly type?: 'normal' | 'separator';
+  readonly enabled?: boolean;
+  readonly submenu?: readonly NativeContextMenuItem[];
+}
 
 export interface IpcChannelMap extends ViewIpcChannelMap {
   /** Fetch BBS menu (板一覧) */
@@ -433,6 +442,21 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
   'update:download-and-install': {
     args: [];
     result: void;
+  };
+  /** Show a native context menu and return the selected item id (null if dismissed) */
+  'shell:popup-context-menu': {
+    args: [items: readonly NativeContextMenuItem[]];
+    result: string | null;
+  };
+  /** Open a modal in a child BrowserWindow */
+  'modal:open': {
+    args: [modalType: ModalWindowType];
+    result: void;
+  };
+  /** Modal host renderer requests its init data */
+  'modal:host-ready': {
+    args: [];
+    result: ModalWindowInitData;
   };
 }
 
