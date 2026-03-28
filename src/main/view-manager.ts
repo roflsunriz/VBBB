@@ -224,9 +224,12 @@ export class ViewManager {
   switchBoardTab(tabId: string): void {
     if (!this.boardTabs.has(tabId)) return;
 
-    this.hideActiveBoardTab();
+    const prevTabId = this.activeBoardTabId;
     this.activeBoardTabId = tabId;
     this.positionActiveBoardTab();
+    if (prevTabId !== null && prevTabId !== tabId) {
+      this.hideBoardTab(prevTabId);
+    }
     this.broadcastTabRegistry();
   }
 
@@ -328,9 +331,12 @@ export class ViewManager {
   switchThreadTab(tabId: string): void {
     if (!this.threadTabs.has(tabId)) return;
 
-    this.hideActiveThreadTab();
+    const prevTabId = this.activeThreadTabId;
     this.activeThreadTabId = tabId;
     this.positionActiveThreadTab();
+    if (prevTabId !== null && prevTabId !== tabId) {
+      this.hideThreadTab(prevTabId);
+    }
     this.broadcastTabRegistry();
   }
 
@@ -385,6 +391,8 @@ export class ViewManager {
 
   updateLayout(bounds: ContentBounds): void {
     this.layoutBounds = bounds;
+    this.updateAllBoardTabBounds();
+    this.updateAllThreadTabBounds();
     this.positionActiveBoardTab();
     this.positionActiveThreadTab();
   }
@@ -555,6 +563,7 @@ export class ViewManager {
     });
 
     this.window.contentView.addChildView(view);
+    view.setVisible(false);
     view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
     return view;
   }
@@ -583,8 +592,12 @@ export class ViewManager {
 
   hideAllTabViews(): void {
     this.tabViewsHidden = true;
-    this.hideActiveBoardTab();
-    this.hideActiveThreadTab();
+    for (const entry of this.boardTabs.values()) {
+      entry.view?.setVisible(false);
+    }
+    for (const entry of this.threadTabs.values()) {
+      entry.view?.setVisible(false);
+    }
   }
 
   showAllTabViews(): void {
@@ -593,19 +606,39 @@ export class ViewManager {
     this.positionActiveThreadTab();
   }
 
-  private hideActiveBoardTab(): void {
-    if (this.activeBoardTabId === null) return;
-    const entry = this.boardTabs.get(this.activeBoardTabId);
+  private hideBoardTab(tabId: string): void {
+    const entry = this.boardTabs.get(tabId);
     if (entry?.view !== undefined && entry.view !== null) {
-      entry.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      entry.view.setVisible(false);
     }
   }
 
-  private hideActiveThreadTab(): void {
-    if (this.activeThreadTabId === null) return;
-    const entry = this.threadTabs.get(this.activeThreadTabId);
+  private hideThreadTab(tabId: string): void {
+    const entry = this.threadTabs.get(tabId);
     if (entry?.view !== undefined && entry.view !== null) {
-      entry.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      entry.view.setVisible(false);
+    }
+  }
+
+  /** Update bounds for ALL board tab views so inactive tabs have correct size. */
+  private updateAllBoardTabBounds(): void {
+    if (this.layoutBounds === null) return;
+    const bounds = this.layoutBounds.boardTabArea;
+    for (const entry of this.boardTabs.values()) {
+      if (entry.view !== null) {
+        this.applyBounds(entry.view, bounds);
+      }
+    }
+  }
+
+  /** Update bounds for ALL thread tab views so inactive tabs have correct size. */
+  private updateAllThreadTabBounds(): void {
+    if (this.layoutBounds === null) return;
+    const bounds = this.layoutBounds.threadTabArea;
+    for (const entry of this.threadTabs.values()) {
+      if (entry.view !== null) {
+        this.applyBounds(entry.view, bounds);
+      }
     }
   }
 
@@ -615,6 +648,7 @@ export class ViewManager {
     const entry = this.boardTabs.get(this.activeBoardTabId);
     if (entry?.view === undefined || entry.view === null) return;
     this.applyBounds(entry.view, this.layoutBounds.boardTabArea);
+    entry.view.setVisible(true);
   }
 
   private positionActiveThreadTab(): void {
@@ -623,6 +657,7 @@ export class ViewManager {
     const entry = this.threadTabs.get(this.activeThreadTabId);
     if (entry?.view === undefined || entry.view === null) return;
     this.applyBounds(entry.view, this.layoutBounds.threadTabArea);
+    entry.view.setVisible(true);
   }
 
   private applyBounds(view: WebContentsView, bounds: RectBounds): void {
