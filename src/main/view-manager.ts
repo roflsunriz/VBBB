@@ -21,6 +21,12 @@ import type {
 } from '@shared/view-ipc';
 import type { Board } from '@shared/domain';
 import type { SavedTab, SessionState } from '@shared/history';
+import { createLogger } from './logger';
+
+const logger = createLogger('view-manager');
+
+const BOARD_POOL_SIZE = 2;
+const THREAD_POOL_SIZE = 3;
 
 interface BoardTabEntry {
   readonly meta: BoardTabMeta;
@@ -62,6 +68,9 @@ export class ViewManager {
   private readonly webContentsToTabType = new Map<number, 'board' | 'thread'>();
   private readonly scrollPositions = new Map<string, number>();
 
+  private readonly boardTabPool: WebContentsView[] = [];
+  private readonly threadTabPool: WebContentsView[] = [];
+
   constructor(window: BaseWindow) {
     this.window = window;
   }
@@ -95,6 +104,62 @@ export class ViewManager {
   }
 
   // ---------------------------------------------------------------------------
+  // Pre-warmed View Pool
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Batch-create pre-warmed views at startup so tab creation is near-instant.
+   * Each view loads its HTML and mounts React in the background.
+   * When a pool view calls view:board-tab-ready / view:thread-tab-ready,
+   * it receives null (not yet assigned), entering a waiting state.
+   */
+  warmPool(): void {
+    const boardCount = Math.max(0, BOARD_POOL_SIZE - this.boardTabPool.length);
+    const threadCount = Math.max(0, THREAD_POOL_SIZE - this.threadTabPool.length);
+
+    for (let i = 0; i < boardCount; i++) {
+      const view = this.createTabView();
+      this.loadPage(view, 'board-tab.html');
+      this.boardTabPool.push(view);
+    }
+    for (let i = 0; i < threadCount; i++) {
+      const view = this.createTabView();
+      this.loadPage(view, 'thread-tab.html');
+      this.threadTabPool.push(view);
+    }
+    logger.info(
+      `Pool warmed: ${String(boardCount)} board + ${String(threadCount)} thread views`,
+    );
+  }
+
+  private takeBoardPoolView(): WebContentsView | null {
+    const view = this.boardTabPool.shift() ?? null;
+    if (view !== null) {
+      this.replenishPool('board');
+    }
+    return view;
+  }
+
+  private takeThreadPoolView(): WebContentsView | null {
+    const view = this.threadTabPool.shift() ?? null;
+    if (view !== null) {
+      this.replenishPool('thread');
+    }
+    return view;
+  }
+
+  private replenishPool(type: 'board' | 'thread'): void {
+    const pool = type === 'board' ? this.boardTabPool : this.threadTabPool;
+    const maxSize = type === 'board' ? BOARD_POOL_SIZE : THREAD_POOL_SIZE;
+    const page = type === 'board' ? 'board-tab.html' : 'thread-tab.html';
+
+    if (pool.length >= maxSize) return;
+    const view = this.createTabView();
+    this.loadPage(view, page);
+    pool.push(view);
+  }
+
+  // ---------------------------------------------------------------------------
   // Board Tabs
   // ---------------------------------------------------------------------------
 
@@ -111,6 +176,19 @@ export class ViewManager {
       title: board.title,
       boardUrl: board.url,
     };
+
+    const poolView = this.takeBoardPoolView();
+    if (poolView !== null) {
+      this.webContentsToTabId.set(poolView.webContents.id, tabId);
+      this.webContentsToTabType.set(poolView.webContents.id, 'board');
+      this.boardTabs.set(tabId, { meta, board, view: poolView });
+
+      const initData: BoardTabInitData = { tabId, board };
+      poolView.webContents.send('view:board-tab-init', initData);
+
+      this.switchBoardTab(tabId);
+      return tabId;
+    }
 
     const view = this.createTabView();
     this.webContentsToTabId.set(view.webContents.id, tabId);
@@ -195,6 +273,26 @@ export class ViewManager {
       boardUrl,
       threadId,
     };
+
+    const poolView = this.takeThreadPoolView();
+    if (poolView !== null) {
+      this.webContentsToTabId.set(poolView.webContents.id, tabId);
+      this.webContentsToTabType.set(poolView.webContents.id, 'thread');
+      this.threadTabs.set(tabId, { meta, view: poolView });
+
+      const scrollTop = this.scrollPositions.get(tabId) ?? 0;
+      const initData: ThreadTabInitData = {
+        tabId,
+        boardUrl,
+        threadId,
+        title,
+        ...(scrollTop > 0 ? { scrollTop } : {}),
+      };
+      poolView.webContents.send('view:thread-tab-init', initData);
+
+      this.switchThreadTab(tabId);
+      return tabId;
+    }
 
     const view = this.createTabView();
     this.webContentsToTabId.set(view.webContents.id, tabId);
@@ -346,6 +444,16 @@ export class ViewManager {
   // ---------------------------------------------------------------------------
 
   destroyAll(): void {
+    for (const view of this.boardTabPool) {
+      this.destroyTabView(view);
+    }
+    this.boardTabPool.length = 0;
+
+    for (const view of this.threadTabPool) {
+      this.destroyTabView(view);
+    }
+    this.threadTabPool.length = 0;
+
     for (const entry of this.boardTabs.values()) {
       this.destroyTabView(entry.view);
     }

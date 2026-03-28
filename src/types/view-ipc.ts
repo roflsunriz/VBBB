@@ -181,11 +181,11 @@ export interface ViewIpcChannelMap {
   };
   'view:board-tab-ready': {
     args: [];
-    result: BoardTabInitData;
+    result: BoardTabInitData | null;
   };
   'view:thread-tab-ready': {
     args: [];
-    result: ThreadTabInitData;
+    result: ThreadTabInitData | null;
   };
   'view:open-thread-request': {
     args: [boardUrl: string, threadId: string, title: string];

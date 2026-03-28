@@ -185,20 +185,26 @@ export function BoardTabApp(): React.JSX.Element {
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const edgeRefreshLockedRef = useRef(false);
 
-  // Initialize on mount
+  // Initialize on mount (pull model) or via push event from pool
   const initRef = useRef(false);
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     void (async () => {
-      const initData: BoardTabInitData = await window.electronApi.invoke('view:board-tab-ready');
-      await initialize(initData);
+      const initData = await window.electronApi.invoke('view:board-tab-ready');
+      if (initData !== null) {
+        await initialize(initData);
+      }
     })();
   }, [initialize]);
 
   // Listen for push events
   useEffect(() => {
+    const unsubInit = window.electronApi.on('view:board-tab-init', (...args: unknown[]) => {
+      const initData = args[0] as BoardTabInitData;
+      void useBoardTabStore.getState().initialize(initData);
+    });
     const unsubNg = window.electronApi.on('view:ng-rules-updated', (...args: unknown[]) => {
       const rules = args[0] as readonly NgRule[];
       useBoardTabStore.getState().setNgRules(rules);
@@ -211,6 +217,7 @@ export function BoardTabApp(): React.JSX.Element {
       void useBoardTabStore.getState().refreshBoard();
     });
     return () => {
+      unsubInit();
       unsubNg();
       unsubFav();
       unsubRefresh();
@@ -412,6 +419,33 @@ export function BoardTabApp(): React.JSX.Element {
     [board, favoriteUrlToId],
   );
 
+  const getFirstVisibleFileName = useCallback((): string | null => {
+    const container = listScrollRef.current;
+    if (container === null) return null;
+    const idx = Math.floor(container.scrollTop / THREAD_ROW_HEIGHT);
+    const subject = sortedSubjects[idx];
+    return subject?.fileName ?? null;
+  }, [sortedSubjects]);
+
+  const clearFilterWithScrollRestore = useCallback(() => {
+    const targetFileName = getFirstVisibleFileName();
+    setFilter('');
+    if (targetFileName !== null) {
+      requestAnimationFrame(() => {
+        const container = listScrollRef.current;
+        if (container === null) return;
+        const rows = container.children;
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (row instanceof HTMLElement && row.dataset['fileName'] === targetFileName) {
+            row.scrollIntoView({ block: 'start' });
+            return;
+          }
+        }
+      });
+    }
+  }, [getFirstVisibleFileName, setFilter]);
+
   const handleRefresh = useCallback(() => {
     if (board === null || subjectLoading) return;
     void refreshBoard();
@@ -587,9 +621,7 @@ export function BoardTabApp(): React.JSX.Element {
               </span>
               <button
                 type="button"
-                onClick={() => {
-                  setFilter('');
-                }}
+                onClick={clearFilterWithScrollRestore}
                 className="shrink-0 rounded p-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
                 aria-label="検索をクリア"
               >
@@ -647,6 +679,7 @@ export function BoardTabApp(): React.JSX.Element {
             return (
               <div
                 key={subject.fileName}
+                data-file-name={subject.fileName}
                 className="flex w-full items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 py-1 text-xs opacity-40"
                 style={{ height: THREAD_ROW_HEIGHT }}
               >
@@ -658,6 +691,7 @@ export function BoardTabApp(): React.JSX.Element {
           return (
             <div
               key={subject.fileName}
+              data-file-name={subject.fileName}
               className="flex w-full cursor-pointer items-center gap-1 border-b border-[var(--color-border-secondary)] px-3 text-xs hover:bg-[var(--color-bg-hover)]"
               style={{ height: THREAD_ROW_HEIGHT }}
               onClick={() => {

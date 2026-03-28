@@ -409,15 +409,17 @@ export function ThreadTabApp(): React.JSX.Element {
   const scrollReportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRestoredRef = useRef(false);
 
-  // Initialize on mount
+  // Initialize on mount (pull model) or via push event from pool
   const initRef = useRef(false);
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     void (async () => {
-      const initData: ThreadTabInitData = await window.electronApi.invoke('view:thread-tab-ready');
-      await initialize(initData);
+      const initData = await window.electronApi.invoke('view:thread-tab-ready');
+      if (initData !== null) {
+        await initialize(initData);
+      }
     })();
   }, [initialize]);
 
@@ -435,6 +437,10 @@ export function ThreadTabApp(): React.JSX.Element {
 
   // Listen for push events
   useEffect(() => {
+    const unsubInit = window.electronApi.on('view:thread-tab-init', (...args: unknown[]) => {
+      const initData = args[0] as ThreadTabInitData;
+      void useThreadTabStore.getState().initialize(initData);
+    });
     const unsubNg = window.electronApi.on('view:ng-rules-updated', (...args: unknown[]) => {
       const rules = args[0] as readonly NgRule[];
       useThreadTabStore.getState().setNgRules(rules);
@@ -450,6 +456,7 @@ export function ThreadTabApp(): React.JSX.Element {
       },
     );
     return () => {
+      unsubInit();
       unsubNg();
       unsubRefresh();
       unsubHighlight();
@@ -890,6 +897,45 @@ export function ThreadTabApp(): React.JSX.Element {
     [boardUrl, threadId],
   );
 
+  const getFirstVisibleResNumber = useCallback((): number | null => {
+    const container = scrollRef.current;
+    if (container === null) return null;
+    const containerTop = container.getBoundingClientRect().top;
+    for (const child of container.children) {
+      const rect = child.getBoundingClientRect();
+      if (rect.bottom > containerTop) {
+        const id = child.id;
+        if (id.startsWith('res-')) {
+          return Number(id.slice(4));
+        }
+      }
+    }
+    return null;
+  }, []);
+
+  const clearFilterWithScrollRestore = useCallback(() => {
+    const targetResNumber = getFirstVisibleResNumber();
+    setFilterKey(null);
+    if (targetResNumber !== null) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`res-${String(targetResNumber)}`);
+        el?.scrollIntoView({ block: 'start' });
+      });
+    }
+  }, [getFirstVisibleResNumber]);
+
+  const clearSearchWithScrollRestore = useCallback(() => {
+    const targetResNumber = getFirstVisibleResNumber();
+    setSearchQuery('');
+    searchInputRef.current?.focus();
+    if (targetResNumber !== null) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`res-${String(targetResNumber)}`);
+        el?.scrollIntoView({ block: 'start' });
+      });
+    }
+  }, [getFirstVisibleResNumber]);
+
   const handleToggleAaFont = useCallback((resNumber: number, forceAa: boolean) => {
     setAaOverrides((prev) => {
       const next = new Map(prev);
@@ -1293,10 +1339,7 @@ export function ThreadTabApp(): React.JSX.Element {
           {searchQuery !== '' && (
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('');
-                searchInputRef.current?.focus();
-              }}
+              onClick={clearSearchWithScrollRestore}
               className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             >
               <MdiIcon path={mdiClose} size={10} />
@@ -1353,9 +1396,7 @@ export function ThreadTabApp(): React.JSX.Element {
           </span>
           <button
             type="button"
-            onClick={() => {
-              setFilterKey(null);
-            }}
+            onClick={clearFilterWithScrollRestore}
             className="rounded px-1.5 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           >
             <MdiIcon path={mdiClose} size={12} />

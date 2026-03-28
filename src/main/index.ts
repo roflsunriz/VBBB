@@ -71,6 +71,7 @@ function createWindow(): BaseWindow {
     if (savedTabs.length > 0 || (session.boardTabUrls ?? []).length > 0) {
       vm.restoreTabs(savedTabs, session, lookupBoard);
     }
+    vm.warmPool();
     if (windowState.isMaximized) {
       mainWindow.maximize();
     }

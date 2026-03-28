@@ -467,14 +467,26 @@ export async function registerIpcHandlers(): Promise<void> {
 
   handle('ng:set-rules', async (rules) => {
     await saveNgRules(dataDir, rules);
+    const vm = getViewManagerOrNull();
+    if (vm !== null) {
+      vm.broadcastToAllTabs('view:ng-rules-updated', loadNgRules(dataDir));
+    }
   });
 
   handle('ng:add-rule', async (rule) => {
     await addNgRule(dataDir, rule);
+    const vm = getViewManagerOrNull();
+    if (vm !== null) {
+      vm.broadcastToAllTabs('view:ng-rules-updated', loadNgRules(dataDir));
+    }
   });
 
   handle('ng:remove-rule', async (ruleId: string) => {
     await removeNgRule(dataDir, ruleId);
+    const vm = getViewManagerOrNull();
+    if (vm !== null) {
+      vm.broadcastToAllTabs('view:ng-rules-updated', loadNgRules(dataDir));
+    }
   });
 
   handle('fav:load', () => {
