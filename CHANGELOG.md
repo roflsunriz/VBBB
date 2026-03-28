@@ -5,6 +5,43 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-03-28
+
+### Added
+
+- **レス本文の選択テキストからNGワード（本文フィールド）を追加する機能**
+  - コンテキストメニューの「NG追加」サブメニューに「選択テキスト（本文）」オプションを追加
+  - 既存の「選択テキスト（全項目）」に加え、本文 (`body`) フィールド限定でのNGワード登録が可能に
+- **選択テキストで外部ブラウザ検索する機能**
+  - テキスト選択時のコンテキストメニューに「外部ブラウザで検索」サブメニューを追加
+  - Google / DuckDuckGo / Yandex の3検索エンジンに対応
+  - クリックで既定のブラウザが起動し検索結果ページを表示
+
+### Changed
+
+- **タブ切り替え時の白フラッシュを解消**
+  - 非アクティブタブの管理方式を `setVisible(false)` からオフスクリーン配置方式に変更
+  - 非アクティブタブは正しいサイズ（width/height）を維持したまま画面外（Y=-20000）に配置され、バックグラウンドで描画を継続
+  - タブ切り替え時は Y 座標の移動のみで表示されるため、リサイズ起因の再描画が不要に
+  - `addChildView` による z-order 制御でアクティブタブを最前面に配置
+  - タブビューの初期背景色をダークテーマのプライマリ背景色 (`#171717`) に設定
+- **プリウォーム済みビュープールの導入によりタブ起動を高速化**
+  - 起動時に板タブ×2、スレッドタブ×3 の `WebContentsView` を事前作成し HTML + React のマウントまで完了
+  - 新しいタブを開く際にプールから取得し、IPC プッシュイベントでデータを注入する方式に変更
+  - プールビューもレイアウトサイズでオフスクリーン配置され、割り当て前にプリレンダリング完了
+- **NG設定変更の即時反映**
+  - `ng:set-rules` / `ng:add-rule` / `ng:remove-rule` 実行時に `view:ng-rules-updated` を全タブにブロードキャスト
+- **フィルタ解除時のスクロール位置保持**
+  - スレッドタブ：フィルタ/検索解除時に、解除前に表示されていたレス番号までスクロール復元
+  - 板タブ：フィルタ解除時に、解除前に表示されていたスレッドまでスクロール復元
+- `BoardTabApp` / `ThreadTabApp` の初期化をプルモデル（`invoke`）からプッシュモデル（`send` + `on`）に対応
+- `view:board-tab-ready` / `view:thread-tab-ready` の戻り型を `null` 許容に変更（プール由来のビュー対応）
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.3.0` に更新
+
+### Documentation
+
+- `how-to-update.md` にE2E/ユニットテスト実行・prettier実行・タグ作成手順を追記
+
 ## [3.2.3] - 2026-03-27
 
 ### Fixed

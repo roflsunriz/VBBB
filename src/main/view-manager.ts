@@ -130,9 +130,7 @@ export class ViewManager {
 
     this.updatePoolBounds();
 
-    logger.info(
-      `Pool warmed: ${String(boardCount)} board + ${String(threadCount)} thread views`,
-    );
+    logger.info(`Pool warmed: ${String(boardCount)} board + ${String(threadCount)} thread views`);
   }
 
   private takeBoardPoolView(): WebContentsView | null {
@@ -163,9 +161,7 @@ export class ViewManager {
 
     if (this.layoutBounds !== null) {
       const bounds =
-        type === 'board'
-          ? this.layoutBounds.boardTabArea
-          : this.layoutBounds.threadTabArea;
+        type === 'board' ? this.layoutBounds.boardTabArea : this.layoutBounds.threadTabArea;
       view.setBounds({
         x: Math.round(bounds.x),
         y: ViewManager.OFFSCREEN_Y,

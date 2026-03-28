@@ -23,11 +23,7 @@ export function boundedLevenshtein(a: string, b: string, maxDist: number): numbe
     let rowMin = i;
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(
-        (prev[j] ?? 0) + 1,
-        (curr[j - 1] ?? 0) + 1,
-        (prev[j - 1] ?? 0) + cost,
-      );
+      curr[j] = Math.min((prev[j] ?? 0) + 1, (curr[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
       if ((curr[j] ?? 0) < rowMin) rowMin = curr[j] ?? 0;
     }
     if (rowMin > maxDist) return null;

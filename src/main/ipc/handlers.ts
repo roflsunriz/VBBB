@@ -2,7 +2,16 @@
  * IPC handler registration.
  * Connects renderer requests to main process services.
  */
-import { app, BaseWindow, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
+import {
+  app,
+  BaseWindow,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  shell,
+  type MenuItemConstructorOptions,
+} from 'electron';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { AgeSage, BoardType, type BBSMenu, type Board, type ThreadIndex } from '@shared/domain';
@@ -1142,8 +1151,7 @@ export async function registerIpcHandlers(): Promise<void> {
             if (item.type === 'separator') {
               return { type: 'separator' };
             }
-            const hasSubmenu =
-              item.submenu !== undefined && item.submenu.length > 0;
+            const hasSubmenu = item.submenu !== undefined && item.submenu.length > 0;
             const base: MenuItemConstructorOptions = {
               label: item.label,
               enabled: item.enabled ?? true,

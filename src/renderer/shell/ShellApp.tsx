@@ -439,7 +439,9 @@ export function ShellApp(): React.JSX.Element {
           isRoundItem = roundItems.some(
             (item: RoundItemEntry) => item.url === tab.boardUrl && item.fileName === fileName,
           );
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         const isFavorite = favoriteUrlToId.has(threadUrl);
 
@@ -461,7 +463,11 @@ export function ShellApp(): React.JSX.Element {
               if (dist !== null) {
                 const sim = 1 - dist / maxLen;
                 if (sim >= threshold) {
-                  matches.push({ threadId: s.fileName.replace('.dat', ''), title: s.title, similarity: sim });
+                  matches.push({
+                    threadId: s.fileName.replace('.dat', ''),
+                    title: s.title,
+                    similarity: sim,
+                  });
                 }
               }
             }
@@ -473,7 +479,9 @@ export function ShellApp(): React.JSX.Element {
               });
             }
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         if (relatedItems.length === 0) {
           relatedItems.push({ id: 'related:none', label: '関連スレッドなし', enabled: false });
         }
@@ -481,10 +489,14 @@ export function ShellApp(): React.JSX.Element {
         const items: NativeContextMenuItem[] = [
           { id: 'refresh', label: '更新' },
           { id: 'toggle-round', label: isRoundItem ? '巡回から削除' : '巡回に追加' },
-          { id: 'copy', label: 'コピー', submenu: [
-            { id: 'copy-url', label: 'スレッドのURLをコピー' },
-            { id: 'copy-title-url', label: 'タイトル+URLをコピー' },
-          ]},
+          {
+            id: 'copy',
+            label: 'コピー',
+            submenu: [
+              { id: 'copy-url', label: 'スレッドのURLをコピー' },
+              { id: 'copy-title-url', label: 'タイトル+URLをコピー' },
+            ],
+          },
           { id: 'related', label: '関連スレッド', submenu: relatedItems },
           { id: 'open-external', label: '外部ブラウザで開く' },
           { id: 'sep', label: '', type: 'separator' },
@@ -505,7 +517,11 @@ export function ShellApp(): React.JSX.Element {
               void api.invoke('round:remove-item', tab.boardUrl, fileName);
             } else {
               void api.invoke('round:add-item', {
-                url: tab.boardUrl, boardTitle: '', fileName, threadTitle: tab.title, roundName: '',
+                url: tab.boardUrl,
+                boardTitle: '',
+                fileName,
+                threadTitle: tab.title,
+                roundName: '',
               } satisfies RoundItemEntry);
             }
             break;
@@ -525,11 +541,18 @@ export function ShellApp(): React.JSX.Element {
               void removeFavorite(existingFavId);
             } else {
               let boardType: BoardType;
-              try { boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname); }
-              catch { boardType = BoardType.Type2ch; }
+              try {
+                boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
+              } catch {
+                boardType = BoardType.Type2ch;
+              }
               void addFavorite({
-                id: `fav-${tab.threadId}-${String(Date.now())}`, kind: 'item', type: 'thread',
-                boardType, url: threadUrl, title: tab.title,
+                id: `fav-${tab.threadId}-${String(Date.now())}`,
+                kind: 'item',
+                type: 'thread',
+                boardType,
+                url: threadUrl,
+                title: tab.title,
               } satisfies FavItem);
             }
             break;
@@ -547,54 +570,68 @@ export function ShellApp(): React.JSX.Element {
   );
 
   // ---- Board tab context menu (native) ----
-  const handleBoardTabContextMenu = useCallback((e: React.MouseEvent, tab: BoardTabMeta) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleBoardTabContextMenu = useCallback(
+    (e: React.MouseEvent, tab: BoardTabMeta) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    void (async () => {
-      const api = window.electronApi;
+      void (async () => {
+        const api = window.electronApi;
 
-      let isRoundBoard = false;
-      try {
-        const roundBoards = await api.invoke('round:get-boards');
-        isRoundBoard = roundBoards.some((board: RoundBoardEntry) => board.url === tab.boardUrl);
-      } catch { /* ignore */ }
-
-      const items: NativeContextMenuItem[] = [
-        { id: 'refresh', label: '更新' },
-        { id: 'add-fav', label: 'お気に入りに追加' },
-        { id: 'toggle-round', label: isRoundBoard ? '巡回から削除' : '巡回に追加' },
-      ];
-
-      const action = await api.invoke('shell:popup-context-menu', items);
-      if (action === null) return;
-
-      switch (action) {
-        case 'refresh':
-          setActiveBoardTab(tab.id);
-          break;
-        case 'add-fav': {
-          let boardType: BoardType;
-          try { boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname); }
-          catch { boardType = BoardType.Type2ch; }
-          void addFavorite({
-            id: `fav-board-${String(Date.now())}`, kind: 'item', type: 'board',
-            boardType, url: tab.boardUrl, title: tab.title,
-          } satisfies FavItem);
-          break;
+        let isRoundBoard = false;
+        try {
+          const roundBoards = await api.invoke('round:get-boards');
+          isRoundBoard = roundBoards.some((board: RoundBoardEntry) => board.url === tab.boardUrl);
+        } catch {
+          /* ignore */
         }
-        case 'toggle-round':
-          if (isRoundBoard) {
-            void api.invoke('round:remove-board', tab.boardUrl);
-          } else {
-            void api.invoke('round:add-board', {
-              url: tab.boardUrl, boardTitle: tab.title, roundName: '',
-            } satisfies RoundBoardEntry);
+
+        const items: NativeContextMenuItem[] = [
+          { id: 'refresh', label: '更新' },
+          { id: 'add-fav', label: 'お気に入りに追加' },
+          { id: 'toggle-round', label: isRoundBoard ? '巡回から削除' : '巡回に追加' },
+        ];
+
+        const action = await api.invoke('shell:popup-context-menu', items);
+        if (action === null) return;
+
+        switch (action) {
+          case 'refresh':
+            setActiveBoardTab(tab.id);
+            break;
+          case 'add-fav': {
+            let boardType: BoardType;
+            try {
+              boardType = detectBoardTypeByHost(new URL(tab.boardUrl).hostname);
+            } catch {
+              boardType = BoardType.Type2ch;
+            }
+            void addFavorite({
+              id: `fav-board-${String(Date.now())}`,
+              kind: 'item',
+              type: 'board',
+              boardType,
+              url: tab.boardUrl,
+              title: tab.title,
+            } satisfies FavItem);
+            break;
           }
-          break;
-      }
-    })();
-  }, [setActiveBoardTab, addFavorite]);
+          case 'toggle-round':
+            if (isRoundBoard) {
+              void api.invoke('round:remove-board', tab.boardUrl);
+            } else {
+              void api.invoke('round:add-board', {
+                url: tab.boardUrl,
+                boardTitle: tab.title,
+                roundName: '',
+              } satisfies RoundBoardEntry);
+            }
+            break;
+        }
+      })();
+    },
+    [setActiveBoardTab, addFavorite],
+  );
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
@@ -617,7 +654,9 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={() => { openModal('add-board'); }}
+          onClick={() => {
+            openModal('add-board');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="外部掲示板を追加 (したらば/まちBBS)"
         >
@@ -629,7 +668,9 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={() => { openModal('auth'); }}
+          onClick={() => {
+            openModal('auth');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="認証設定"
         >
@@ -638,7 +679,9 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { openModal('proxy'); }}
+          onClick={() => {
+            openModal('proxy');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="プロキシ設定"
         >
@@ -647,7 +690,9 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { openModal('round'); }}
+          onClick={() => {
+            openModal('round');
+          }}
           className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${roundTimerEnabled ? 'bg-[var(--color-success)]/15 text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]`}
           title={roundTimerEnabled ? '巡回リスト (自動巡回 ON)' : '巡回リスト'}
         >
@@ -656,7 +701,9 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { openModal('cookie-manager'); }}
+          onClick={() => {
+            openModal('cookie-manager');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="Cookie/UA管理"
         >
@@ -665,7 +712,9 @@ export function ShellApp(): React.JSX.Element {
         </button>
         <button
           type="button"
-          onClick={() => { openModal('console'); }}
+          onClick={() => {
+            openModal('console');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="診断コンソール"
         >
@@ -677,7 +726,9 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={() => { openModal('dsl-editor'); }}
+          onClick={() => {
+            openModal('dsl-editor');
+          }}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="DSLエディタ"
         >
@@ -711,7 +762,9 @@ export function ShellApp(): React.JSX.Element {
 
         <button
           type="button"
-          onClick={() => { openModal('about'); }}
+          onClick={() => {
+            openModal('about');
+          }}
           className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
           title="VBBBについて"
         >

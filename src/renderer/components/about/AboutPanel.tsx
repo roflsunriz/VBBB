@@ -16,9 +16,7 @@ export function AboutPanel({ onClose }: AboutPanelProps): React.JSX.Element {
         Versatile BBS Browser
       </p>
       <p className="text-center text-xs text-[var(--color-text-muted)]">v{__APP_VERSION__}</p>
-      <p className="text-center text-xs text-[var(--color-text-muted)]">
-        2ch/5ch互換BBSブラウザ
-      </p>
+      <p className="text-center text-xs text-[var(--color-text-muted)]">2ch/5ch互換BBSブラウザ</p>
       <p className="text-center text-xs text-[var(--color-text-muted)]">
         Electron + React + TypeScript
       </p>
