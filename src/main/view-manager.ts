@@ -127,6 +127,9 @@ export class ViewManager {
       this.loadPage(view, 'thread-tab.html');
       this.threadTabPool.push(view);
     }
+
+    this.updatePoolBounds();
+
     logger.info(
       `Pool warmed: ${String(boardCount)} board + ${String(threadCount)} thread views`,
     );
@@ -157,6 +160,19 @@ export class ViewManager {
     const view = this.createTabView();
     this.loadPage(view, page);
     pool.push(view);
+
+    if (this.layoutBounds !== null) {
+      const bounds =
+        type === 'board'
+          ? this.layoutBounds.boardTabArea
+          : this.layoutBounds.threadTabArea;
+      view.setBounds({
+        x: Math.round(bounds.x),
+        y: ViewManager.OFFSCREEN_Y,
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -226,6 +242,11 @@ export class ViewManager {
 
     const prevTabId = this.activeBoardTabId;
     this.activeBoardTabId = tabId;
+
+    const entry = this.boardTabs.get(tabId);
+    if (entry?.view !== undefined && entry.view !== null) {
+      this.window.contentView.addChildView(entry.view);
+    }
     this.positionActiveBoardTab();
     if (prevTabId !== null && prevTabId !== tabId) {
       this.hideBoardTab(prevTabId);
@@ -333,6 +354,11 @@ export class ViewManager {
 
     const prevTabId = this.activeThreadTabId;
     this.activeThreadTabId = tabId;
+
+    const entry = this.threadTabs.get(tabId);
+    if (entry?.view !== undefined && entry.view !== null) {
+      this.window.contentView.addChildView(entry.view);
+    }
     this.positionActiveThreadTab();
     if (prevTabId !== null && prevTabId !== tabId) {
       this.hideThreadTab(prevTabId);
@@ -391,10 +417,7 @@ export class ViewManager {
 
   updateLayout(bounds: ContentBounds): void {
     this.layoutBounds = bounds;
-    this.updateAllBoardTabBounds();
-    this.updateAllThreadTabBounds();
-    this.positionActiveBoardTab();
-    this.positionActiveThreadTab();
+    this.updateAllTabBounds();
   }
 
   handleWindowResize(): void {
@@ -552,6 +575,9 @@ export class ViewManager {
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  /** Offscreen Y offset — keeps the view at correct size but out of sight */
+  private static readonly OFFSCREEN_Y = -20000;
+
   private createTabView(): WebContentsView {
     const view = new WebContentsView({
       webPreferences: {
@@ -562,9 +588,9 @@ export class ViewManager {
       },
     });
 
+    view.setBackgroundColor('#171717');
     this.window.contentView.addChildView(view);
-    view.setVisible(false);
-    view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    view.setBounds({ x: 0, y: ViewManager.OFFSCREEN_Y, width: 0, height: 0 });
     return view;
   }
 
@@ -592,12 +618,7 @@ export class ViewManager {
 
   hideAllTabViews(): void {
     this.tabViewsHidden = true;
-    for (const entry of this.boardTabs.values()) {
-      entry.view?.setVisible(false);
-    }
-    for (const entry of this.threadTabs.values()) {
-      entry.view?.setVisible(false);
-    }
+    this.moveAllTabsOffscreen();
   }
 
   showAllTabViews(): void {
@@ -606,39 +627,105 @@ export class ViewManager {
     this.positionActiveThreadTab();
   }
 
+  private moveAllTabsOffscreen(): void {
+    for (const entry of this.boardTabs.values()) {
+      if (entry.view !== null) {
+        this.moveOffscreen(entry.view);
+      }
+    }
+    for (const entry of this.threadTabs.values()) {
+      if (entry.view !== null) {
+        this.moveOffscreen(entry.view);
+      }
+    }
+  }
+
   private hideBoardTab(tabId: string): void {
     const entry = this.boardTabs.get(tabId);
     if (entry?.view !== undefined && entry.view !== null) {
-      entry.view.setVisible(false);
+      this.moveOffscreen(entry.view);
     }
   }
 
   private hideThreadTab(tabId: string): void {
     const entry = this.threadTabs.get(tabId);
     if (entry?.view !== undefined && entry.view !== null) {
-      entry.view.setVisible(false);
+      this.moveOffscreen(entry.view);
     }
   }
 
-  /** Update bounds for ALL board tab views so inactive tabs have correct size. */
-  private updateAllBoardTabBounds(): void {
-    if (this.layoutBounds === null) return;
-    const bounds = this.layoutBounds.boardTabArea;
-    for (const entry of this.boardTabs.values()) {
-      if (entry.view !== null) {
-        this.applyBounds(entry.view, bounds);
-      }
-    }
+  /**
+   * Move a view offscreen while preserving its width/height.
+   * The view continues to render at the correct size in the background,
+   * eliminating first-paint flash when it becomes visible again.
+   */
+  private moveOffscreen(view: WebContentsView): void {
+    const current = view.getBounds();
+    if (current.y === ViewManager.OFFSCREEN_Y) return;
+    view.setBounds({
+      x: current.x,
+      y: ViewManager.OFFSCREEN_Y,
+      width: current.width,
+      height: current.height,
+    });
   }
 
-  /** Update bounds for ALL thread tab views so inactive tabs have correct size. */
-  private updateAllThreadTabBounds(): void {
+  /**
+   * Update bounds for ALL tab views (active + inactive) so they pre-render
+   * at the correct size. Inactive tabs are kept offscreen.
+   */
+  private updateAllTabBounds(): void {
     if (this.layoutBounds === null) return;
-    const bounds = this.layoutBounds.threadTabArea;
-    for (const entry of this.threadTabs.values()) {
-      if (entry.view !== null) {
-        this.applyBounds(entry.view, bounds);
-      }
+
+    const boardBounds = this.layoutBounds.boardTabArea;
+    for (const [id, entry] of this.boardTabs) {
+      if (entry.view === null) continue;
+      const isActive = id === this.activeBoardTabId && !this.tabViewsHidden;
+      entry.view.setBounds({
+        x: Math.round(boardBounds.x),
+        y: isActive ? Math.round(boardBounds.y) : ViewManager.OFFSCREEN_Y,
+        width: Math.round(boardBounds.width),
+        height: Math.round(boardBounds.height),
+      });
+    }
+
+    const threadBounds = this.layoutBounds.threadTabArea;
+    for (const [id, entry] of this.threadTabs) {
+      if (entry.view === null) continue;
+      const isActive = id === this.activeThreadTabId && !this.tabViewsHidden;
+      entry.view.setBounds({
+        x: Math.round(threadBounds.x),
+        y: isActive ? Math.round(threadBounds.y) : ViewManager.OFFSCREEN_Y,
+        width: Math.round(threadBounds.width),
+        height: Math.round(threadBounds.height),
+      });
+    }
+
+    this.updatePoolBounds();
+  }
+
+  /** Keep pool views at the correct size so they pre-render before assignment. */
+  private updatePoolBounds(): void {
+    if (this.layoutBounds === null) return;
+
+    const boardBounds = this.layoutBounds.boardTabArea;
+    for (const view of this.boardTabPool) {
+      view.setBounds({
+        x: Math.round(boardBounds.x),
+        y: ViewManager.OFFSCREEN_Y,
+        width: Math.round(boardBounds.width),
+        height: Math.round(boardBounds.height),
+      });
+    }
+
+    const threadBounds = this.layoutBounds.threadTabArea;
+    for (const view of this.threadTabPool) {
+      view.setBounds({
+        x: Math.round(threadBounds.x),
+        y: ViewManager.OFFSCREEN_Y,
+        width: Math.round(threadBounds.width),
+        height: Math.round(threadBounds.height),
+      });
     }
   }
 
@@ -648,7 +735,6 @@ export class ViewManager {
     const entry = this.boardTabs.get(this.activeBoardTabId);
     if (entry?.view === undefined || entry.view === null) return;
     this.applyBounds(entry.view, this.layoutBounds.boardTabArea);
-    entry.view.setVisible(true);
   }
 
   private positionActiveThreadTab(): void {
@@ -657,7 +743,6 @@ export class ViewManager {
     const entry = this.threadTabs.get(this.activeThreadTabId);
     if (entry?.view === undefined || entry.view === null) return;
     this.applyBounds(entry.view, this.layoutBounds.threadTabArea);
-    entry.view.setVisible(true);
   }
 
   private applyBounds(view: WebContentsView, bounds: RectBounds): void {
