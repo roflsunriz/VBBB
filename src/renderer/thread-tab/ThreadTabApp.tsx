@@ -1525,6 +1525,12 @@ export function ThreadTabApp(): React.JSX.Element {
           }
           if (contextSelectedText.length > 0) {
             pushNg(
+              'selected-body',
+              `選択テキスト（本文）: ${contextSelectedText}`,
+              NgStringFieldEnum.Body,
+              contextSelectedText,
+            );
+            pushNg(
               'selected-all',
               `選択テキスト（全項目）: ${contextSelectedText}`,
               NgStringFieldEnum.All,
@@ -1659,6 +1665,64 @@ export function ThreadTabApp(): React.JSX.Element {
                   </div>
                 )}
               </div>
+              {/* External search submenu (only shown when text is selected) */}
+              {contextSelectedText.length > 0 && (
+                <div
+                  className="relative"
+                  onMouseEnter={() => {
+                    setOpenContextSubMenu('search');
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                    role="menuitem"
+                  >
+                    外部ブラウザで検索
+                    <MdiIcon path={mdiChevronRight} size={12} />
+                  </button>
+                  {openContextSubMenu === 'search' && (
+                    <div
+                      className="absolute top-0 left-full z-10 min-w-48 rounded border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] py-1 shadow-lg"
+                      onMouseEnter={() => {
+                        setOpenContextSubMenu('search');
+                      }}
+                    >
+                      {(
+                        [
+                          {
+                            label: 'Google で検索',
+                            url: `https://www.google.com/search?q=${encodeURIComponent(contextSelectedText)}`,
+                          },
+                          {
+                            label: 'DuckDuckGo で検索',
+                            url: `https://duckduckgo.com/?q=${encodeURIComponent(contextSelectedText)}`,
+                          },
+                          {
+                            label: 'Yandex で検索',
+                            url: `https://yandex.com/search/?text=${encodeURIComponent(contextSelectedText)}`,
+                          },
+                        ] as const
+                      ).map((engine) => (
+                        <button
+                          key={engine.label}
+                          type="button"
+                          className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void window.electronApi.invoke('shell:open-external', engine.url);
+                            setContextMenu(null);
+                            setOpenContextSubMenu(null);
+                          }}
+                          role="menuitem"
+                        >
+                          {engine.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mx-2 my-0.5 border-t border-[var(--color-border-secondary)]" />
               <button
                 type="button"
