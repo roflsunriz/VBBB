@@ -12,6 +12,8 @@ import {
   saveSessionStateSync,
   saveTabsSync,
 } from './services/tab-persistence';
+import { loadFolderIdx } from './services/subject';
+import { getBoardDir } from './services/file-io';
 import { ViewManager } from './view-manager';
 import { setViewManager, getViewManagerOrNull } from './view-manager-ref';
 import { PanelWindowManager } from './panel-window-manager';
@@ -69,7 +71,19 @@ function createWindow(): BaseWindow {
 
   shellView.webContents.on('did-finish-load', () => {
     if (savedTabs.length > 0 || (session.boardTabUrls ?? []).length > 0) {
-      vm.restoreTabs(savedTabs, session, lookupBoard);
+      const lookupKokomade = (boardUrl: string, threadId: string): number => {
+        try {
+          const board = lookupBoard(boardUrl);
+          const boardDir = getBoardDir(dataDir, board.url);
+          const indices = loadFolderIdx(boardDir);
+          const datFileName = `${threadId}.dat`;
+          const idx = indices.find((i) => i.fileName === datFileName);
+          return idx?.kokomade ?? -1;
+        } catch {
+          return -1;
+        }
+      };
+      vm.restoreTabs(savedTabs, session, lookupBoard, lookupKokomade);
     }
     vm.warmPool();
     if (windowState.isMaximized) {

@@ -64,6 +64,7 @@ interface BoardTabState {
   favorites: FavTree;
 
   newThreadEditorOpen: boolean;
+  nextThreadDraft: { readonly subject: string; readonly message: string } | null;
 
   // Actions
   initialize: (initData: BoardTabInitData) => Promise<void>;
@@ -74,6 +75,7 @@ interface BoardTabState {
   setNgRules: (rules: readonly NgRule[]) => void;
   setFavorites: (tree: FavTree) => void;
   openNewThreadEditor: () => void;
+  openNewThreadEditorWithDraft: (subject: string, message: string) => void;
   closeNewThreadEditor: () => void;
   refreshBoard: () => Promise<void>;
 }
@@ -91,6 +93,7 @@ export const useBoardTabStore = create<BoardTabState>((set, get) => ({
   ngRules: [],
   favorites: { children: [] },
   newThreadEditorOpen: false,
+  nextThreadDraft: null,
 
   initialize: async (initData) => {
     const board = initData.board;
@@ -163,11 +166,15 @@ export const useBoardTabStore = create<BoardTabState>((set, get) => ({
   },
 
   openNewThreadEditor: () => {
-    set({ newThreadEditorOpen: true });
+    set({ newThreadEditorOpen: true, nextThreadDraft: null });
+  },
+
+  openNewThreadEditorWithDraft: (subject, message) => {
+    set({ newThreadEditorOpen: true, nextThreadDraft: { subject, message } });
   },
 
   closeNewThreadEditor: () => {
-    set({ newThreadEditorOpen: false });
+    set({ newThreadEditorOpen: false, nextThreadDraft: null });
   },
 
   refreshBoard: async () => {

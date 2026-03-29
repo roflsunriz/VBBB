@@ -8,28 +8,30 @@
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { mdiSend, mdiLoading, mdiClose } from '@mdi/js';
-import { useBBSStore } from '../../stores/bbs-store';
 import { useStatusLogStore } from '../../stores/status-log-store';
 import { MdiIcon } from '../common/MdiIcon';
 import { TopResizeHandle } from '../common/TopResizeHandle';
+import type { KotehanConfig } from '@shared/domain';
 
 interface NewThreadEditorProps {
   readonly boardUrl: string;
   readonly onClose: () => void;
+  readonly initialDraft?: { readonly subject: string; readonly message: string } | null | undefined;
+  readonly kotehanOverride?: KotehanConfig | undefined;
 }
 
-export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): React.JSX.Element {
-  const kotehan = useBBSStore((s) => s.kotehan);
-  const saveKotehan = useBBSStore((s) => s.saveKotehan);
-  const setStatusMessage = useBBSStore((s) => s.setStatusMessage);
-  const refreshSelectedBoard = useBBSStore((s) => s.refreshSelectedBoard);
-  const openThread = useBBSStore((s) => s.openThread);
-  const nextThreadDraft = useBBSStore((s) => s.nextThreadDraft);
-
-  const [subject, setSubject] = useState(nextThreadDraft?.subject ?? '');
-  const [name, setName] = useState(kotehan.name);
-  const [mail, setMail] = useState(kotehan.mail.length > 0 ? kotehan.mail : '');
-  const [message, setMessage] = useState(nextThreadDraft?.message ?? '');
+export function NewThreadEditor({
+  boardUrl,
+  onClose,
+  initialDraft,
+  kotehanOverride,
+}: NewThreadEditorProps): React.JSX.Element {
+  const [subject, setSubject] = useState(initialDraft?.subject ?? '');
+  const [name, setName] = useState(kotehanOverride?.name ?? '');
+  const [mail, setMail] = useState(
+    (kotehanOverride?.mail ?? '').length > 0 ? (kotehanOverride?.mail ?? '') : '',
+  );
+  const [message, setMessage] = useState(initialDraft?.message ?? '');
   const [posting, setPosting] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -40,9 +42,11 @@ export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): Re
   }, []);
 
   useEffect(() => {
-    setName(kotehan.name);
-    setMail(kotehan.mail.length > 0 ? kotehan.mail : '');
-  }, [kotehan]);
+    if (kotehanOverride !== undefined) {
+      setName(kotehanOverride.name);
+      setMail(kotehanOverride.mail.length > 0 ? kotehanOverride.mail : '');
+    }
+  }, [kotehanOverride]);
 
   // Focus the subject input on mount
   useEffect(() => {
@@ -78,19 +82,19 @@ export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): Re
 
       if (result.success) {
         setResultMessage('スレッド作成成功');
-        setStatusMessage('スレッド作成が完了しました');
         pushLog('post', 'success', 'スレッド作成が完了しました');
-        void saveKotehan(boardUrl, { name, mail });
+        void window.electronApi.invoke('bbs:set-kotehan', boardUrl, { name, mail });
 
-        // Refresh board thread list to include the new thread
-        await refreshSelectedBoard();
-
-        // Try to open the newly created thread (it should now be at the top of the list)
-        const { subjects } = useBBSStore.getState();
-        const newest = subjects[0];
+        const subjectResult = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
+        const newest = subjectResult.threads[0];
         if (newest !== undefined) {
           const newThreadId = newest.fileName.replace('.dat', '');
-          void openThread(boardUrl, newThreadId, newest.title);
+          void window.electronApi.invoke(
+            'view:open-thread-request',
+            boardUrl,
+            newThreadId,
+            newest.title,
+          );
         }
 
         setTimeout(() => {
@@ -98,7 +102,6 @@ export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): Re
         }, 800);
       } else {
         setResultMessage(`作成失敗: ${result.resultType}`);
-        setStatusMessage(`スレッド作成失敗: ${result.resultType}`);
         pushLog('post', 'error', `スレッド作成失敗: ${result.resultType}`);
       }
     } catch (err) {
@@ -108,18 +111,7 @@ export function NewThreadEditor({ boardUrl, onClose }: NewThreadEditorProps): Re
     } finally {
       setPosting(false);
     }
-  }, [
-    boardUrl,
-    subject,
-    name,
-    mail,
-    message,
-    setStatusMessage,
-    saveKotehan,
-    refreshSelectedBoard,
-    openThread,
-    onClose,
-  ]);
+  }, [boardUrl, subject, name, mail, message, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

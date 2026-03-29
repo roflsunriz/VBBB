@@ -93,7 +93,7 @@ export const useThreadTabStore = create<ThreadTabState>((set, get) => ({
   error: null,
   scrollTop: 0,
   initialScrollTop: 0,
-  kokomade: 0,
+  kokomade: -1,
   isDatFallen: false,
 
   postEditorOpen: false,
@@ -115,6 +115,7 @@ export const useThreadTabStore = create<ThreadTabState>((set, get) => ({
       threadId: initData.threadId,
       title: initData.title,
       initialScrollTop: initData.scrollTop ?? 0,
+      kokomade: initData.kokomade ?? -1,
     });
 
     // Fetch thread data and supporting data in parallel

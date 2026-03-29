@@ -67,6 +67,7 @@ export class ViewManager {
   private readonly webContentsToTabId = new Map<number, string>();
   private readonly webContentsToTabType = new Map<number, 'board' | 'thread'>();
   private readonly scrollPositions = new Map<string, number>();
+  private readonly kokomadePositions = new Map<string, number>();
 
   private readonly boardTabPool: WebContentsView[] = [];
   private readonly threadTabPool: WebContentsView[] = [];
@@ -301,12 +302,14 @@ export class ViewManager {
       this.threadTabs.set(tabId, { meta, view: poolView });
 
       const scrollTop = this.scrollPositions.get(tabId) ?? 0;
+      const kokomade = this.kokomadePositions.get(tabId);
       const initData: ThreadTabInitData = {
         tabId,
         boardUrl,
         threadId,
         title,
         ...(scrollTop > 0 ? { scrollTop } : {}),
+        ...(kokomade !== undefined && kokomade >= 0 ? { kokomade } : {}),
       };
       poolView.webContents.send('view:thread-tab-init', initData);
 
@@ -385,12 +388,14 @@ export class ViewManager {
     const entry = this.threadTabs.get(tabId);
     if (entry === undefined) return null;
     const scrollTop = this.scrollPositions.get(tabId) ?? 0;
+    const kokomade = this.kokomadePositions.get(tabId);
     return {
       tabId,
       boardUrl: entry.meta.boardUrl,
       threadId: entry.meta.threadId,
       title: entry.meta.title,
       ...(scrollTop > 0 ? { scrollTop } : {}),
+      ...(kokomade !== undefined && kokomade >= 0 ? { kokomade } : {}),
     };
   }
 
@@ -464,6 +469,25 @@ export class ViewManager {
   broadcastToAll(channel: string, ...args: unknown[]): void {
     this.broadcastToShell(channel, ...args);
     this.broadcastToAllTabs(channel, ...args);
+  }
+
+  sendToBoardTab(tabId: string, channel: string, ...args: unknown[]): void {
+    const entry = this.boardTabs.get(tabId);
+    entry?.view?.webContents.send(channel, ...args);
+  }
+
+  updateKokomadePosition(tabId: string, kokomade: number): void {
+    this.kokomadePositions.set(tabId, kokomade);
+  }
+
+  /**
+   * Populate kokomade from thread index entries during session restore.
+   */
+  setKokomadeFromIndex(boardUrl: string, threadId: string, kokomade: number): void {
+    const tabId = `${boardUrl}:${threadId}`;
+    if (kokomade >= 0) {
+      this.kokomadePositions.set(tabId, kokomade);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -545,6 +569,7 @@ export class ViewManager {
     savedTabs: readonly SavedTab[],
     session: SessionState,
     lookupBoard: (url: string) => Board,
+    lookupKokomade?: (boardUrl: string, threadId: string) => number,
   ): void {
     const boardUrls = session.boardTabUrls ?? [];
     for (const url of boardUrls) {
@@ -553,6 +578,12 @@ export class ViewManager {
     }
 
     for (const tab of savedTabs) {
+      if (lookupKokomade !== undefined) {
+        const kokomade = lookupKokomade(tab.boardUrl, tab.threadId);
+        if (kokomade >= 0) {
+          this.setKokomadeFromIndex(tab.boardUrl, tab.threadId, kokomade);
+        }
+      }
       const tabId = this.createThreadTab(tab.boardUrl, tab.threadId, tab.title);
       if (tab.scrollTop !== undefined && tab.scrollTop > 0) {
         this.scrollPositions.set(tabId, tab.scrollTop);

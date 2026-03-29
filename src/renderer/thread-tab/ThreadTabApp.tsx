@@ -4,6 +4,7 @@
  * No virtual scrolling — renders all responses directly.
  */
 import {
+  Fragment,
   useCallback,
   useRef,
   useEffect,
@@ -28,9 +29,10 @@ import {
   mdiEye,
   mdiVolumeHigh,
   mdiChevronRight,
+  mdiArrowRightBold,
 } from '@mdi/js';
 import { createPortal } from 'react-dom';
-import type { Res } from '@shared/domain';
+import type { Res, SubjectRecord } from '@shared/domain';
 import {
   type NgRule,
   type NgFilterResult,
@@ -69,6 +71,8 @@ import {
   type WatchoiInfo,
 } from '../utils/thread-analysis';
 import { extractIps } from '../utils/ip-detect';
+import { findNextThread, NEXT_THREAD_RESPONSE_THRESHOLD } from '../utils/next-thread-detect';
+import { generateNextThreadTemplate } from '../utils/next-thread-template';
 import { useScrollKeyboard } from '../hooks/use-scroll-keyboard';
 import { ContextMenuContainer } from '../components/common/ContextMenuContainer';
 import { buildResPermalink } from '@shared/url-parser';
@@ -345,6 +349,8 @@ export function ThreadTabApp(): React.JSX.Element {
   const highlightSettings = useThreadTabStore((s) => s.highlightSettings);
   const postHistory = useThreadTabStore((s) => s.postHistory);
   const initialScrollTop = useThreadTabStore((s) => s.initialScrollTop);
+  const kokomade = useThreadTabStore((s) => s.kokomade);
+  const updateKokomade = useThreadTabStore((s) => s.updateKokomade);
   const initialize = useThreadTabStore((s) => s.initialize);
   const refreshThread = useThreadTabStore((s) => s.refreshThread);
   const toggleAnalysis = useThreadTabStore((s) => s.toggleAnalysis);
@@ -377,6 +383,10 @@ export function ThreadTabApp(): React.JSX.Element {
     result: IpLookupResult | null;
     loading: boolean;
   } | null>(null);
+  const [nextThreadCandidate, setNextThreadCandidate] = useState<SubjectRecord | null | undefined>(
+    undefined,
+  );
+  const lastVisibleResRef = useRef(-1);
 
   const handleIpLookup = useCallback((ip: string) => {
     setIpLookupPopup({ ip, result: null, loading: true });
@@ -463,7 +473,7 @@ export function ThreadTabApp(): React.JSX.Element {
     };
   }, []);
 
-  // Cleanup
+  // Cleanup + kokomade auto-save on unmount
   useEffect(() => {
     return () => {
       if (edgeRefreshUnlockTimerRef.current !== null) {
@@ -472,8 +482,36 @@ export function ThreadTabApp(): React.JSX.Element {
       if (scrollReportTimerRef.current !== null) {
         clearTimeout(scrollReportTimerRef.current);
       }
+      if (lastVisibleResRef.current >= 1) {
+        const state = useThreadTabStore.getState();
+        if (state.boardUrl.length > 0 && state.threadId.length > 0) {
+          void window.electronApi.invoke(
+            'bbs:update-thread-index',
+            state.boardUrl,
+            state.threadId,
+            {
+              kokomade: lastVisibleResRef.current,
+            },
+          );
+        }
+      }
     };
   }, []);
+
+  // Auto-detect next thread when response count reaches threshold
+  const responseCount = responses.length;
+  useEffect(() => {
+    if (responseCount < NEXT_THREAD_RESPONSE_THRESHOLD) return;
+    void (async () => {
+      try {
+        const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
+        const found = findNextThread(title, `${threadId}.dat`, result.threads);
+        setNextThreadCandidate(found ?? null);
+      } catch {
+        setNextThreadCandidate(null);
+      }
+    })();
+  }, [boardUrl, threadId, title, responseCount]);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -734,6 +772,22 @@ export function ThreadTabApp(): React.JSX.Element {
     scrollReportTimerRef.current = setTimeout(() => {
       if (scrollRef.current !== null) {
         void window.electronApi.invoke('view:report-scroll-position', scrollRef.current.scrollTop);
+
+        const container = scrollRef.current;
+        const containerBottom = container.getBoundingClientRect().bottom;
+        let lastVisible = -1;
+        for (const child of container.children) {
+          const rect = child.getBoundingClientRect();
+          if (rect.top < containerBottom && child.id.startsWith('res-')) {
+            const num = Number(child.id.slice(4));
+            if (!Number.isNaN(num) && num > lastVisible) {
+              lastVisible = num;
+            }
+          }
+        }
+        if (lastVisible >= 1) {
+          lastVisibleResRef.current = lastVisible;
+        }
       }
     }, 500);
   }, []);
@@ -935,6 +989,46 @@ export function ThreadTabApp(): React.JSX.Element {
       });
     }
   }, [getFirstVisibleResNumber]);
+
+  const handleSearchNextThread = useCallback(() => {
+    void (async () => {
+      try {
+        const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
+        const found = findNextThread(title, `${threadId}.dat`, result.threads);
+        setNextThreadCandidate(found ?? null);
+      } catch {
+        setNextThreadCandidate(null);
+      }
+    })();
+  }, [boardUrl, threadId, title]);
+
+  const handleOpenNextThread = useCallback(() => {
+    if (nextThreadCandidate === undefined || nextThreadCandidate === null) return;
+    const nextId = nextThreadCandidate.fileName.replace('.dat', '');
+    void window.electronApi.invoke(
+      'view:open-thread-request',
+      boardUrl,
+      nextId,
+      nextThreadCandidate.title,
+    );
+  }, [nextThreadCandidate, boardUrl]);
+
+  const handleCreateNextThread = useCallback(() => {
+    const firstPost = responses[0];
+    if (firstPost === undefined) return;
+    const template = generateNextThreadTemplate({
+      firstPostBody: firstPost.body,
+      currentTitle: title,
+      boardUrl,
+      threadId,
+    });
+    void window.electronApi.invoke(
+      'view:open-board-new-thread-editor',
+      boardUrl,
+      template.subject,
+      template.message,
+    );
+  }, [responses, title, boardUrl, threadId]);
 
   const handleToggleAaFont = useCallback((resNumber: number, forceAa: boolean) => {
     setAaOverrides((prev) => {
@@ -1309,6 +1403,31 @@ export function ThreadTabApp(): React.JSX.Element {
         >
           <MdiIcon path={mdiRobot} size={14} />
         </button>
+        <div className="mx-0.5 h-4 w-px bg-[var(--color-border-primary)]" />
+        <button
+          type="button"
+          onClick={handleSearchNextThread}
+          className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
+            nextThreadCandidate !== undefined && nextThreadCandidate !== null
+              ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
+              : nextThreadCandidate === null
+                ? 'text-[var(--color-text-muted)]'
+                : 'text-[var(--color-warning)]'
+          }`}
+          title="次スレを検索"
+        >
+          <MdiIcon path={mdiArrowRightBold} size={12} />
+          次スレ
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateNextThread}
+          className="flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium text-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
+          title="現スレの>>1をベースに次スレを立てる"
+        >
+          <MdiIcon path={mdiPencil} size={12} />
+          次スレを立てる
+        </button>
       </div>
 
       {/* Thread title */}
@@ -1404,6 +1523,74 @@ export function ThreadTabApp(): React.JSX.Element {
         </div>
       )}
 
+      {/* DAT fallen banner */}
+      {isDatFallen && responseCount < NEXT_THREAD_RESPONSE_THRESHOLD && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-3 py-1.5 text-xs">
+          <span className="flex-1 font-semibold text-[var(--color-text-muted)]">
+            このスレッドはDAT落ちしています
+          </span>
+          <button
+            type="button"
+            onClick={handleCreateNextThread}
+            className="shrink-0 rounded bg-[var(--color-accent)] px-2 py-0.5 text-white hover:opacity-90"
+          >
+            次スレを立てる
+          </button>
+        </div>
+      )}
+
+      {/* Next thread banner */}
+      {responseCount >= NEXT_THREAD_RESPONSE_THRESHOLD && nextThreadCandidate !== undefined && (
+        <div
+          className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs ${
+            nextThreadCandidate !== null
+              ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/10'
+              : 'border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)]/60'
+          }`}
+        >
+          <span className="shrink-0 font-semibold text-[var(--color-text-muted)]">
+            このスレッドは1000を超えました
+          </span>
+          {nextThreadCandidate !== null ? (
+            <>
+              <span
+                className="min-w-0 flex-1 truncate text-[var(--color-success)]"
+                title={nextThreadCandidate.title}
+              >
+                次スレ: {nextThreadCandidate.title}
+              </span>
+              <button
+                type="button"
+                onClick={handleOpenNextThread}
+                className="shrink-0 rounded bg-[var(--color-success)] px-2 py-0.5 text-white hover:opacity-90"
+              >
+                開く
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-[var(--color-text-muted)]">
+                次スレは見つかりませんでした
+              </span>
+              <button
+                type="button"
+                onClick={handleSearchNextThread}
+                className="shrink-0 rounded border border-[var(--color-border-primary)] px-2 py-0.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+              >
+                再検索
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNextThread}
+                className="shrink-0 rounded bg-[var(--color-accent)] px-2 py-0.5 text-white hover:opacity-90"
+              >
+                次スレを立てる
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Responses — no virtual scrolling */}
       <div
         ref={scrollRef}
@@ -1411,7 +1598,18 @@ export function ThreadTabApp(): React.JSX.Element {
         onWheel={handleThreadWheel}
         onScroll={handleScroll}
       >
-        {displayResponses.map(renderResponse)}
+        {displayResponses.map((res) => (
+          <Fragment key={res.number}>
+            {kokomade >= 0 && res.number === kokomade + 1 && (
+              <div className="mx-4 my-1 flex items-center gap-2 border-t-2 border-[var(--color-warning)] py-1">
+                <span className="text-xs font-semibold text-[var(--color-warning)]">
+                  --- ここまで読んだ ---
+                </span>
+              </div>
+            )}
+            {renderResponse(res)}
+          </Fragment>
+        ))}
       </div>
 
       {/* Edge refresh overlay */}
@@ -1550,9 +1748,7 @@ export function ThreadTabApp(): React.JSX.Element {
                 type="button"
                 className="w-full px-3 py-1.5 text-left text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
                 onClick={() => {
-                  void window.electronApi.invoke('bbs:update-thread-index', boardUrl, threadId, {
-                    kokomade: ctxRes.number,
-                  });
+                  updateKokomade(ctxRes.number);
                   setContextMenu(null);
                 }}
                 role="menuitem"

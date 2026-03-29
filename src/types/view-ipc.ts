@@ -62,6 +62,7 @@ export interface ThreadTabInitData {
   readonly threadId: string;
   readonly title: string;
   readonly scrollTop?: number | undefined;
+  readonly kokomade?: number | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +124,10 @@ export interface ViewPushEventMap {
   'view:refresh-board': undefined;
   'view:refresh-thread': undefined;
   'view:thread-tab-title-updated': { readonly tabId: string; readonly title: string };
+  'view:board-open-new-thread-with-draft': {
+    readonly subject: string;
+    readonly message: string;
+  };
   'panel:closed': {
     readonly panelType: PanelType;
     readonly boardUrl: string;
@@ -205,6 +210,10 @@ export interface ViewIpcChannelMap {
   };
   'view:show-tab-views': {
     args: [];
+    result: void;
+  };
+  'view:open-board-new-thread-editor': {
+    args: [boardUrl: string, subject: string, message: string];
     result: void;
   };
   'panel:open': {

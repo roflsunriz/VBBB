@@ -169,6 +169,7 @@ export function BoardTabApp(): React.JSX.Element {
   const ngRules = useBoardTabStore((s) => s.ngRules);
   const favorites = useBoardTabStore((s) => s.favorites);
   const newThreadEditorOpen = useBoardTabStore((s) => s.newThreadEditorOpen);
+  const nextThreadDraft = useBoardTabStore((s) => s.nextThreadDraft);
   const openNewThreadEditor = useBoardTabStore((s) => s.openNewThreadEditor);
   const closeNewThreadEditor = useBoardTabStore((s) => s.closeNewThreadEditor);
   const setFilter = useBoardTabStore((s) => s.setFilter);
@@ -216,11 +217,19 @@ export function BoardTabApp(): React.JSX.Element {
     const unsubRefresh = window.electronApi.on('view:refresh-board', () => {
       void useBoardTabStore.getState().refreshBoard();
     });
+    const unsubDraft = window.electronApi.on(
+      'view:board-open-new-thread-with-draft',
+      (...args: unknown[]) => {
+        const data = args[0] as { subject: string; message: string };
+        useBoardTabStore.getState().openNewThreadEditorWithDraft(data.subject, data.message);
+      },
+    );
     return () => {
       unsubInit();
       unsubNg();
       unsubFav();
       unsubRefresh();
+      unsubDraft();
     };
   }, []);
 
@@ -595,7 +604,11 @@ export function BoardTabApp(): React.JSX.Element {
       {/* New Thread Editor */}
       {newThreadEditorOpen && board !== null && (
         <Suspense fallback={null}>
-          <NewThreadEditor boardUrl={board.url} onClose={closeNewThreadEditor} />
+          <NewThreadEditor
+            boardUrl={board.url}
+            onClose={closeNewThreadEditor}
+            initialDraft={nextThreadDraft}
+          />
         </Suspense>
       )}
 

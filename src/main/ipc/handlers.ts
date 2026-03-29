@@ -408,6 +408,13 @@ export async function registerIpcHandlers(): Promise<void> {
     const datFileName = `${threadId}.dat`;
     const existing = indices.find((idx) => idx.fileName === datFileName);
 
+    if (updates.kokomade !== undefined) {
+      const vm = getViewManagerOrNull();
+      if (vm !== null) {
+        vm.setKokomadeFromIndex(boardUrl, threadId, updates.kokomade);
+      }
+    }
+
     if (existing !== undefined) {
       // Update existing entry
       const updated = indices.map((idx) => {
@@ -1043,7 +1050,16 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('view:create-thread-tab', (boardUrl: string, threadId: string, title: string) => {
-    return getViewManager().createThreadTab(boardUrl, threadId, title);
+    const vm = getViewManager();
+    const board = lookupBoard(boardUrl);
+    const boardDir = getBoardDir(dataDir, board.url);
+    const indices = loadFolderIdx(boardDir);
+    const datFileName = `${threadId}.dat`;
+    const idx = indices.find((i) => i.fileName === datFileName);
+    if (idx !== undefined && idx.kokomade >= 0) {
+      vm.setKokomadeFromIndex(boardUrl, threadId, idx.kokomade);
+    }
+    return vm.createThreadTab(boardUrl, threadId, title);
   });
 
   handle('view:close-thread-tab', (tabId: string) => {
@@ -1085,8 +1101,27 @@ export async function registerIpcHandlers(): Promise<void> {
   });
 
   handle('view:open-thread-request', (boardUrl: string, threadId: string, title: string) => {
-    getViewManager().createThreadTab(boardUrl, threadId, title);
+    const vm = getViewManager();
+    const board = lookupBoard(boardUrl);
+    const boardDir = getBoardDir(dataDir, board.url);
+    const indices = loadFolderIdx(boardDir);
+    const datFileName = `${threadId}.dat`;
+    const idx = indices.find((i) => i.fileName === datFileName);
+    if (idx !== undefined && idx.kokomade >= 0) {
+      vm.setKokomadeFromIndex(boardUrl, threadId, idx.kokomade);
+    }
+    vm.createThreadTab(boardUrl, threadId, title);
   });
+
+  handle(
+    'view:open-board-new-thread-editor',
+    (boardUrl: string, subject: string, message: string) => {
+      const vm = getViewManager();
+      const board = lookupBoard(boardUrl);
+      const tabId = vm.createBoardTab(board);
+      vm.sendToBoardTab(tabId, 'view:board-open-new-thread-with-draft', { subject, message });
+    },
+  );
 
   handle('view:update-thread-tab-title', (tabId: string, title: string) => {
     getViewManager().updateThreadTabTitle(tabId, title);
