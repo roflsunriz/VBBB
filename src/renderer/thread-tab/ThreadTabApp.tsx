@@ -91,6 +91,9 @@ const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2})
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
 const INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY = 'vbbb-inline-video-initial-volume-percent';
 const DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT = 10;
+const HEADER_REFRESH_INTERVAL_KEY = 'vbbb-header-refresh-interval-min';
+const DEFAULT_HEADER_REFRESH_INTERVAL_MIN = 30;
+const VALID_HEADER_REFRESH_INTERVALS = [5, 15, 30, 60] as const;
 
 interface PopupState {
   readonly resNumbers: readonly number[];
@@ -124,6 +127,33 @@ function formatRelativeTime(date: Date): string {
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 365) return `${String(diffDay)}日前`;
   return `${String(Math.floor(diffDay / 365))}年前`;
+}
+
+function formatDateCompact(date: Date): string {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const mi = String(date.getMinutes()).padStart(2, '0');
+  return `${String(y)}/${mo}/${d} ${h}:${mi}`;
+}
+
+function formatRelativeDay(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return '未来';
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return '今日';
+  if (diffDays === 1) return '昨日';
+  if (diffDays < 365) return `${String(diffDays)}日前`;
+  return `${String(Math.floor(diffDays / 365))}年前`;
+}
+
+function computeIkioiFromFileName(fileName: string, count: number): number {
+  const threadTs = parseInt(fileName.replace('.dat', ''), 10);
+  if (Number.isNaN(threadTs) || threadTs <= 0) return 0;
+  const elapsedDays = (Date.now() / 1000 - threadTs) / 86400;
+  if (elapsedDays <= 0) return 0;
+  return count / elapsedDays;
 }
 
 function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.ReactNode {
@@ -387,6 +417,20 @@ export function ThreadTabApp(): React.JSX.Element {
     undefined,
   );
   const lastVisibleResRef = useRef(-1);
+  const [ikioiRank, setIkioiRank] = useState<{ rank: number; total: number } | null>(null);
+  const [headerRefreshIntervalMin, setHeaderRefreshIntervalMin] = useState(() => {
+    try {
+      const raw = localStorage.getItem(HEADER_REFRESH_INTERVAL_KEY);
+      if (raw !== null) {
+        const n = Number(raw);
+        if ((VALID_HEADER_REFRESH_INTERVALS as readonly number[]).includes(n)) return n;
+      }
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_HEADER_REFRESH_INTERVAL_MIN;
+  });
+  const [headerRefreshTick, setHeaderRefreshTick] = useState(0);
 
   const handleIpLookup = useCallback((ip: string) => {
     setIpLookupPopup({ ip, result: null, loading: true });
@@ -682,6 +726,61 @@ export function ThreadTabApp(): React.JSX.Element {
     }
     return results;
   }, [responses, ngRules, boardUrl, threadId, idCountMap, title]);
+
+  const threadStats = useMemo(() => {
+    const firstRes = responses[0];
+    const lastRes = responses[responses.length - 1];
+    const firstDate = firstRes !== undefined ? parseResDateTime(firstRes.dateTime) : null;
+    const lastDate = lastRes !== undefined ? parseResDateTime(lastRes.dateTime) : null;
+    const threadAgeMs = firstDate !== null ? Date.now() - firstDate.getTime() : 0;
+    const threadAgeDays = Math.max(threadAgeMs / (1000 * 60 * 60 * 24), 1);
+    const momentum = responses.length / threadAgeDays;
+    return { firstDate, lastDate, momentum };
+  }, [responses, headerRefreshTick]);
+
+  // Periodic header refresh timer
+  useEffect(() => {
+    if (headerRefreshIntervalMin <= 0) return;
+    const id = setInterval(
+      () => {
+        setHeaderRefreshTick((prev) => prev + 1);
+      },
+      headerRefreshIntervalMin * 60 * 1000,
+    );
+    return () => {
+      clearInterval(id);
+    };
+  }, [headerRefreshIntervalMin]);
+
+  // Fetch ikioi rank from board subject list
+  useEffect(() => {
+    if (boardUrl.length === 0 || threadId.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
+        if (cancelled) return;
+        const datFileName = `${threadId}.dat`;
+        const ranked = result.threads
+          .map((s) => ({
+            fileName: s.fileName,
+            ikioi: computeIkioiFromFileName(s.fileName, s.count),
+          }))
+          .sort((a, b) => b.ikioi - a.ikioi);
+        const idx = ranked.findIndex((s) => s.fileName === datFileName);
+        if (idx >= 0) {
+          setIkioiRank({ rank: idx + 1, total: ranked.length });
+        } else {
+          setIkioiRank(null);
+        }
+      } catch {
+        if (!cancelled) setIkioiRank(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardUrl, threadId, headerRefreshTick]);
 
   // Search filtering
   const searchFilteredResNumbers = useMemo(() => {
@@ -1438,7 +1537,48 @@ export function ThreadTabApp(): React.JSX.Element {
           )}
           {title}
         </h2>
-        <p className="text-xs text-[var(--color-text-muted)]">{responses.length} レス</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--color-text-muted)]">
+          <span>
+            {responses.length - ngFilterResults.size}/{ngFilterResults.size}/{responses.length} レス
+          </span>
+          <span>勢い: {threadStats.momentum.toFixed(1)}</span>
+          {ikioiRank !== null && (
+            <span>
+              ランク: {ikioiRank.rank}/{ikioiRank.total}
+            </span>
+          )}
+          {threadStats.firstDate !== null && (
+            <span>
+              {'>>'}1: {formatDateCompact(threadStats.firstDate)} (
+              {formatRelativeDay(threadStats.firstDate)})
+            </span>
+          )}
+          {threadStats.lastDate !== null && (
+            <span>
+              最新: {formatDateCompact(threadStats.lastDate)} (
+              {formatRelativeDay(threadStats.lastDate)})
+            </span>
+          )}
+          <select
+            className="ml-auto cursor-pointer bg-transparent text-[10px] text-[var(--color-text-muted)] outline-none"
+            value={headerRefreshIntervalMin}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setHeaderRefreshIntervalMin(val);
+              try {
+                localStorage.setItem(HEADER_REFRESH_INTERVAL_KEY, String(val));
+              } catch {
+                /* ignore */
+              }
+            }}
+            title="ヘッダー自動更新間隔"
+          >
+            <option value={5}>5分</option>
+            <option value={15}>15分</option>
+            <option value={30}>30分</option>
+            <option value={60}>60分</option>
+          </select>
+        </div>
       </div>
 
       {/* Search bar */}

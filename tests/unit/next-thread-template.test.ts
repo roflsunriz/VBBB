@@ -32,6 +32,18 @@ describe('htmlBodyToText', () => {
     const html = '!extend:checked:vvvvvv:1000:512<br>テスト &amp; 本文';
     expect(htmlBodyToText(html)).toBe('!extend:checked:vvvvvv:1000:512\nテスト & 本文');
   });
+
+  it('strips spaces immediately after <br> tags', () => {
+    expect(htmlBodyToText('line1<br> line2<br>  line3')).toBe('line1\nline2\nline3');
+  });
+
+  it('strips tabs immediately after <br> tags', () => {
+    expect(htmlBodyToText('a<br>\tb')).toBe('a\nb');
+  });
+
+  it('does not strip spaces that are not after <br>', () => {
+    expect(htmlBodyToText('hello world')).toBe('hello world');
+  });
 });
 
 describe('incrementTitleNumber', () => {
@@ -216,6 +228,19 @@ describe('generateNextThreadTemplate', () => {
     expect(result.message).toContain(
       'https://phoebe.bbspink.com/test/read.cgi/pinkplus/1111111111/',
     );
+  });
+
+  it('strips leading whitespace from lines (nbsp / space after br)', () => {
+    const body = '&nbsp;先頭nbsp行<br>&nbsp; 2行目<br> 3行目スペース';
+    const result = generateNextThreadTemplate({
+      ...baseInput,
+      firstPostBody: body,
+      currentTitle: 'テスト★1',
+    });
+    const lines = result.message.split('\n');
+    expect(lines[0]).toBe('先頭nbsp行');
+    expect(lines[1]).toBe('2行目');
+    expect(lines[2]).toBe('3行目スペース');
   });
 
   it('increments 前スレ title number in message body', () => {

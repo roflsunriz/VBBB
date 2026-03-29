@@ -41,7 +41,7 @@ const THREAD_URL_PATTERN =
  */
 export function htmlBodyToText(html: string): string {
   let text = html;
-  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<br\s*\/?>[\t ]*/gi, '\n');
   text = text.replace(/<[^>]*>/g, '');
   text = decodeHtmlEntities(text);
   return text;
@@ -133,11 +133,12 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
 
   const extendCmd = findExtendCommand(lines);
 
-  const filteredLines = lines.filter((line) => {
-    const trimmed = line.trim();
-    if (VIPQ2_EXTDAT_PATTERN.test(trimmed)) return false;
-    return true;
-  });
+  const filteredLines = lines
+    .map((line) => line.trimStart())
+    .filter((line) => {
+      if (VIPQ2_EXTDAT_PATTERN.test(line)) return false;
+      return true;
+    });
 
   const currentThreadUrl = buildThreadUrl(boardUrl, threadId);
 
