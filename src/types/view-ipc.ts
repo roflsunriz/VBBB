@@ -81,11 +81,43 @@ export type ModalWindowType =
   | 'console'
   | 'add-board'
   | 'update'
-  | 'dsl-editor';
+  | 'dsl-editor'
+  | 'media';
 
-export interface ModalWindowInitData {
-  readonly modalType: ModalWindowType;
+export interface MediaViewerImagePayload {
+  readonly mediaType: 'image';
+  readonly url: string;
+  readonly pageUrl?: string | undefined;
+  readonly allImageUrls?: readonly string[] | undefined;
 }
+
+export interface MediaViewerVideoPayload {
+  readonly mediaType: 'video';
+  readonly url: string;
+  readonly originalUrl: string;
+  readonly initialVolume: number;
+}
+
+export interface MediaViewerAudioPayload {
+  readonly mediaType: 'audio';
+  readonly url: string;
+  readonly originalUrl: string;
+  readonly initialVolume: number;
+}
+
+export type MediaViewerPayload =
+  | MediaViewerImagePayload
+  | MediaViewerVideoPayload
+  | MediaViewerAudioPayload;
+
+export type ModalWindowInitData =
+  | {
+      readonly modalType: Exclude<ModalWindowType, 'media'>;
+    }
+  | {
+      readonly modalType: 'media';
+      readonly payload: MediaViewerPayload;
+    };
 
 export interface PanelWindowInitData {
   readonly panelType: PanelType;

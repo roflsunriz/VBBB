@@ -1,10 +1,9 @@
 /**
  * Inline image thumbnail component.
  * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
- * to prevent layout shift. Click opens a full-featured image modal.
+ * to prevent layout shift. Click opens a dedicated media BrowserWindow.
  */
-import { useState, useCallback } from 'react';
-import { ImageModal } from './ImageModal';
+import { useCallback, useState } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useStatusLogStore } from '../../stores/status-log-store';
@@ -24,19 +23,22 @@ export function ImageThumbnail({
   displayUrl,
   allImageUrls,
 }: ImageThumbnailProps): React.JSX.Element {
-  const [modalOpen, setModalOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setModalOpen(false);
-  }, []);
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void window.electronApi.invoke('media:open', {
+        mediaType: 'image',
+        url: displayUrl,
+        pageUrl: url,
+        allImageUrls,
+      });
+    },
+    [allImageUrls, displayUrl, url],
+  );
 
   const handleError = useCallback(() => {
     console.warn(`[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${displayUrl}`);
@@ -44,12 +46,20 @@ export function ImageThumbnail({
     useStatusLogStore.getState().pushLog('media', 'error', `画像読み込みエラー: ${displayUrl}`);
   }, [url, displayUrl]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      setModalOpen(true);
-    }
-  }, []);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        void window.electronApi.invoke('media:open', {
+          mediaType: 'image',
+          url: displayUrl,
+          pageUrl: url,
+          allImageUrls,
+        });
+      }
+    },
+    [allImageUrls, displayUrl, url],
+  );
 
   if (hasError) {
     return (
@@ -99,15 +109,6 @@ export function ImageThumbnail({
           />
         )}
       </span>
-
-      {modalOpen && (
-        <ImageModal
-          url={displayUrl}
-          pageUrl={url}
-          allImageUrls={allImageUrls}
-          onClose={handleCloseModal}
-        />
-      )}
     </>
   );
 }

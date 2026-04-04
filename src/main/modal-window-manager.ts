@@ -10,7 +10,12 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
-import type { ModalWindowType, ModalWindowInitData, ModalWindowState } from '@shared/view-ipc';
+import type {
+  MediaViewerPayload,
+  ModalWindowType,
+  ModalWindowInitData,
+  ModalWindowState,
+} from '@shared/view-ipc';
 import { createLogger } from './logger';
 
 const logger = createLogger('modal-window');
@@ -46,6 +51,7 @@ const MODAL_CONFIGS: Record<ModalWindowType, ModalConfig> = {
   'add-board': { width: 512, height: 320, title: '外部板追加', resizable: false },
   update: { width: 450, height: 375, title: 'アップデート確認', resizable: false },
   'dsl-editor': { width: 800, height: 600, title: 'DSLエディタ', resizable: true },
+  media: { width: 960, height: 720, title: 'メディアビューア', resizable: true },
 };
 
 const MODAL_STATE_FILE = 'modal-state.json';
@@ -69,6 +75,32 @@ export class ModalWindowManager {
   }
 
   openModal(modalType: ModalWindowType): void {
+    if (modalType === 'media') {
+      return;
+    }
+    this.openConfiguredModal(modalType, { modalType });
+  }
+
+  openMediaViewer(payload: MediaViewerPayload): void {
+    const existing = this.modals.get('media');
+    if (existing !== undefined && !existing.isDestroyed()) {
+      const initData: ModalWindowInitData = { modalType: 'media', payload };
+      this.modalInitData.set(existing.webContents.id, initData);
+      existing.setTitle(
+        payload.mediaType === 'image'
+          ? '画像ビューア'
+          : payload.mediaType === 'video'
+            ? '動画プレイヤー'
+            : '音声プレイヤー',
+      );
+      existing.webContents.send('media:update', payload);
+      existing.focus();
+      return;
+    }
+    this.openConfiguredModal('media', { modalType: 'media', payload });
+  }
+
+  private openConfiguredModal(modalType: ModalWindowType, initData: ModalWindowInitData): void {
     const existing = this.modals.get(modalType);
     if (existing !== undefined && !existing.isDestroyed()) {
       existing.focus();
@@ -86,6 +118,7 @@ export class ModalWindowManager {
       minWidth: 300,
       minHeight: 200,
       show: false,
+      center: true,
       title: config.title,
       resizable: config.resizable,
       minimizable: false,
@@ -107,7 +140,17 @@ export class ModalWindowManager {
 
     const webContentsId = win.webContents.id;
     this.modals.set(modalType, win);
-    this.modalInitData.set(webContentsId, { modalType });
+    this.modalInitData.set(webContentsId, initData);
+
+    if (modalType === 'media' && initData.modalType === 'media') {
+      win.setTitle(
+        initData.payload.mediaType === 'image'
+          ? '画像ビューア'
+          : initData.payload.mediaType === 'video'
+            ? '動画プレイヤー'
+            : '音声プレイヤー',
+      );
+    }
 
     win.once('ready-to-show', () => {
       win.show();

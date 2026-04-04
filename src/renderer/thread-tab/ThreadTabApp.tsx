@@ -1280,17 +1280,22 @@ export function ThreadTabApp(): React.JSX.Element {
             onMouseOut={handleBodyMouseOut}
             onClick={(e) => {
               const target = e.target;
-              if (
-                target instanceof HTMLAnchorElement &&
-                target.dataset['anchorNums'] !== undefined
-              ) {
-                e.preventDefault();
-                const nums = target.dataset['anchorNums']
-                  .split(',')
-                  .map(Number)
-                  .filter((n) => !Number.isNaN(n));
-                if (nums.length > 0) {
-                  handleAnchorClick(e, nums);
+              if (target instanceof HTMLAnchorElement) {
+                const externalUrl = target.dataset['url'];
+                if (externalUrl !== undefined && externalUrl.length > 0) {
+                  e.preventDefault();
+                  void window.electronApi.invoke('shell:open-external', externalUrl);
+                  return;
+                }
+                if (target.dataset['anchorNums'] !== undefined) {
+                  e.preventDefault();
+                  const nums = target.dataset['anchorNums']
+                    .split(',')
+                    .map(Number)
+                    .filter((n) => !Number.isNaN(n));
+                  if (nums.length > 0) {
+                    handleAnchorClick(e, nums);
+                  }
                 }
               }
             }}

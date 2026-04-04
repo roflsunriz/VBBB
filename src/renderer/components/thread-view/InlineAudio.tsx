@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
-import { useStatusLogStore } from '../../stores/status-log-store';
+import { useCallback } from 'react';
 
 interface InlineAudioProps {
   readonly url: string;
@@ -12,50 +11,24 @@ export function InlineAudio({
   originalUrl,
   initialVolume,
 }: InlineAudioProps): React.JSX.Element {
-  const [hasError, setHasError] = useState(false);
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
-
-  const audioRef = useCallback(
-    (el: HTMLAudioElement | null) => {
-      audioElRef.current = el;
-      if (el !== null) {
-        el.volume = Math.min(1, Math.max(0, initialVolume));
-      }
-    },
-    [initialVolume],
-  );
-
-  const handleError = useCallback(() => {
-    console.warn(`[InlineAudio] 音声読み込みエラー — url: ${url} / originalUrl: ${originalUrl}`);
-    setHasError(true);
-    useStatusLogStore.getState().pushLog('media', 'error', `音声読み込みエラー: ${originalUrl}`);
-  }, [url, originalUrl]);
-
-  const handleOpenExternal = useCallback(() => {
-    void window.electronApi.invoke('shell:open-external', originalUrl);
-  }, [originalUrl]);
-
-  if (hasError) {
-    return (
-      <button
-        type="button"
-        onClick={handleOpenExternal}
-        className="inline-block rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-muted)] hover:underline"
-        title="外部ブラウザで開く"
-      >
-        [音声読み込みエラー: {originalUrl}]
-      </button>
-    );
-  }
+  const handleOpenPlayer = useCallback(() => {
+    void window.electronApi.invoke('media:open', {
+      mediaType: 'audio',
+      url,
+      originalUrl,
+      initialVolume,
+    });
+  }, [initialVolume, originalUrl, url]);
 
   return (
-    <audio
-      ref={audioRef}
-      src={url}
-      controls
-      preload="metadata"
-      onError={handleError}
-      className="h-8 max-w-[320px] rounded border border-[var(--color-border-secondary)]"
-    />
+    <button
+      type="button"
+      onClick={handleOpenPlayer}
+      className="flex w-full max-w-[420px] items-center justify-between rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-2 text-left text-xs hover:bg-[var(--color-bg-hover)]"
+      title={originalUrl}
+    >
+      <span className="truncate text-[var(--color-text-primary)]">音声プレイヤーで開く</span>
+      <span className="ml-3 shrink-0 text-[var(--color-text-muted)]">audio</span>
+    </button>
   );
 }

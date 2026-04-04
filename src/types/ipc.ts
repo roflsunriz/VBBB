@@ -31,7 +31,12 @@ import type {
 } from './search';
 import type { UpdateCheckResult } from './update';
 import type { RemoteSearchResult } from './remote-search';
-import type { ModalWindowInitData, ModalWindowType, ViewIpcChannelMap } from './view-ipc';
+import type {
+  MediaViewerPayload,
+  ModalWindowInitData,
+  ModalWindowType,
+  ViewIpcChannelMap,
+} from './view-ipc';
 
 /** Serializable context menu item for native Electron Menu.popup() */
 export interface NativeContextMenuItem {
@@ -366,6 +371,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
   /** Open URL in external browser */
   'shell:open-external': {
     args: [url: string];
+    result: void;
+  };
+  /** Open media viewer/player in a dedicated BrowserWindow */
+  'media:open': {
+    args: [payload: MediaViewerPayload];
     result: void;
   };
   /** Get all cookies grouped by domain */

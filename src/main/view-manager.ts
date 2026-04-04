@@ -476,6 +476,11 @@ export class ViewManager {
     entry?.view?.webContents.send(channel, ...args);
   }
 
+  sendToThreadTab(tabId: string, channel: string, ...args: unknown[]): void {
+    const entry = this.threadTabs.get(tabId);
+    entry?.view?.webContents.send(channel, ...args);
+  }
+
   updateKokomadePosition(tabId: string, kokomade: number): void {
     this.kokomadePositions.set(tabId, kokomade);
   }

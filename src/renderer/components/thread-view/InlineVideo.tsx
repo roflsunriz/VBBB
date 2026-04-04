@@ -1,19 +1,11 @@
 /**
- * Inline video player component.
+ * Inline video launcher component.
  * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
- * to prevent layout shift. Only loads video when scrolled into view.
- *
- * Keyboard shortcuts (when video is focused):
- *   K / Space  — Play / Pause | F — Fullscreen | M — Mute
- *   J / L      — ±10 s seek   | ←/→ — ±5 s     | ↑/↓ — Volume
- *   0–9        — % seek       | Home/End — Start/End
- *   , / .      — Frame step   | < / > — Playback rate
+ * to prevent layout shift. Playback itself happens in a dedicated BrowserWindow.
  */
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
-import { useStatusLogStore } from '../../stores/status-log-store';
-import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -28,48 +20,17 @@ export function InlineVideo({
   originalUrl,
   initialVolume,
 }: InlineVideoProps): React.JSX.Element {
-  const [hasError, setHasError] = useState(false);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
-  const videoElRef = useRef<HTMLVideoElement | null>(null);
-  const handleVideoKeyDown = useVideoKeyboard(videoElRef);
+  const videoElRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleError = useCallback(() => {
-    console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url} / originalUrl: ${originalUrl}`);
-    setHasError(true);
-    useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${originalUrl}`);
-  }, [url, originalUrl]);
-
-  const videoRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      videoElRef.current = el;
-      if (el) {
-        el.volume = Math.min(1, Math.max(0, initialVolume));
-      }
-    },
-    [initialVolume],
-  );
-
-  const handleOpenExternal = useCallback(() => {
-    void window.electronApi.invoke('shell:open-external', originalUrl);
-  }, [originalUrl]);
-  const restoreVideoFocus = useCallback(() => {
-    requestAnimationFrame(() => {
-      videoElRef.current?.focus({ preventScroll: true });
+  const handleOpenPlayer = useCallback(() => {
+    void window.electronApi.invoke('media:open', {
+      mediaType: 'video',
+      url,
+      originalUrl,
+      initialVolume,
     });
-  }, []);
-
-  if (hasError) {
-    return (
-      <button
-        type="button"
-        onClick={handleOpenExternal}
-        className="inline-block rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-muted)] hover:underline"
-        title="外部ブラウザで開く"
-      >
-        [動画読み込みエラー: {originalUrl}]
-      </button>
-    );
-  }
+  }, [initialVolume, originalUrl, url]);
 
   return (
     <span
@@ -81,25 +42,29 @@ export function InlineVideo({
       }}
     >
       {isVisible ? (
-        <video
-          ref={videoRef}
-          src={url}
-          controls
-          preload="metadata"
-          loop
-          playsInline
-          tabIndex={0}
-          onError={handleError}
-          onClick={restoreVideoFocus}
-          onPlay={restoreVideoFocus}
-          onPause={restoreVideoFocus}
-          onKeyDown={handleVideoKeyDown}
-          className="rounded border border-[var(--color-border-secondary)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+        <button
+          ref={videoElRef}
+          type="button"
+          onClick={handleOpenPlayer}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOpenPlayer();
+            }
+          }}
+          className="flex h-full w-full flex-col items-center justify-center rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-3 text-center focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
           style={{
             maxWidth: `${String(VIDEO_MAX_WIDTH)}px`,
             maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
           }}
-        />
+        >
+          <span className="mb-2 text-sm text-[var(--color-text-primary)]">
+            動画プレイヤーで開く
+          </span>
+          <span className="break-all text-[10px] text-[var(--color-text-muted)]">
+            {originalUrl}
+          </span>
+        </button>
       ) : (
         <MediaPlaceholder width={VIDEO_MAX_WIDTH} height={VIDEO_MAX_HEIGHT} mediaType="video" />
       )}

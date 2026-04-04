@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import type { ModalWindowInitData, ModalWindowType } from '@shared/view-ipc';
+import type { MediaViewerPayload, ModalWindowInitData, ModalWindowType } from '@shared/view-ipc';
 import { getStoredTheme, applyTheme } from '../components/settings/ThemeSelector';
+import { MediaViewer } from '../components/thread-view/MediaViewer';
 
 const AuthPanel = lazy(() =>
   import('../components/auth/AuthPanel').then((m) => ({ default: m.AuthPanel })),
@@ -59,6 +60,8 @@ function renderModal(modalType: ModalWindowType): React.JSX.Element {
       return <UpdateDialog onClose={onClose} />;
     case 'dsl-editor':
       return <DslEditor onClose={onClose} />;
+    case 'media':
+      return <div />;
   }
 }
 
@@ -72,6 +75,13 @@ export function ModalHostApp(): React.JSX.Element {
   useEffect(() => {
     void window.electronApi.invoke('modal:host-ready').then((data) => {
       setInitData(data);
+    });
+  }, []);
+
+  useEffect(() => {
+    return window.electronApi.on('media:update', (...args: unknown[]) => {
+      const payload = args[0] as MediaViewerPayload;
+      setInitData({ modalType: 'media', payload });
     });
   }, []);
 
@@ -104,7 +114,11 @@ export function ModalHostApp(): React.JSX.Element {
           </div>
         }
       >
-        {renderModal(initData.modalType)}
+        {initData.modalType === 'media' ? (
+          <MediaViewer payload={initData.payload} onClose={onClose} />
+        ) : (
+          renderModal(initData.modalType)
+        )}
       </Suspense>
     </div>
   );

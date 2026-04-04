@@ -646,6 +646,7 @@ export async function registerIpcHandlers(): Promise<void> {
     const items = getRoundItems();
     const updatedBoards: string[] = [];
     const updatedThreads: Array<{ boardUrl: string; threadId: string }> = [];
+    const vm = getViewManagerOrNull();
     for (const board of boards) {
       try {
         const boardObj = lookupBoard(board.url);
@@ -656,6 +657,7 @@ export async function registerIpcHandlers(): Promise<void> {
           await fetchSubject(boardObj, dataDir);
         }
         updatedBoards.push(board.url);
+        vm?.sendToBoardTab(board.url, 'view:refresh-board');
       } catch {
         logger.warn(`Round: failed to fetch subject for ${board.url}`);
       }
@@ -671,13 +673,13 @@ export async function registerIpcHandlers(): Promise<void> {
           await fetchDat(boardObj, threadId, dataDir);
         }
         updatedThreads.push({ boardUrl: item.url, threadId });
+        vm?.sendToThreadTab(`${item.url}:${threadId}`, 'view:refresh-thread');
       } catch {
         logger.warn(`Round: failed to fetch dat for ${item.url}/${item.fileName}`);
       }
     }
     try {
-      const vm = getViewManager();
-      vm.broadcastToAll('round:completed', { updatedBoards, updatedThreads });
+      getViewManager().broadcastToAll('round:completed', { updatedBoards, updatedThreads });
     } catch {
       // ViewManager not initialized yet
     }
@@ -878,6 +880,12 @@ export async function registerIpcHandlers(): Promise<void> {
   // Open URL in external browser
   handle('shell:open-external', async (url: string) => {
     await shell.openExternal(url);
+  });
+
+  handle('media:open', (payload) => {
+    const mgr = getModalWindowManagerOrNull();
+    if (mgr === null) return;
+    mgr.openMediaViewer(payload);
   });
 
   // User-Agent management (persisted via user-agent-store)
