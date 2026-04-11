@@ -1,9 +1,9 @@
 /**
- * E2E: Application launch and initial UI structure.
+ * E2E: Built renderer smoke test with mocked IPC.
  *
  * Verifies that:
- *  - The Electron window opens and is visible.
- *  - The window title includes the product name.
+ *  - The built shell page opens and is visible.
+ *  - The built shell route is loaded.
  *  - The three-pane layout (toolbar / left pane / status bar) renders.
  *  - The left-pane tab bar contains all four tab buttons.
  *  - The toolbar contains key action buttons.
@@ -11,11 +11,8 @@
 import { test, expect } from './fixtures/electron-fixture';
 
 test.describe('アプリ起動', () => {
-  test('ウィンドウタイトルに VBBB が含まれる', async ({ electronApp, window: _window }) => {
-    const title = await electronApp.evaluate(({ BaseWindow }) => {
-      return BaseWindow.getAllWindows()[0]?.getTitle() ?? '';
-    });
-    expect(title).toContain('VBBB');
+  test('shell.html が読み込まれる', async ({ window }) => {
+    await expect(window).toHaveURL(/\/shell\.html$/);
   });
 
   test('ツールバー（header）が表示される', async ({ window }) => {

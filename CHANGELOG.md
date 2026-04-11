@@ -5,6 +5,23 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-04-11
+
+### Added
+
+- **メディアビューア機能を追加**
+  - 画像サムネイルクリック時に専用の画像ビューアウィンドウを開けるよう対応
+  - 画像ビューアで拡大・縮小・全体表示・原寸表示・ドラッグ移動・保存に対応
+  - 複数画像があるレスでは、画像ビューア内でキーボードの左右キーによる前後切り替えに対応
+  - 音声リンクを専用プレイヤーウィンドウで再生できるよう対応
+  - 動画リンクを専用プレイヤーウィンドウで再生できるよう対応
+
+### Changed
+
+- インライン動画を埋め込み再生から専用プレイヤー起動方式に変更し、スレッド表示の安定性と操作性を改善
+- `ModalHostApp` / `modal-window-manager` / IPC 型定義を拡張し、メディアビューア用のモーダルウィンドウ管理に対応
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.5.0` に更新
+
 ## [3.4.0] - 2026-03-30
 
 ### Added

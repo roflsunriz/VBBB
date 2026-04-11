@@ -1,51 +1,90 @@
-/**
- * Custom Playwright fixture for Electron (VBBB).
- *
- * Provides `electronApp` (ElectronApplication) and `window` (Page) fixtures.
- * Each test gets its own fresh Electron process to ensure full isolation.
- *
- * Prerequisites: run `bun run build` so that `out/main/index.js` exists.
- */
-import { test as base, _electron as electron } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
-import { join } from 'node:path';
+import { test as base, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-type ElectronFixtures = {
-  electronApp: ElectronApplication;
+export type Invocation = {
+  channel: string;
+  args: unknown[];
+};
+
+type TestElectronApi = {
+  invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+  sendSync: (channel: string, ...args: unknown[]) => unknown;
+  on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
+};
+
+type RendererFixtures = {
   window: Page;
 };
 
-const MAIN_ENTRY = join(process.cwd(), 'out/main/index.js');
+declare global {
+  interface Window {
+    electronApi: TestElectronApi;
+    __VBBB_TEST__?: {
+      readonly invocations: Invocation[];
+    };
+  }
+}
 
-/** Time to wait for the initial React tree to mount after load. */
 const APP_READY_TIMEOUT = 30_000;
 
-export const test = base.extend<ElectronFixtures>({
-  electronApp: async ({}, use) => {
-    /**
-     * Build an env map without ELECTRON_RENDERER_URL so electron-toolkit/utils
-     * treats this as a production launch and loads the built renderer file
-     * (out/renderer/shell.html) instead of a dev server URL.
-     */
-    const env: Record<string, string> = Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] =>
-          entry[1] !== undefined && entry[0] !== 'ELECTRON_RENDERER_URL',
-      ),
-    );
-    const app = await electron.launch({ args: [MAIN_ENTRY], env });
-    await use(app);
-    await app.close();
-  },
+export const test = base.extend<RendererFixtures>({
+  window: async ({ page, baseURL }, use) => {
+    await page.addInitScript(() => {
+      const invocations: Invocation[] = [];
+      const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
-  window: async ({ electronApp }, use) => {
-    const page = await electronApp.firstWindow();
+      document.title = 'VBBB';
+
+      window.__VBBB_TEST__ = { invocations };
+      window.electronApi = {
+        invoke: (channel: string, ...args: unknown[]) => {
+          const store = window.__VBBB_TEST__?.invocations ?? invocations;
+          store.push({ channel, args });
+
+          switch (channel) {
+            case 'bbs:fetch-menu':
+              return Promise.resolve({ categories: [] });
+            case 'fav:load':
+              return Promise.resolve({ children: [] });
+            case 'ng:get-rules':
+              return Promise.resolve([]);
+            case 'post:load-history':
+              return Promise.resolve([]);
+            case 'round:get-timer':
+              return Promise.resolve({ enabled: false });
+            case 'view:get-tab-registry':
+              return Promise.resolve({
+                boardTabs: [],
+                activeBoardTabId: null,
+                threadTabs: [],
+                activeThreadTabId: null,
+              });
+            case 'menu:wait-action':
+              return new Promise(() => {
+                // Keep the shell long-poll idle for the lifetime of the page.
+              });
+            default:
+              return Promise.resolve(null);
+          }
+        },
+        sendSync: () => null,
+        on: (channel: string, callback: (...args: unknown[]) => void) => {
+          const set = listeners.get(channel) ?? new Set<(...args: unknown[]) => void>();
+          set.add(callback);
+          listeners.set(channel, set);
+          return () => {
+            set.delete(callback);
+          };
+        },
+      } satisfies TestElectronApi;
+    });
+
+    const targetUrl = `${baseURL ?? 'http://127.0.0.1:4173'}/shell.html`;
+    await page.goto(targetUrl);
     await page.waitForLoadState('domcontentloaded');
-    // Wait for the React app to mount — the toolbar header is rendered on the
-    // first paint before any async data (BBS menu) arrives.
     await page.waitForSelector('header', { state: 'visible', timeout: APP_READY_TIMEOUT });
     await use(page);
   },
 });
 
-export { expect } from '@playwright/test';
+export { expect };

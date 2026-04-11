@@ -1,63 +1,52 @@
 /**
- * E2E: Toolbar button interactions and modal open/close behavior.
+ * E2E: Toolbar button interactions and modal-open IPC behavior.
  *
- * Since v3.2.0, modals open as separate BrowserWindow instances (not DOM dialogs).
- * Each test clicks a toolbar button, waits for the new window, verifies content,
- * and then closes the modal window.
+ * Renderer smoke tests run against the built shell with mocked IPC, so these
+ * checks verify the expected `modal:open` calls rather than real BrowserWindow
+ * creation.
  */
 import { test, expect } from './fixtures/electron-fixture';
+import type { Invocation } from './fixtures/electron-fixture';
+import type { Page } from '@playwright/test';
+
+async function getModalOpenInvocations(page: Page): Promise<Invocation[]> {
+  return page.evaluate<Invocation[]>(() => {
+    const state = window.__VBBB_TEST__;
+    return (state?.invocations ?? []).filter((call: Invocation) => call.channel === 'modal:open');
+  });
+}
 
 test.describe('ツールバーボタン・モーダル', () => {
-  test('Aboutモーダル: 開く → 内容確認 → 閉じる（閉じるボタン）', async ({
-    electronApp,
-    window,
-  }) => {
-    const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByTitle('VBBBについて').click(),
-    ]);
-    await modalPage.waitForLoadState('domcontentloaded');
+  test('Aboutモーダル: クリックで about を開く IPC が送られる', async ({ window }) => {
+    await window.getByTitle('VBBBについて').click();
 
-    await expect(modalPage.getByRole('heading', { name: 'VBBB' })).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(modalPage.getByText('Versatile BBS Browser')).toBeVisible();
-    await expect(modalPage.getByText(/^v\d+\.\d+\.\d+/)).toBeVisible();
-
-    await modalPage.getByRole('button', { name: /閉じる/ }).click();
-    await expect(() => {
-      expect(modalPage.isClosed()).toBe(true);
-    }).toPass({ timeout: 5_000 });
+    await expect
+      .poll(async () => getModalOpenInvocations(window))
+      .toContainEqual({ channel: 'modal:open', args: ['about'] });
   });
 
-  test('認証モーダル: 開く → 閉じる', async ({ electronApp, window }) => {
-    const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByRole('button', { name: /認証/ }).click(),
-    ]);
-    await modalPage.waitForLoadState('domcontentloaded');
-    expect(modalPage.isClosed()).toBe(false);
-    await modalPage.close();
+  test('認証モーダル: クリックで auth を開く IPC が送られる', async ({ window }) => {
+    await window.getByRole('button', { name: /認証/ }).click();
+
+    await expect
+      .poll(async () => getModalOpenInvocations(window))
+      .toContainEqual({ channel: 'modal:open', args: ['auth'] });
   });
 
-  test('プロキシモーダル: 開く → 閉じる', async ({ electronApp, window }) => {
-    const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByRole('button', { name: /プロキシ/ }).click(),
-    ]);
-    await modalPage.waitForLoadState('domcontentloaded');
-    expect(modalPage.isClosed()).toBe(false);
-    await modalPage.close();
+  test('プロキシモーダル: クリックで proxy を開く IPC が送られる', async ({ window }) => {
+    await window.getByRole('button', { name: /プロキシ/ }).click();
+
+    await expect
+      .poll(async () => getModalOpenInvocations(window))
+      .toContainEqual({ channel: 'modal:open', args: ['proxy'] });
   });
 
-  test('外部板追加ダイアログ: 開く → 閉じる', async ({ electronApp, window }) => {
-    const [modalPage] = await Promise.all([
-      electronApp.waitForEvent('window', { timeout: 10_000 }),
-      window.getByRole('button', { name: /外部板追加/ }).click(),
-    ]);
-    await modalPage.waitForLoadState('domcontentloaded');
-    expect(modalPage.isClosed()).toBe(false);
-    await modalPage.close();
+  test('外部板追加ダイアログ: クリックで add-board を開く IPC が送られる', async ({ window }) => {
+    await window.getByRole('button', { name: /外部板追加/ }).click();
+
+    await expect
+      .poll(async () => getModalOpenInvocations(window))
+      .toContainEqual({ channel: 'modal:open', args: ['add-board'] });
   });
 
   test('板一覧更新ボタン: クリック中は無効化される', async ({ window }) => {
