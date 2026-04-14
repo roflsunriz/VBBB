@@ -25,6 +25,11 @@ describe('httpEncode', () => {
     // テスト in Shift_JIS is 0x83 0x65 0x83 0x58 0x83 0x67
     expect(encoded).toBe('%83e%83X%83g');
   });
+
+  it('normalizes wave dash to a legacy-compatible byte sequence', () => {
+    expect(httpEncode('\u301C', 'Shift_JIS')).toBe('%81%60');
+    expect(httpEncode('\u301C', 'EUC-JP')).toBe('%A1%C1');
+  });
 });
 
 describe('replaceWithNCR', () => {
@@ -45,6 +50,11 @@ describe('replaceWithNCR', () => {
     // These are in Windows-31J (CP932) but not in strict Shift_JIS
     expect(replaceWithNCR('\u2460')).toBe('\u2460'); // ①
     expect(replaceWithNCR('\uFF5E')).toBe('\uFF5E'); // ～
+  });
+
+  it('normalizes wave dash to fullwidth tilde instead of NCR', () => {
+    expect(replaceWithNCR('\u301C')).toBe('\uFF5E');
+    expect(replaceWithNCR('いいよね\u301C')).toBe('いいよね\uFF5E');
   });
 });
 

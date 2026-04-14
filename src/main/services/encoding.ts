@@ -6,6 +6,51 @@ import iconv from 'iconv-lite';
 import { type EncodingType } from '@shared/api';
 
 /**
+ * Legacy Japanese encodings use compatibility mappings for a handful of code
+ * points. Normalize them before encode checks so user input like U+301C (〜)
+ * is sent as the representable U+FF5E (～) instead of degrading to '?' or NCR.
+ */
+const LEGACY_JAPANESE_COMPAT_MAP: Readonly<Record<string, string>> = {
+  '\u301C': '\uFF5E', // wave dash -> fullwidth tilde
+  '\u2016': '\u2225', // double vertical line -> parallel to
+  '\u2212': '\uFF0D', // minus sign -> fullwidth hyphen-minus
+  '\u00A2': '\uFFE0', // cent sign -> fullwidth cent sign
+  '\u00A3': '\uFFE1', // pound sign -> fullwidth pound sign
+  '\u00AC': '\uFFE2', // not sign -> fullwidth not sign
+  '\u2014': '\u2015', // em dash -> horizontal bar
+};
+
+function normalizeForLegacyJapaneseEncoding(text: string, encoding: EncodingType): string {
+  if (encoding !== 'Shift_JIS' && encoding !== 'EUC-JP') {
+    return text;
+  }
+
+  let normalized = '';
+  for (const char of text) {
+    normalized += LEGACY_JAPANESE_COMPAT_MAP[char] ?? char;
+  }
+  return normalized;
+}
+
+function encodeStringEucJp(text: string): Buffer {
+  const parts: Buffer[] = [];
+
+  for (const char of text) {
+    if (char === '\uFF5E') {
+      // Prefer the plane-1 EUC-JP wave-dash bytes (A1 C1). iconv-lite encodes
+      // U+FF5E as the plane-2 sequence 8F A2 B7, but legacy BBS servers on
+      // JBBS/したらば often mishandle that form and store replacement chars.
+      parts.push(Buffer.from([0xa1, 0xc1]));
+      continue;
+    }
+
+    parts.push(iconv.encode(char, 'EUC-JP'));
+  }
+
+  return Buffer.concat(parts);
+}
+
+/**
  * Decode a buffer from the specified encoding to a UTF-8 string.
  */
 export function decodeBuffer(buffer: Buffer, encoding: EncodingType): string {
@@ -16,7 +61,11 @@ export function decodeBuffer(buffer: Buffer, encoding: EncodingType): string {
  * Encode a UTF-8 string to a buffer in the specified encoding.
  */
 export function encodeString(text: string, encoding: EncodingType): Buffer {
-  return iconv.encode(text, encoding);
+  const normalized = normalizeForLegacyJapaneseEncoding(text, encoding);
+  if (encoding === 'EUC-JP') {
+    return encodeStringEucJp(normalized);
+  }
+  return iconv.encode(normalized, encoding);
 }
 
 /**
@@ -67,8 +116,9 @@ export function replaceWithNCR(input: string, encoding: EncodingType = 'Shift_JI
   const parts: string[] = [];
 
   for (const { segment } of segmenter.segment(input)) {
-    if (canEncodeInEncoding(segment, encoding)) {
-      parts.push(segment);
+    const normalized = normalizeForLegacyJapaneseEncoding(segment, encoding);
+    if (canEncodeInEncoding(normalized, encoding)) {
+      parts.push(normalized);
     } else {
       // Convert each codepoint in the grapheme cluster to NCR
       for (const char of segment) {
