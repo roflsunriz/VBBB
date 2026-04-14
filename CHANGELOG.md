@@ -5,6 +5,19 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-04-14
+
+### Fixed
+
+- **JBBS/したらば投稿で「～」が文字化けする問題を修正**
+  - レガシー日本語エンコーディングの互換文字正規化を追加し、入力した `〜` / `～` を投稿用の互換表現へ正規化
+  - `EUC-JP` 投稿時に `～` を互換性の高い面1バイト列で送信するよう調整し、JBBS/したらばで `&#65533;&#65533;` に化けるケースを修正
+  - エンコーディング単体テストを追加し、`Shift_JIS` / `EUC-JP` の波ダッシュ送信バイト列を検証
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.5.1` に更新
+
 ## [3.5.0] - 2026-04-11
 
 ### Added
