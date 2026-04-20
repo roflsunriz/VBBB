@@ -505,3 +505,15 @@ export interface IpcSyncChannelMap {
     result: void;
   };
 }
+
+export interface ElectronApi {
+  invoke<K extends keyof IpcChannelMap>(
+    channel: K,
+    ...args: IpcChannelMap[K]['args']
+  ): Promise<IpcChannelMap[K]['result']>;
+  sendSync<K extends keyof IpcSyncChannelMap>(
+    channel: K,
+    ...args: IpcSyncChannelMap[K]['args']
+  ): IpcSyncChannelMap[K]['result'];
+  on(channel: string, callback: (...args: unknown[]) => void): () => void;
+}

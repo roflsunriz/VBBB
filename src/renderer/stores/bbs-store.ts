@@ -17,6 +17,7 @@ import type {
 import { DatFetchStatus } from '@shared/domain';
 import type { FavNode, FavTree } from '@shared/favorite';
 import type { BrowsingHistoryEntry, DisplayRange, SavedTab, SessionState } from '@shared/history';
+import type { ElectronApi } from '@shared/ipc';
 import type { NgRule } from '@shared/ng';
 import type { PostHistoryEntry } from '@shared/post-history';
 import type { HighlightSettings } from '@shared/settings';
@@ -298,8 +299,8 @@ function loadHighlightSettings(): HighlightSettings {
   return DEFAULT_HIGHLIGHT_SETTINGS;
 }
 
-function getApi(): Window['electronApi'] {
-  return window.electronApi;
+function getApi(): ElectronApi {
+  return window.electronApi as ElectronApi;
 }
 
 /** Guards against concurrent openThread calls for the same thread */

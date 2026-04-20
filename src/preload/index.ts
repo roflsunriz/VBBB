@@ -1,10 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { IpcChannelMap, IpcSyncChannelMap } from '@shared/ipc';
+import type { ElectronApi, IpcChannelMap, IpcSyncChannelMap } from '@shared/ipc';
 
 type ChannelKey = keyof IpcChannelMap;
 type SyncChannelKey = keyof IpcSyncChannelMap;
 
-const api = {
+const api: ElectronApi = {
   invoke: <K extends ChannelKey>(
     channel: K,
     ...args: IpcChannelMap[K]['args']
@@ -30,8 +30,6 @@ const api = {
       ipcRenderer.removeListener(channel, listener);
     };
   },
-} as const;
-
-export type ElectronApi = typeof api;
+};
 
 contextBridge.exposeInMainWorld('electronApi', api);

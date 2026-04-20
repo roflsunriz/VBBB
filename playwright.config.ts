@@ -8,6 +8,7 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  testMatch: ['**/*.pw.ts'],
   /** Electron startup + IPC init can take longer than a browser page load. */
   timeout: 60_000,
   retries: 1,

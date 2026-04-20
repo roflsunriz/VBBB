@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { ElectronApi } from '../preload/index';
+import type { ElectronApi } from '../types/ipc';
 
 declare global {
   /** App version injected by Vite define */
