@@ -5,6 +5,18 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-04-20
+
+### Fixed
+
+- **Windows GitHub Actions 上で相対時刻 E2E が不安定に落ちる問題を修正**
+  - E2E モックのレス日時を確実に過去日時へ変更し、ランナーのタイムゾーン差で相対時刻が空表示になるケースを解消
+  - Release ワークフローの Windows E2E でも `相対時刻` テストが安定して通るよう修正
+
+### Changed
+
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.6.1` に更新
+
 ## [3.6.0] - 2026-04-20
 
 ### Added
@@ -702,6 +714,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.6.1]: https://github.com/roflsunriz/VBBB/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/roflsunriz/VBBB/compare/v3.5.1...v3.6.0
 [3.5.1]: https://github.com/roflsunriz/VBBB/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/roflsunriz/VBBB/compare/v3.4.0...v3.5.0

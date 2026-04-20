@@ -8,7 +8,7 @@
         number: 1,
         name: '名無しさん (ﾜｯﾁｮｲW abcd-1234 [240f:aa:bbbb:1:*])',
         mail: 'sage',
-        dateTime: '2026/04/20(日) 18:00:00 ID:OWN123 BE:12345-2',
+        dateTime: '2026/04/19(土) 18:00:00 ID:OWN123 BE:12345-2',
         body: '本文1<br>https://example.test/image.jpg<br>https://youtu.be/abcdefghijk<br>https://example.test/page',
         title: '実況スレ Part1',
       },
@@ -16,7 +16,7 @@
         number: 2,
         name: 'テスター',
         mail: '',
-        dateTime: '2026/04/20(日) 18:01:00 ID:ABC999',
+        dateTime: '2026/04/19(土) 18:01:00 ID:ABC999',
         body: '>>1 返信です',
         title: '',
       },
@@ -24,7 +24,7 @@
         number: 3,
         name: 'コテハン#trip',
         mail: '',
-        dateTime: '2026/04/20(日) 18:02:00 ID:ABC999',
+        dateTime: '2026/04/19(土) 18:02:00 ID:ABC999',
         body: '長文テスト '.repeat(20),
         title: '',
       },
@@ -34,7 +34,7 @@
       number: index + 4,
       name: `名無し${index + 4}`,
       mail: '',
-      dateTime: `2026/04/20(日) 18:${String((index + 3) % 60).padStart(2, '0')}:00 ID:FILL${index + 4}`,
+      dateTime: `2026/04/19(土) 18:${String((index + 3) % 60).padStart(2, '0')}:00 ID:FILL${index + 4}`,
       body: `ダミーレス ${index + 4}`,
       title: '',
     }));
@@ -45,7 +45,7 @@
         number: 9,
         name: '新着レス',
         mail: '',
-        dateTime: '2026/04/20(日) 19:00:00 ID:NEW111',
+        dateTime: '2026/04/19(土) 19:00:00 ID:NEW111',
         body: '更新後のレス',
         title: '',
       });
@@ -223,7 +223,7 @@
       nextStart: null,
     },
     updateInfo: {
-      latestVersion: '3.6.0',
+      latestVersion: '3.6.1',
       hasUpdate: true,
     },
     boardTabInitData: {
