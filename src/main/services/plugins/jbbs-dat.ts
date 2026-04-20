@@ -104,6 +104,20 @@ function getRawModeUrl(board: Board, threadId: string, startFrom?: number): stri
   return base;
 }
 
+function loadLocalJBBSDatResponses(
+  localPath: string,
+  encoding: 'EUC-JP' | 'Shift_JIS',
+): { readonly responses: readonly Res[]; readonly size: number } | null {
+  const localContent = readFileSafe(localPath);
+  if (localContent === null) return null;
+
+  const text = decodeBuffer(localContent, encoding);
+  return {
+    responses: parseJBBSDat(text),
+    size: localContent.length,
+  };
+}
+
 /**
  * Fetch JBBS DAT with differential support.
  */
@@ -274,11 +288,12 @@ async function fetchJBBSDatFull(
       size: response.body.length,
     };
   } catch (err) {
+    const cached = loadLocalJBBSDatResponses(localPath, encoding);
     return {
       status: DatFetchStatus.Error,
-      responses: [],
+      responses: cached?.responses ?? [],
       lastModified: null,
-      size: 0,
+      size: cached?.size ?? 0,
       errorMessage: `JBBS fetch error: ${err instanceof Error ? err.message : String(err)}`,
     };
   }

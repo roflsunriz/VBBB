@@ -1,5 +1,54 @@
-import { describe, it, expect } from 'vitest';
-import { parseJBBSDatLine, parseJBBSDat } from '../../src/main/services/plugins/jbbs-dat';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+vi.mock('../../src/main/services/http-client', () => ({
+  httpFetch: vi.fn(),
+}));
+
+import {
+  fetchJBBSDat,
+  parseJBBSDatLine,
+  parseJBBSDat,
+} from '../../src/main/services/plugins/jbbs-dat';
+import { DatFetchStatus, BoardType } from '../../src/types/domain';
+import type { Board } from '../../src/types/domain';
+import { httpFetch } from '../../src/main/services/http-client';
+import type { HttpResponse } from '../../src/types/api';
+import { encodeString } from '../../src/main/services/encoding';
+
+const mockHttpFetch = httpFetch as unknown as Mock<typeof httpFetch>;
+
+function makeResponse(overrides: Partial<HttpResponse> = {}): HttpResponse {
+  return { status: 200, headers: {}, body: Buffer.from(''), ...overrides };
+}
+
+const TEST_BOARD: Board = {
+  title: 'Shitaraba Board',
+  url: 'https://jbbs.shitaraba.net/game/12345/',
+  bbsId: '12345',
+  serverUrl: 'https://jbbs.shitaraba.net/',
+  boardType: BoardType.Shitaraba,
+  jbbsDir: 'game',
+};
+
+const TEST_THREAD_ID = '1234567890';
+const SIMPLE_JBBS_DAT_TEXT =
+  '1<>名無しさん<>sage<>2024/01/01 00:00:00<>本文1<>スレタイ<>ID1\n2<>名無しさん<>sage<>2024/01/01 00:01:00<>本文2<><>ID2\n';
+const SIMPLE_JBBS_DAT = encodeString(SIMPLE_JBBS_DAT_TEXT, 'EUC-JP');
+
+let tmpDir: string;
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  tmpDir = await mkdtemp(join(tmpdir(), 'vbbb-jbbs-dat-test-'));
+});
+
+afterEach(async () => {
+  await rm(tmpDir, { recursive: true, force: true });
+});
 
 describe('parseJBBSDatLine', () => {
   it('parses a standard 7-field JBBS DAT line', () => {
@@ -102,5 +151,21 @@ describe('parseJBBSDat', () => {
     const responses = parseJBBSDat(content);
     expect(responses).toHaveLength(3);
     expect(responses.map((r) => r.number)).toStrictEqual([1, 3, 10]);
+  });
+});
+
+describe('fetchJBBSDat', () => {
+  it('keeps local cache when full fetch throws after diff fallback', async () => {
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 200, body: SIMPLE_JBBS_DAT }));
+    await fetchJBBSDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+
+    mockHttpFetch.mockRejectedValueOnce(new Error('diff failed'));
+    mockHttpFetch.mockRejectedValueOnce(new Error('full failed'));
+
+    const result = await fetchJBBSDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+    expect(result.status).toBe(DatFetchStatus.Error);
+    expect(result.responses).toHaveLength(2);
+    expect(result.size).toBeGreaterThan(0);
+    expect(result.errorMessage).toContain('full failed');
   });
 });

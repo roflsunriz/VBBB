@@ -917,6 +917,13 @@ export const useBBSStore = create<BBSState>((set, get) => ({
         resolvedTitle = threadId;
       }
 
+      if (result.status === DatFetchStatus.Error && result.responses.length === 0) {
+        const errorMsg = result.errorMessage ?? 'Unknown error';
+        set({ statusMessage: `読み込み失敗: ${errorMsg}` });
+        pushStatus('thread', 'error', `スレッド読み込み失敗: ${errorMsg}`);
+        return;
+      }
+
       const isDatFallen =
         result.status === DatFetchStatus.Archived || result.status === DatFetchStatus.DatFallen;
 
@@ -940,13 +947,24 @@ export const useBBSStore = create<BBSState>((set, get) => ({
       set((state) => ({
         tabs: [...state.tabs, newTab],
         activeTabId: tabId,
-        statusMessage: `${resolvedTitle}: ${String(result.responses.length)} レス`,
+        statusMessage:
+          result.status === DatFetchStatus.Error
+            ? `${resolvedTitle}: キャッシュを表示中 (${String(result.responses.length)} レス)`
+            : `${resolvedTitle}: ${String(result.responses.length)} レス`,
       }));
-      pushStatus(
-        'thread',
-        'success',
-        `${resolvedTitle}: ${String(result.responses.length)} レス取得`,
-      );
+      if (result.status === DatFetchStatus.Error) {
+        pushStatus(
+          'thread',
+          'warn',
+          `${resolvedTitle}: 取得失敗のためキャッシュを表示 (${String(result.responses.length)} レス) - ${result.errorMessage ?? 'Unknown error'}`,
+        );
+      } else {
+        pushStatus(
+          'thread',
+          'success',
+          `${resolvedTitle}: ${String(result.responses.length)} レス取得`,
+        );
+      }
 
       void getApi().invoke('history:add', boardUrl, threadId, resolvedTitle);
 

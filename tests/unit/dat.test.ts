@@ -221,4 +221,31 @@ describe('fetchDat', () => {
     expect(result.status).toBe(DatFetchStatus.Partial);
     expect(result.responses.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('keeps local cache when full fetch fails after cache exists', async () => {
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 200, body: SIMPLE_DAT }));
+    await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 416, body: Buffer.from('') }));
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 503, body: Buffer.from('') }));
+
+    const result = await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+    expect(result.status).toBe(DatFetchStatus.Error);
+    expect(result.responses).toHaveLength(2);
+    expect(result.size).toBeGreaterThan(0);
+    expect(result.errorMessage).toContain('503');
+  });
+
+  it('keeps local cache when full fetch throws after cache exists', async () => {
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 200, body: SIMPLE_DAT }));
+    await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 416, body: Buffer.from('') }));
+    mockHttpFetch.mockRejectedValueOnce(new Error('network down'));
+
+    const result = await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+    expect(result.status).toBe(DatFetchStatus.Error);
+    expect(result.responses).toHaveLength(2);
+    expect(result.errorMessage).toContain('network down');
+  });
 });

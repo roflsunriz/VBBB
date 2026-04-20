@@ -169,6 +169,22 @@ function isMachiBoard(board: Board): boolean {
   }
 }
 
+function loadLocalDatResponses(
+  localPath: string,
+  encoding: 'Shift_JIS' | 'EUC-JP',
+  board: Board,
+  threadId: string,
+): { readonly responses: readonly Res[]; readonly size: number } | null {
+  const localContent = readFileSafe(localPath);
+  if (localContent === null) return null;
+
+  const text = decodeBuffer(localContent, encoding);
+  return {
+    responses: cachedParseDat(text, board.url, threadId, localContent.length),
+    size: localContent.length,
+  };
+}
+
 /**
  * Get the oyster URL for UPLIFT past-log access.
  * Returns undefined if not logged in.
@@ -339,34 +355,46 @@ async function fetchDatFull(
       : 'EUC-JP';
   const replaceRules = loadReplaceRules(dataDir);
 
-  const response = await httpFetch({
-    url: datUrl,
-    method: 'GET',
-  });
+  try {
+    const response = await httpFetch({
+      url: datUrl,
+      method: 'GET',
+    });
 
-  if (response.status === 302 || response.status === 404) {
-    // DAT fallen — try kako (5ch returns 302 or 404 for fallen threads)
-    return fetchDatKako(board, threadId, dataDir, encoding);
-  }
+    if (response.status === 302 || response.status === 404) {
+      // DAT fallen — try kako (5ch returns 302 or 404 for fallen threads)
+      return fetchDatKako(board, threadId, dataDir, encoding);
+    }
 
-  if (response.status !== 200) {
+    if (response.status !== 200) {
+      const cached = loadLocalDatResponses(localPath, encoding, board, threadId);
+      return {
+        status: DatFetchStatus.Error,
+        responses: cached?.responses ?? [],
+        lastModified: null,
+        size: cached?.size ?? 0,
+        errorMessage: `HTTP ${String(response.status)}`,
+      };
+    }
+
+    await atomicWriteFile(localPath, response.body);
+    const text = applyDatReplace(decodeBuffer(response.body, encoding), replaceRules);
+    return {
+      status: DatFetchStatus.Full,
+      responses: cachedParseDat(text, board.url, threadId, response.body.length),
+      lastModified: response.lastModified ?? null,
+      size: response.body.length,
+    };
+  } catch (err) {
+    const cached = loadLocalDatResponses(localPath, encoding, board, threadId);
     return {
       status: DatFetchStatus.Error,
-      responses: [],
+      responses: cached?.responses ?? [],
       lastModified: null,
-      size: 0,
-      errorMessage: `HTTP ${String(response.status)}`,
+      size: cached?.size ?? 0,
+      errorMessage: err instanceof Error ? err.message : String(err),
     };
   }
-
-  await atomicWriteFile(localPath, response.body);
-  const text = applyDatReplace(decodeBuffer(response.body, encoding), replaceRules);
-  return {
-    status: DatFetchStatus.Full,
-    responses: cachedParseDat(text, board.url, threadId, response.body.length),
-    lastModified: response.lastModified ?? null,
-    size: response.body.length,
-  };
 }
 
 async function fetchDatKako(
