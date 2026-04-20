@@ -439,6 +439,22 @@ export function ThreadTabApp(): React.JSX.Element {
     });
   }, []);
 
+  const searchNextThreadCandidate = useCallback(async (): Promise<SubjectRecord | null> => {
+    if (boardUrl.length === 0 || threadId.length === 0 || title.length === 0) {
+      setNextThreadCandidate(undefined);
+      return null;
+    }
+    try {
+      const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
+      const found = findNextThread(title, `${threadId}.dat`, result.threads) ?? null;
+      setNextThreadCandidate(found);
+      return found;
+    } catch {
+      setNextThreadCandidate(null);
+      return null;
+    }
+  }, [boardUrl, threadId, title]);
+
   const [inlineVideoInitialVolumePercent, setInlineVideoInitialVolumePercent] = useState(() => {
     try {
       const raw = localStorage.getItem(INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY);
@@ -542,20 +558,15 @@ export function ThreadTabApp(): React.JSX.Element {
     };
   }, []);
 
-  // Auto-detect next thread when response count reaches threshold
+  // Auto-detect next thread whenever enough thread context is available.
   const responseCount = responses.length;
   useEffect(() => {
-    if (responseCount < NEXT_THREAD_RESPONSE_THRESHOLD) return;
-    void (async () => {
-      try {
-        const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
-        const found = findNextThread(title, `${threadId}.dat`, result.threads);
-        setNextThreadCandidate(found ?? null);
-      } catch {
-        setNextThreadCandidate(null);
-      }
-    })();
-  }, [boardUrl, threadId, title, responseCount]);
+    if (boardUrl.length === 0 || threadId.length === 0 || title.length === 0) {
+      setNextThreadCandidate(undefined);
+      return;
+    }
+    void searchNextThreadCandidate();
+  }, [boardUrl, threadId, title, responseCount, searchNextThreadCandidate]);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -1090,16 +1101,8 @@ export function ThreadTabApp(): React.JSX.Element {
   }, [getFirstVisibleResNumber]);
 
   const handleSearchNextThread = useCallback(() => {
-    void (async () => {
-      try {
-        const result = await window.electronApi.invoke('bbs:fetch-subject', boardUrl);
-        const found = findNextThread(title, `${threadId}.dat`, result.threads);
-        setNextThreadCandidate(found ?? null);
-      } catch {
-        setNextThreadCandidate(null);
-      }
-    })();
-  }, [boardUrl, threadId, title]);
+    void searchNextThreadCandidate();
+  }, [searchNextThreadCandidate]);
 
   const handleOpenNextThread = useCallback(() => {
     if (nextThreadCandidate === undefined || nextThreadCandidate === null) return;
@@ -1111,6 +1114,18 @@ export function ThreadTabApp(): React.JSX.Element {
       nextThreadCandidate.title,
     );
   }, [nextThreadCandidate, boardUrl]);
+
+  const handleNextThreadAction = useCallback(() => {
+    if (nextThreadCandidate !== undefined && nextThreadCandidate !== null) {
+      handleOpenNextThread();
+      return;
+    }
+    void searchNextThreadCandidate().then((found) => {
+      if (found === null) return;
+      const nextId = found.fileName.replace('.dat', '');
+      void window.electronApi.invoke('view:open-thread-request', boardUrl, nextId, found.title);
+    });
+  }, [boardUrl, handleOpenNextThread, nextThreadCandidate, searchNextThreadCandidate]);
 
   const handleCreateNextThread = useCallback(() => {
     const firstPost = responses[0];
@@ -1510,7 +1525,7 @@ export function ThreadTabApp(): React.JSX.Element {
         <div className="mx-0.5 h-4 w-px bg-[var(--color-border-primary)]" />
         <button
           type="button"
-          onClick={handleSearchNextThread}
+          onClick={handleNextThreadAction}
           className={`flex items-center gap-0.5 rounded px-1.5 py-1 text-xs font-medium hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)] ${
             nextThreadCandidate !== undefined && nextThreadCandidate !== null
               ? 'bg-[var(--color-success)]/20 text-[var(--color-success)]'
@@ -1518,7 +1533,11 @@ export function ThreadTabApp(): React.JSX.Element {
                 ? 'text-[var(--color-text-muted)]'
                 : 'text-[var(--color-warning)]'
           }`}
-          title="次スレを検索"
+          title={
+            nextThreadCandidate !== undefined && nextThreadCandidate !== null
+              ? '次スレへ移動'
+              : '次スレを検索'
+          }
         >
           <MdiIcon path={mdiArrowRightBold} size={12} />
           次スレ
@@ -1685,7 +1704,7 @@ export function ThreadTabApp(): React.JSX.Element {
       )}
 
       {/* Next thread banner */}
-      {responseCount >= NEXT_THREAD_RESPONSE_THRESHOLD && nextThreadCandidate !== undefined && (
+      {nextThreadCandidate !== undefined && (
         <div
           className={`flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-xs ${
             nextThreadCandidate !== null
@@ -1694,7 +1713,9 @@ export function ThreadTabApp(): React.JSX.Element {
           }`}
         >
           <span className="shrink-0 font-semibold text-[var(--color-text-muted)]">
-            このスレッドは1000を超えました
+            {responseCount >= NEXT_THREAD_RESPONSE_THRESHOLD
+              ? 'このスレッドは1000を超えました'
+              : '次スレ候補'}
           </span>
           {nextThreadCandidate !== null ? (
             <>

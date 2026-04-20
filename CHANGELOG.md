@@ -5,6 +5,26 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-04-20
+
+### Added
+
+- **モックベース E2E テストを板タブ・スレッドタブ領域まで拡張**
+  - 巡回パネルの一覧表示・手動実行・自動巡回切り替え・削除を検証する Playwright テストを追加
+  - 板タブのスレッド検索・お気に入り追加・NG スレ追加・新規スレ立てを検証するテストを追加
+  - スレッドタブの更新・相対時刻・分析・次スレ遷移・書き込み導線・インライン表示切り替え・プログラマティック書き込み導線を検証するテストを追加
+  - シェル UI の板タブ/スレタブ表示向き切り替えを検証する E2E テストを追加
+
+### Changed
+
+- **次スレボタンの遷移条件を緩和**
+  - レス数に関係なく、次スレ候補が見つかっていればツールバーの `次スレ` ボタンから即時遷移できるよう変更
+  - 初回自動検出に失敗しても、ボタン押下時に再探索して遷移できるようフォールバックを追加
+  - タイトル表記ゆれで次スレ候補を取りこぼしにくくするため、次スレ検出に緩い一致判定を追加
+- E2E モックのスレッド初期レス数を通常件数ベースへ見直し、`1000` 到達前提に依存しないテスト構成へ変更
+- GitHub Actions の `CI` / `Release` ワークフローで Playwright ブラウザをキャッシュし、E2E 失敗時に `playwright-report` / `test-results` をアーティファクト保存するよう変更
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.6.0` に更新
+
 ## [3.5.1] - 2026-04-14
 
 ### Fixed
@@ -682,6 +702,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.6.0]: https://github.com/roflsunriz/VBBB/compare/v3.5.1...v3.6.0
+[3.5.1]: https://github.com/roflsunriz/VBBB/compare/v3.5.0...v3.5.1
+[3.5.0]: https://github.com/roflsunriz/VBBB/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/roflsunriz/VBBB/compare/v3.3.0...v3.4.0
+[3.3.0]: https://github.com/roflsunriz/VBBB/compare/v3.2.2...v3.3.0
 [2.5.1]: https://github.com/roflsunriz/VBBB/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/roflsunriz/VBBB/compare/v2.4.0...v2.5.0
 [2.0.0]: https://github.com/roflsunriz/VBBB/compare/v1.6.2...v2.0.0

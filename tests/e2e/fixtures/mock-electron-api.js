@@ -2,6 +2,56 @@
   const STORAGE_KEY = 'vbbb-e2e-state';
 
   const clone = (value) => JSON.parse(JSON.stringify(value));
+  const createThreadResponses = (includeUpdatedRes) => {
+    const base = [
+      {
+        number: 1,
+        name: '名無しさん (ﾜｯﾁｮｲW abcd-1234 [240f:aa:bbbb:1:*])',
+        mail: 'sage',
+        dateTime: '2026/04/20(日) 18:00:00 ID:OWN123 BE:12345-2',
+        body: '本文1<br>https://example.test/image.jpg<br>https://youtu.be/abcdefghijk<br>https://example.test/page',
+        title: '実況スレ Part1',
+      },
+      {
+        number: 2,
+        name: 'テスター',
+        mail: '',
+        dateTime: '2026/04/20(日) 18:01:00 ID:ABC999',
+        body: '>>1 返信です',
+        title: '',
+      },
+      {
+        number: 3,
+        name: 'コテハン#trip',
+        mail: '',
+        dateTime: '2026/04/20(日) 18:02:00 ID:ABC999',
+        body: '長文テスト '.repeat(20),
+        title: '',
+      },
+    ];
+
+    const filler = Array.from({ length: 5 }, (_, index) => ({
+      number: index + 4,
+      name: `名無し${index + 4}`,
+      mail: '',
+      dateTime: `2026/04/20(日) 18:${String((index + 3) % 60).padStart(2, '0')}:00 ID:FILL${index + 4}`,
+      body: `ダミーレス ${index + 4}`,
+      title: '',
+    }));
+
+    const responses = base.concat(filler);
+    if (includeUpdatedRes) {
+      responses.push({
+        number: 9,
+        name: '新着レス',
+        mail: '',
+        dateTime: '2026/04/20(日) 19:00:00 ID:NEW111',
+        body: '更新後のレス',
+        title: '',
+      });
+    }
+    return responses;
+  };
 
   const createDefaultState = () => ({
     menuFetchCount: 0,
@@ -55,6 +105,22 @@
     ngRules: [],
     postHistory: [],
     roundTimer: { enabled: false, intervalMinutes: 15 },
+    roundBoards: [
+      {
+        url: 'https://example.test/livejupiter/',
+        boardTitle: 'なんでも実況J',
+        roundName: '定期巡回',
+      },
+    ],
+    roundItems: [
+      {
+        url: 'https://example.test/livejupiter/',
+        boardTitle: 'なんでも実況J',
+        fileName: '1234567890.dat',
+        threadTitle: '実況スレ Part1',
+        roundName: '実況チェック',
+      },
+    ],
     tabRegistry: {
       boardTabs: [],
       activeBoardTabId: null,
@@ -160,6 +226,63 @@
       latestVersion: '3.6.0',
       hasUpdate: true,
     },
+    boardTabInitData: {
+      tabId: 'board-livejupiter',
+      board: {
+        title: 'なんでも実況J',
+        url: 'https://example.test/livejupiter/',
+        bbsId: 'livejupiter',
+        serverUrl: 'https://example.test/',
+        boardType: '2ch',
+      },
+    },
+    threadTabInitData: {
+      tabId: 'thread-livejupiter-1234567890',
+      boardUrl: 'https://example.test/livejupiter/',
+      threadId: '1234567890',
+      title: '実況スレ Part1',
+      scrollTop: 0,
+      kokomade: 1,
+    },
+    subjectThreads: [
+      {
+        fileName: '1234567890.dat',
+        title: '実況スレ Part1',
+        count: 8,
+      },
+      {
+        fileName: '1234567891.dat',
+        title: '実況スレ Part2',
+        count: 3,
+      },
+      {
+        fileName: '1234567892.dat',
+        title: '避難所スレ',
+        count: 5,
+      },
+    ],
+    threadIndices: [
+      {
+        no: 1,
+        fileName: '1234567890.dat',
+        title: '実況スレ Part1',
+        count: 8,
+        size: 2048,
+        roundDate: null,
+        lastModified: '2026-04-20T10:00:00.000Z',
+        kokomade: 1,
+        newReceive: 0,
+        unRead: false,
+        scrollTop: 0,
+        scrollResNumber: 0,
+        scrollResOffset: 0,
+        allResCount: 8,
+        newResCount: 0,
+        ageSage: 3,
+      },
+    ],
+    datFetchCount: 0,
+    datResponses: [createThreadResponses(false), createThreadResponses(true)],
   });
 
   const readState = () => {
@@ -323,25 +446,33 @@
           return clone(menus[index] || { categories: [] });
         }
         case 'bbs:fetch-subject':
-          return {
-            threads: [
-              {
-                title: '実況スレ',
-                fileName: '1234567890.dat',
-                count: 42,
-                ikioi: 120,
-                lastModified: '2026-04-20T10:00:00.000Z',
-              },
-            ],
-          };
+          return { threads: clone(state.subjectThreads) };
         case 'bbs:resolve-board-title':
           return 'game/12345';
         case 'bbs:get-thread-index':
-          return [];
+          return clone(state.threadIndices);
         case 'bbs:get-kotehan':
           return { name: '', mail: '' };
         case 'bbs:get-samba':
           return { interval: 0, lastPostTime: null };
+        case 'bbs:fetch-dat': {
+          const responsesList = ensureArray(state.datResponses);
+          const fetchCount = typeof state.datFetchCount === 'number' ? state.datFetchCount : 0;
+          const index = Math.min(fetchCount, Math.max(0, responsesList.length - 1));
+          writeState({ ...state, datFetchCount: fetchCount + 1 });
+          return {
+            status: 'full',
+            responses: clone(responsesList[index] || []),
+            lastModified: '2026-04-20T10:00:00.000Z',
+            size: 4096,
+          };
+        }
+        case 'bbs:post':
+          return { success: true, resultType: 'grtOK', message: 'OK' };
+        case 'bbs:set-kotehan':
+        case 'post:save-history':
+        case 'history:add':
+          return null;
         case 'fav:load':
           return clone(state.favorites);
         case 'fav:save':
@@ -437,13 +568,44 @@
           return clone(state.postHistory);
         case 'round:get-timer':
           return clone(state.roundTimer);
+        case 'round:get-boards':
+          return clone(state.roundBoards);
+        case 'round:get-items':
+          return clone(state.roundItems);
         case 'round:add-board':
+          writeState({
+            ...state,
+            roundBoards: [...ensureArray(state.roundBoards), clone(args[0])],
+          });
+          return null;
         case 'round:add-item':
+          writeState({ ...state, roundItems: [...ensureArray(state.roundItems), clone(args[0])] });
+          return null;
         case 'round:remove-board':
+          writeState({
+            ...state,
+            roundBoards: ensureArray(state.roundBoards).filter((board) => board.url !== args[0]),
+          });
+          return null;
         case 'round:remove-item':
+          writeState({
+            ...state,
+            roundItems: ensureArray(state.roundItems).filter(
+              (item) => !(item.url === args[0] && item.fileName === args[1]),
+            ),
+          });
+          return null;
+        case 'round:execute':
+          return null;
+        case 'round:set-timer':
+          writeState({ ...state, roundTimer: clone(args[0]) });
           return null;
         case 'view:get-tab-registry':
           return clone(state.tabRegistry);
+        case 'view:board-tab-ready':
+          return clone(state.boardTabInitData);
+        case 'view:thread-tab-ready':
+          return clone(state.threadTabInitData);
         case 'view:create-board-tab': {
           const boardUrl = String(args[0]);
           const board = getBoardFromMenu(boardUrl);
@@ -507,6 +669,8 @@
         case 'view:reorder-thread-tabs':
         case 'view:layout-update':
           return null;
+        case 'view:open-board-new-thread-editor':
+          return null;
         case 'history:load':
           return clone(state.history);
         case 'history:clear':
@@ -567,6 +731,18 @@
         case 'diag:save-logs':
           writeState({ ...state, savedLogText: String(args[0]) });
           return { saved: true, path: 'C:/tmp/vbbb-console.log' };
+        case 'image:save-bulk':
+          return { saved: ensureArray(args[0]).length, folder: 'C:/tmp/images' };
+        case 'ip:lookup':
+          return {
+            ip: String(args[0]),
+            country: 'Japan',
+            region: 'Tokyo',
+            city: 'Chiyoda',
+            isp: 'Test ISP',
+            org: 'Test Org',
+            as: 'AS64500 Test',
+          };
         case 'cookie:get-all':
           return clone(state.cookies);
         case 'cookie:remove':
@@ -604,10 +780,12 @@
           emit('update:progress', { percent: 100, bytesDownloaded: 100, totalBytes: 100 });
           return null;
         case 'shell:open-external':
-        case 'shell:popup-context-menu':
         case 'session:save':
         case 'bbs:update-thread-index':
         case 'view:open-thread-request':
+        case 'panel:open':
+          return null;
+        case 'shell:popup-context-menu':
           return null;
         case 'menu:wait-action':
           return new Promise(() => {});
@@ -621,6 +799,20 @@
           return null;
         case 'dsl:save-file':
           return { saved: true, path: 'C:/tmp/script.vbbs' };
+        case 'auth:donguri-refresh':
+          return clone(state.auth.donguri);
+        case 'auth:donguri-login':
+          return {
+            success: true,
+            message: 'どんぐりログイン成功',
+            state: {
+              status: 'active',
+              message: '',
+              loggedIn: true,
+              userId: 'donguri-user',
+              userName: 'Donguri Tester',
+            },
+          };
         default:
           return null;
       }

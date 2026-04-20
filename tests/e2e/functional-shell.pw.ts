@@ -92,4 +92,29 @@ test.describe('UI機能フロー', () => {
     await historyPanel.getByTitle('履歴をすべて削除').click();
     await expect(window.getByText('履歴はありません')).toBeVisible();
   });
+
+  test('板タブとスレタブの表示向きを切り替えられる', async ({ window }) => {
+    await window.getByRole('button', { name: /ニュース/ }).click();
+    await window.getByRole('button', { name: 'なんでも実況J', exact: true }).click();
+    await expect(window.locator('text=なんでも実況J').nth(1)).toBeVisible();
+
+    await window.getByRole('button', { name: '検索', exact: true }).click();
+    const searchInput = window.getByPlaceholder('検索パターン (正規表現)');
+    await searchInput.fill('実況');
+    await window.getByLabel('検索', { exact: true }).click();
+    await window
+      .getByRole('button', { name: /なんでも実況J.*実況スレ/ })
+      .first()
+      .click();
+    await expect(window.getByText('実況スレ').last()).toBeVisible();
+
+    const orientationButtons = window.locator('button[title="タブを縦に表示"]');
+    await expect(orientationButtons).toHaveCount(2);
+
+    await orientationButtons.nth(0).click();
+    await expect(window.locator('button[title="タブを横に表示"]').nth(0)).toBeVisible();
+
+    await window.locator('button[title="タブを縦に表示"]').first().click();
+    await expect(window.locator('button[title="タブを横に表示"]').nth(1)).toBeVisible();
+  });
 });

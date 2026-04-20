@@ -65,6 +65,10 @@ function prefixSimilarity(a: string, b: string): number {
   return common / Math.max(a.length, b.length);
 }
 
+function normalizeLooseTitle(value: string): string {
+  return value.normalize('NFKC').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Search the board's subject list for the continuation thread of `currentTitle`.
  *
@@ -111,6 +115,26 @@ export function findNextThread(
     if (score >= THRESHOLD && score > bestScore) {
       bestScore = score;
       bestMatch = subject;
+    }
+  }
+
+  if (bestMatch !== undefined) return bestMatch;
+
+  const currentBase = normalizeLooseTitle(`${current.before}${current.after}`);
+  if (currentBase.length === 0) return undefined;
+
+  for (const subject of subjects) {
+    if (subject.fileName === currentFileName) continue;
+
+    const candidate = extractRightmostNumber(subject.title);
+    if (candidate === null || candidate.num !== nextNum) continue;
+
+    const candidateBase = normalizeLooseTitle(`${candidate.before}${candidate.after}`);
+    if (
+      candidateBase.length > 0 &&
+      (candidateBase.includes(currentBase) || currentBase.includes(candidateBase))
+    ) {
+      return subject;
     }
   }
 
