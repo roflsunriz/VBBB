@@ -1,9 +1,16 @@
-import { test as base, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { expect, test as base, type Page } from '@playwright/test';
 
 export type Invocation = {
   channel: string;
   args: unknown[];
+};
+
+type TestHarness = {
+  readonly invocations: Invocation[];
+  readonly getState: () => Record<string, unknown>;
+  readonly setState: (patch: Record<string, unknown>) => Record<string, unknown>;
+  readonly emit: (channel: string, ...args: unknown[]) => void;
 };
 
 type TestElectronApi = {
@@ -14,75 +21,71 @@ type TestElectronApi = {
 
 type RendererFixtures = {
   window: Page;
+  openApp: (path: string) => Promise<Page>;
 };
 
 declare global {
   interface Window {
     electronApi: TestElectronApi;
-    __VBBB_TEST__?: {
-      readonly invocations: Invocation[];
-    };
+    __VBBB_TEST__?: TestHarness;
   }
 }
 
 const APP_READY_TIMEOUT = 30_000;
+const DEFAULT_BASE_URL = 'http://127.0.0.1:4173';
+const MOCK_SCRIPT_PATH = fileURLToPath(new URL('./mock-electron-api.js', import.meta.url));
+
+async function installMockElectronApi(page: Page): Promise<void> {
+  await page.addInitScript({ path: MOCK_SCRIPT_PATH });
+}
+
+async function gotoApp(page: Page, baseURL: string, path: string): Promise<Page> {
+  await installMockElectronApi(page);
+  await page.goto(`${baseURL}/${path}`);
+  await page.waitForLoadState('domcontentloaded');
+  return page;
+}
 
 export const test = base.extend<RendererFixtures>({
+  openApp: async ({ context, baseURL }, use) => {
+    const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
+    const openApp = async (path: string): Promise<Page> => {
+      const page = await context.newPage();
+      await gotoApp(page, resolvedBaseURL, path);
+      return page;
+    };
+    await use(openApp);
+  },
+
   window: async ({ page, baseURL }, use) => {
-    await page.addInitScript(() => {
-      const invocations: Invocation[] = [];
-      const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
-
-      document.title = 'VBBB';
-
-      window.__VBBB_TEST__ = { invocations };
-      window.electronApi = {
-        invoke: (channel: string, ...args: unknown[]) => {
-          const store = window.__VBBB_TEST__?.invocations ?? invocations;
-          store.push({ channel, args });
-
-          switch (channel) {
-            case 'bbs:fetch-menu':
-              return Promise.resolve({ categories: [] });
-            case 'fav:load':
-              return Promise.resolve({ children: [] });
-            case 'ng:get-rules':
-              return Promise.resolve([]);
-            case 'post:load-history':
-              return Promise.resolve([]);
-            case 'round:get-timer':
-              return Promise.resolve({ enabled: false });
-            case 'view:get-tab-registry':
-              return Promise.resolve({
-                boardTabs: [],
-                activeBoardTabId: null,
-                threadTabs: [],
-                activeThreadTabId: null,
-              });
-            case 'menu:wait-action':
-              return new Promise(() => {
-                // Keep the shell long-poll idle for the lifetime of the page.
-              });
-            default:
-              return Promise.resolve(null);
-          }
-        },
-        sendSync: () => null,
-        on: (channel: string, callback: (...args: unknown[]) => void) => {
-          const set = listeners.get(channel) ?? new Set<(...args: unknown[]) => void>();
-          set.add(callback);
-          listeners.set(channel, set);
-          return () => {
-            set.delete(callback);
-          };
-        },
-      } satisfies TestElectronApi;
+    const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.stack ?? error.message);
     });
 
-    const targetUrl = `${baseURL ?? 'http://127.0.0.1:4173'}/shell.html`;
-    await page.goto(targetUrl);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForSelector('header', { state: 'visible', timeout: APP_READY_TIMEOUT });
+    await gotoApp(page, resolvedBaseURL, 'shell.html');
+
+    try {
+      await page.waitForSelector('header', { state: 'visible', timeout: APP_READY_TIMEOUT });
+    } catch (error) {
+      const bodyText = (
+        await page
+          .locator('body')
+          .innerText()
+          .catch(() => '')
+      ).slice(0, 500);
+      throw new Error(
+        [
+          error instanceof Error ? error.message : String(error),
+          `url=${page.url()}`,
+          `title=${await page.title().catch(() => '')}`,
+          `body=${bodyText}`,
+          `pageErrors=${pageErrors.join('\n---\n')}`,
+        ].join('\n'),
+      );
+    }
+
     await use(page);
   },
 });

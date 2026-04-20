@@ -12,9 +12,12 @@ export default defineConfig({
   /** Electron startup + IPC init can take longer than a browser page load. */
   timeout: 60_000,
   retries: 1,
-  /** Keep tests sequential — only one Electron process at a time is safe on CI. */
-  fullyParallel: false,
-  workers: 1,
+  /**
+   * Renderer E2E runs against built static pages with mocked IPC, so suites are
+   * isolated per browser context and can run in parallel safely.
+   */
+  fullyParallel: true,
+  workers: process.env['CI'] === 'true' ? 2 : '50%',
   use: {
     baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
