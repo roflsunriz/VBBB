@@ -288,6 +288,35 @@ describe('generateNextThreadTemplate', () => {
     expect(result.message).not.toContain(prevUrl);
   });
 
+  it('does not replace another same-board URL outside the 前スレ block', () => {
+    const prevUrl = 'https://jbbs.shitaraba.net/bbs/read.cgi/study/13463/1772036153/l50';
+    const relatedUrl = 'https://jbbs.shitaraba.net/bbs/read.cgi/study/13463/1669450079/';
+    const body = [
+      '2045年頃に人類は技術的特異点を迎えると予測されている。',
+      '',
+      '※前スレ',
+      '技術的特異点/シンギュラリティ【総合】避難所 45',
+      prevUrl,
+      '',
+      '※不老技術の動向と医学関連はこちら',
+      '不老不死（不老長寿）を目指すスレ 避難所',
+      relatedUrl,
+    ].join('<br>');
+
+    const result = generateNextThreadTemplate({
+      boardUrl: 'https://jbbs.shitaraba.net/study/13463/',
+      threadId: '1888888888',
+      firstPostBody: body,
+      currentTitle: '技術的特異点/シンギュラリティ【総合】避難所 45',
+    });
+
+    expect(result.message).toContain(
+      'https://jbbs.shitaraba.net/bbs/read.cgi/study/13463/1888888888/',
+    );
+    expect(result.message).toContain(relatedUrl);
+    expect(result.message).not.toContain(prevUrl);
+  });
+
   it('replaces Machi previous thread URL with current thread URL', () => {
     const prevUrl = 'https://machi.to/bbs/read.cgi/tokyo/9999999999/';
     const body = `前スレ<br>${prevUrl}`;

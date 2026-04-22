@@ -137,8 +137,10 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
   const currentThreadUrl = buildThreadUrl(boardUrl, threadId);
   const currentBoardIdentity = extractBoardIdentity(boardUrl);
 
-  const replacedLines = filteredLines.map((line) =>
-    replacePreviousThreadUrls(line, currentBoardIdentity, currentThreadUrl),
+  const replacedLines = replacePreviousThreadReferences(
+    filteredLines,
+    currentBoardIdentity,
+    currentThreadUrl,
   );
 
   const incrementedLines = incrementPrevThreadReferences(replacedLines);
@@ -165,24 +167,35 @@ interface ParsedThreadUrlIdentity extends BoardIdentity {
   readonly originalUrl: string;
 }
 
-function replacePreviousThreadUrls(
-  line: string,
+function replacePreviousThreadReferences(
+  lines: readonly string[],
   currentBoardIdentity: BoardIdentity | null,
   currentThreadUrl: string,
-): string {
-  if (currentBoardIdentity === null) return line;
+): string[] {
+  if (currentBoardIdentity === null) return [...lines];
 
-  return line.replace(URL_TOKEN_PATTERN, (token) => {
-    const parsed = parseSupportedThreadUrl(token);
-    if (parsed === null) return token;
-    if (
-      parsed.kind !== currentBoardIdentity.kind ||
-      parsed.boardKey !== currentBoardIdentity.boardKey
-    ) {
-      return token;
+  const result = [...lines];
+  for (let i = 0; i < result.length; i++) {
+    const line = result[i];
+    if (line === undefined || !line.includes('前スレ')) continue;
+    for (let j = i; j < Math.min(i + 3, result.length); j++) {
+      const target = result[j];
+      if (target === undefined) continue;
+      result[j] = target.replace(URL_TOKEN_PATTERN, (token) => {
+        const parsed = parseSupportedThreadUrl(token);
+        if (parsed === null) return token;
+        if (
+          parsed.kind !== currentBoardIdentity.kind ||
+          parsed.boardKey !== currentBoardIdentity.boardKey
+        ) {
+          return token;
+        }
+        return currentThreadUrl;
+      });
     }
-    return currentThreadUrl;
-  });
+  }
+
+  return result;
 }
 
 function extractBoardIdentity(boardUrl: string): BoardIdentity | null {
