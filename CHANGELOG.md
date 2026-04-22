@@ -5,6 +5,32 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-04-22
+
+### Added
+
+- **外部 URL を開くためのユーティリティと IPC ハンドラを追加**
+  - 既定ブラウザで外部 URL を開く処理を main 側へ集約し、関連する IPC 経路を整理
+  - 外部 URL を開く挙動の単体テストを追加
+- **次スレテンプレート生成の URL 置換を拡張**
+  - 5ch 系だけでなく JBBS/Shitaraba と Machi BBS の前スレ URL も現在のスレ URL に置換できるよう改善
+  - 5ch 仕様変更に関する参照ソースを追加し、置換ロジックの検証材料を補強
+
+### Changed
+
+- **次スレテンプレートの URL 置換ロジックを見直し**
+  - 前スレブロック外の同一ボード URL は置換しないよう調整
+  - 置換条件の整理により、次スレテンプレート生成の精度を改善
+- **GitHub Actions の CI / Release ワークフローを Node 24 対応へ更新**
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.7.0` に更新
+
+### Fixed
+
+- **スレ立て支援機能の数字インクリメント不具合を修正**
+  - `"【IP】トリッカル・もちもちほっぺ大作戦50【あり】"` のようなタイトルで末尾数字を正しく増分できないケースを修正
+- **タイトル末尾の UI ラベル混入を修正**
+  - `"(78%)"` などの表示ラベルが次スレテンプレートの末尾へ付与される不具合を解消
+
 ## [3.6.1] - 2026-04-20
 
 ### Fixed
@@ -714,6 +740,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.7.0]: https://github.com/roflsunriz/VBBB/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/roflsunriz/VBBB/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/roflsunriz/VBBB/compare/v3.5.1...v3.6.0
 [3.5.1]: https://github.com/roflsunriz/VBBB/compare/v3.5.0...v3.5.1

@@ -3,13 +3,23 @@
  * Saves/restores window position, size, and maximized state.
  */
 import { join } from 'node:path';
-import { screen } from 'electron';
+import * as electron from 'electron';
 import { createLogger } from '../logger';
 import { atomicWriteFile, readFileSafe } from './file-io';
 
 const logger = createLogger('window-state');
 
 const WINDOW_STATE_FILE = 'window-state.json';
+type Display = {
+  readonly workArea: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+};
+
+let getAllDisplaysForTest: (() => Display[]) | null = null;
 
 /** Persisted window state */
 export interface WindowState {
@@ -34,7 +44,7 @@ const DEFAULT_STATE: WindowState = {
  */
 function validateBounds(state: WindowState): WindowState {
   try {
-    const displays = screen.getAllDisplays();
+    const displays = getAllDisplaysForTest?.() ?? electron.screen.getAllDisplays();
     const visible = displays.some((d) => {
       const { x, y, width, height } = d.workArea;
       return (
@@ -89,4 +99,11 @@ export function loadWindowState(dataDir: string): WindowState {
 export async function saveWindowState(dataDir: string, state: WindowState): Promise<void> {
   const filePath = join(dataDir, WINDOW_STATE_FILE);
   await atomicWriteFile(filePath, JSON.stringify(state, null, 2));
+}
+
+/**
+ * Test-only hook for providing deterministic display bounds.
+ */
+export function __setWindowStateDisplayProviderForTest(provider: (() => Display[]) | null): void {
+  getAllDisplaysForTest = provider;
 }

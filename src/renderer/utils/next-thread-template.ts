@@ -277,11 +277,7 @@ function parseSupportedThreadUrl(rawUrl: string): ParsedThreadUrlIdentity | null
       return null;
     }
 
-    if (
-      pathSegments[0] === 'test' &&
-      pathSegments[1] === 'read.cgi' &&
-      pathSegments.length >= 4
-    ) {
+    if (pathSegments[0] === 'test' && pathSegments[1] === 'read.cgi' && pathSegments.length >= 4) {
       const boardId = pathSegments[2];
       const threadId = pathSegments[3];
       if (boardId !== undefined && /^\d+$/.test(threadId ?? '')) {

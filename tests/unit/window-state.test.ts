@@ -1,24 +1,14 @@
 /**
  * Tests for window state persistence (feature 8: window size persist).
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// Mock electron before importing the module
-vi.mock('electron', () => ({
-  screen: {
-    getAllDisplays: () => [
-      {
-        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
-      },
-    ],
-  },
-}));
-
-// Import after mock setup
-const { loadWindowState, saveWindowState } = await import('../../src/main/services/window-state');
+// Import after test hook setup
+const { __setWindowStateDisplayProviderForTest, loadWindowState, saveWindowState } =
+  await import('../../src/main/services/window-state');
 
 function createTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'vbbb-ws-test-'));
@@ -26,9 +16,17 @@ function createTempDir(): string {
   return dir;
 }
 
+beforeEach(() => {
+  __setWindowStateDisplayProviderForTest(() => [
+    {
+      workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+    },
+  ]);
+});
+
 describe('loadWindowState', () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    __setWindowStateDisplayProviderForTest(null);
   });
 
   it('returns default state when no file exists', () => {

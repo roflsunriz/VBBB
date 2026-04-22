@@ -223,7 +223,7 @@
       nextStart: null,
     },
     updateInfo: {
-      latestVersion: '3.6.1',
+      latestVersion: '3.7.0',
       hasUpdate: true,
     },
     boardTabInitData: {

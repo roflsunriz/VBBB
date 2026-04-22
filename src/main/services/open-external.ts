@@ -9,15 +9,11 @@ export interface OpenExternalDeps {
 
 function launchWindowsDefaultBrowser(url: string, spawnImpl: typeof spawn): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child: ChildProcess = spawnImpl(
-      'rundll32.exe',
-      ['url.dll,FileProtocolHandler', url],
-      {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      },
-    );
+    const child: ChildProcess = spawnImpl('rundll32.exe', ['url.dll,FileProtocolHandler', url], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
 
     child.once('error', reject);
     child.once('spawn', () => {
