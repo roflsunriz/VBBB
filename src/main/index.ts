@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { app, BaseWindow, session, shell } from 'electron';
+import { app, BaseWindow, session } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { performance } from 'node:perf_hooks';
 import { lookupBoard, registerIpcHandlers } from './ipc/handlers';
@@ -14,6 +14,7 @@ import {
 } from './services/tab-persistence';
 import { loadFolderIdx } from './services/subject';
 import { getBoardDir } from './services/file-io';
+import { openExternalUrl } from './services/open-external';
 import { ViewManager } from './view-manager';
 import { setViewManager, getViewManagerOrNull } from './view-manager-ref';
 import { PanelWindowManager } from './panel-window-manager';
@@ -138,7 +139,7 @@ function createWindow(): BaseWindow {
   });
 
   shellView.webContents.setWindowOpenHandler((details) => {
-    void shell.openExternal(details.url);
+    void openExternalUrl(details.url);
     return { action: 'deny' };
   });
 

@@ -9,7 +9,6 @@ import {
   dialog,
   ipcMain,
   Menu,
-  shell,
   type MenuItemConstructorOptions,
 } from 'electron';
 import { join } from 'node:path';
@@ -39,6 +38,7 @@ import {
 } from '../services/file-io';
 import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { httpFetch } from '../services/http-client';
+import { openExternalUrl } from '../services/open-external';
 import { searchLocal, searchLocalAll } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
@@ -879,7 +879,7 @@ export async function registerIpcHandlers(): Promise<void> {
 
   // Open URL in external browser
   handle('shell:open-external', async (url: string) => {
-    await shell.openExternal(url);
+    await openExternalUrl(url);
   });
 
   handle('media:open', (payload) => {
