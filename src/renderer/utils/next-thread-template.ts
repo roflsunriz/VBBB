@@ -24,13 +24,14 @@ const EXTEND_CMD_PATTERN = /^!extend:[^\n]*/i;
 const VIPQ2_EXTDAT_PATTERN = /^VIPQ2_EXTDAT:.*$/;
 
 /**
- * Regex matching 5ch/2ch thread URLs.
- * Covers patterns like:
- *   https://server.5ch.net/test/read.cgi/board/threadId/
- *   http://server.2ch.net/test/read.cgi/board/threadId
+ * Regex matching supported thread URLs in templates.
+ * Covers:
+ *   5ch/2ch/bbspink: https://host/test/read.cgi/board/threadId/
+ *   JBBS/Shitaraba:  https://host/bbs/read.cgi/dir/board/threadId/
+ *   Machi BBS:       https://host/bbs/read.cgi/board/threadId/
  */
 const THREAD_URL_PATTERN =
-  /https?:\/\/[a-z0-9]+\.(?:5ch\.net|2ch\.net|bbspink\.com)\/test\/read\.cgi\/[a-z0-9_]+\/\d+\/?/gi;
+  /https?:\/\/[^\s/]+\/(?:(?:test\/read\.cgi\/[^/\s]+\/\d+\/?)|(?:bbs\/read\.cgi\/(?:[^/\s]+\/){1,2}\d+\/?))(?=[\s　]|$)/gi;
 
 /**
  * Convert BBS HTML body to plain text.
@@ -169,9 +170,33 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
 function buildThreadUrl(boardUrl: string, threadId: string): string {
   try {
     const url = new URL(boardUrl);
-    const boardId = url.pathname.replace(/^\/|\/$/g, '');
-    return `${url.origin}/test/read.cgi/${boardId}/${threadId}/`;
+    const hostname = url.hostname.toLowerCase();
+    const pathSegments = url.pathname.split('/').filter((segment) => segment.length > 0);
+
+    if (
+      (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
+      pathSegments.length >= 2
+    ) {
+      const dir = pathSegments[0];
+      const boardId = pathSegments[1];
+      if (dir !== undefined && boardId !== undefined) {
+        return `${url.origin}/bbs/read.cgi/${dir}/${boardId}/${threadId}/`;
+      }
+    }
+
+    if (hostname.includes('machi.to') && pathSegments.length >= 1) {
+      const boardId = pathSegments[pathSegments.length - 1];
+      if (boardId !== undefined) {
+        return `${url.origin}/bbs/read.cgi/${boardId}/${threadId}/`;
+      }
+    }
+
+    const boardId = pathSegments[pathSegments.length - 1];
+    if (boardId !== undefined) {
+      return `${url.origin}/test/read.cgi/${boardId}/${threadId}/`;
+    }
   } catch {
-    return boardUrl;
+    /* ignore */
   }
+  return boardUrl;
 }

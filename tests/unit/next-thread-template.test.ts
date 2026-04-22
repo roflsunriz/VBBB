@@ -236,6 +236,38 @@ describe('generateNextThreadTemplate', () => {
     );
   });
 
+  it('replaces JBBS/Shitaraba previous thread URL with current thread URL', () => {
+    const prevUrl = 'https://jbbs.shitaraba.net/bbs/read.cgi/game/12345/9999999999/';
+    const body = `前スレ<br>${prevUrl}`;
+
+    const result = generateNextThreadTemplate({
+      boardUrl: 'https://jbbs.shitaraba.net/game/12345/',
+      threadId: '1111111111',
+      firstPostBody: body,
+      currentTitle: 'テスト★1',
+    });
+
+    expect(result.message).not.toContain('9999999999');
+    expect(result.message).toContain(
+      'https://jbbs.shitaraba.net/bbs/read.cgi/game/12345/1111111111/',
+    );
+  });
+
+  it('replaces Machi previous thread URL with current thread URL', () => {
+    const prevUrl = 'https://machi.to/bbs/read.cgi/tokyo/9999999999/';
+    const body = `前スレ<br>${prevUrl}`;
+
+    const result = generateNextThreadTemplate({
+      boardUrl: 'https://machi.to/tokyo/',
+      threadId: '1111111111',
+      firstPostBody: body,
+      currentTitle: 'テスト★1',
+    });
+
+    expect(result.message).not.toContain('9999999999');
+    expect(result.message).toContain('https://machi.to/bbs/read.cgi/tokyo/1111111111/');
+  });
+
   it('strips leading whitespace from lines (nbsp / space after br)', () => {
     const body = '&nbsp;先頭nbsp行<br>&nbsp; 2行目<br> 3行目スペース';
     const result = generateNextThreadTemplate({
