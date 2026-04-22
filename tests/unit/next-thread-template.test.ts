@@ -173,6 +173,22 @@ describe('generateNextThreadTemplate', () => {
     expect(result.message).toContain('https://news.5ch.net/test/read.cgi/newsplus/1234567890/');
   });
 
+  it('replaces only 5ch previous-thread URLs when other board URLs are also present', () => {
+    const prevUrl = 'https://news.5ch.net/test/read.cgi/newsplus/9999999999/';
+    const shitarabaUrl = 'https://jbbs.shitaraba.net/bbs/read.cgi/game/12345/7777777777/';
+    const body = `前スレ<br>${prevUrl}<br>避難所<br>${shitarabaUrl}`;
+
+    const result = generateNextThreadTemplate({
+      ...baseInput,
+      firstPostBody: body,
+      currentTitle: 'テスト★2',
+    });
+
+    expect(result.message).toContain('https://news.5ch.net/test/read.cgi/newsplus/1234567890/');
+    expect(result.message).toContain(shitarabaUrl);
+    expect(result.message).not.toContain(prevUrl);
+  });
+
   it('handles body without !extend (no lines prepended)', () => {
     const result = generateNextThreadTemplate({
       ...baseInput,
@@ -253,6 +269,25 @@ describe('generateNextThreadTemplate', () => {
     );
   });
 
+  it('replaces only JBBS previous-thread URLs when 5ch URLs are also present', () => {
+    const prevUrl = 'https://jbbs.shitaraba.net/bbs/read.cgi/game/12345/9999999999/';
+    const fiveChUrl = 'https://news.5ch.net/test/read.cgi/newsplus/7777777777/';
+    const body = `前スレ<br>${prevUrl}<br>本スレ案内<br>${fiveChUrl}`;
+
+    const result = generateNextThreadTemplate({
+      boardUrl: 'https://jbbs.shitaraba.net/game/12345/',
+      threadId: '1111111111',
+      firstPostBody: body,
+      currentTitle: 'テスト★1',
+    });
+
+    expect(result.message).toContain(
+      'https://jbbs.shitaraba.net/bbs/read.cgi/game/12345/1111111111/',
+    );
+    expect(result.message).toContain(fiveChUrl);
+    expect(result.message).not.toContain(prevUrl);
+  });
+
   it('replaces Machi previous thread URL with current thread URL', () => {
     const prevUrl = 'https://machi.to/bbs/read.cgi/tokyo/9999999999/';
     const body = `前スレ<br>${prevUrl}`;
@@ -266,6 +301,23 @@ describe('generateNextThreadTemplate', () => {
 
     expect(result.message).not.toContain('9999999999');
     expect(result.message).toContain('https://machi.to/bbs/read.cgi/tokyo/1111111111/');
+  });
+
+  it('replaces only Machi previous-thread URLs when other board URLs are also present', () => {
+    const prevUrl = 'https://machi.to/bbs/read.cgi/tokyo/9999999999/';
+    const fiveChUrl = 'https://news.5ch.net/test/read.cgi/newsplus/7777777777/';
+    const body = `前スレ<br>${prevUrl}<br>参考<br>${fiveChUrl}`;
+
+    const result = generateNextThreadTemplate({
+      boardUrl: 'https://machi.to/tokyo/',
+      threadId: '1111111111',
+      firstPostBody: body,
+      currentTitle: 'テスト★1',
+    });
+
+    expect(result.message).toContain('https://machi.to/bbs/read.cgi/tokyo/1111111111/');
+    expect(result.message).toContain(fiveChUrl);
+    expect(result.message).not.toContain(prevUrl);
   });
 
   it('strips leading whitespace from lines (nbsp / space after br)', () => {

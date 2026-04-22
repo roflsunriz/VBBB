@@ -23,15 +23,8 @@ const EXTEND_CMD_PATTERN = /^!extend:[^\n]*/i;
 /** Regex matching the system-generated VIPQ2_EXTDAT line. */
 const VIPQ2_EXTDAT_PATTERN = /^VIPQ2_EXTDAT:.*$/;
 
-/**
- * Regex matching supported thread URLs in templates.
- * Covers:
- *   5ch/2ch/bbspink: https://host/test/read.cgi/board/threadId/
- *   JBBS/Shitaraba:  https://host/bbs/read.cgi/dir/board/threadId/
- *   Machi BBS:       https://host/bbs/read.cgi/board/threadId/
- */
-const THREAD_URL_PATTERN =
-  /https?:\/\/[^\s/]+\/(?:(?:test\/read\.cgi\/[^/\s]+\/\d+\/?)|(?:bbs\/read\.cgi\/(?:[^/\s]+\/){1,2}\d+\/?))(?=[\s　]|$)/gi;
+/** Regex for scanning URL-like tokens from template text. */
+const URL_TOKEN_PATTERN = /https?:\/\/[^\s　]+/gi;
 
 /**
  * Convert BBS HTML body to plain text.
@@ -142,9 +135,10 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
     });
 
   const currentThreadUrl = buildThreadUrl(boardUrl, threadId);
+  const currentBoardIdentity = extractBoardIdentity(boardUrl);
 
   const replacedLines = filteredLines.map((line) =>
-    line.replace(THREAD_URL_PATTERN, currentThreadUrl),
+    replacePreviousThreadUrls(line, currentBoardIdentity, currentThreadUrl),
   );
 
   const incrementedLines = incrementPrevThreadReferences(replacedLines);
@@ -160,6 +154,136 @@ export function generateNextThreadTemplate(input: NextThreadTemplateInput): Next
   const message = messageLines.join('\n').trim();
 
   return { subject, message };
+}
+
+interface BoardIdentity {
+  readonly kind: '5ch' | 'jbbs' | 'machi';
+  readonly boardKey: string;
+}
+
+interface ParsedThreadUrlIdentity extends BoardIdentity {
+  readonly originalUrl: string;
+}
+
+function replacePreviousThreadUrls(
+  line: string,
+  currentBoardIdentity: BoardIdentity | null,
+  currentThreadUrl: string,
+): string {
+  if (currentBoardIdentity === null) return line;
+
+  return line.replace(URL_TOKEN_PATTERN, (token) => {
+    const parsed = parseSupportedThreadUrl(token);
+    if (parsed === null) return token;
+    if (
+      parsed.kind !== currentBoardIdentity.kind ||
+      parsed.boardKey !== currentBoardIdentity.boardKey
+    ) {
+      return token;
+    }
+    return currentThreadUrl;
+  });
+}
+
+function extractBoardIdentity(boardUrl: string): BoardIdentity | null {
+  try {
+    const url = new URL(boardUrl);
+    const hostname = url.hostname.toLowerCase();
+    const pathSegments = url.pathname.split('/').filter((segment) => segment.length > 0);
+
+    if (
+      (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
+      pathSegments.length >= 2
+    ) {
+      const dir = pathSegments[0];
+      const boardId = pathSegments[1];
+      if (dir !== undefined && boardId !== undefined) {
+        return { kind: 'jbbs', boardKey: `${dir}/${boardId}` };
+      }
+      return null;
+    }
+
+    if (hostname.includes('machi.to') && pathSegments.length >= 1) {
+      const boardId = pathSegments[pathSegments.length - 1];
+      if (boardId !== undefined) {
+        return { kind: 'machi', boardKey: boardId };
+      }
+      return null;
+    }
+
+    const boardId = pathSegments[pathSegments.length - 1];
+    if (boardId !== undefined) {
+      return { kind: '5ch', boardKey: boardId };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function parseSupportedThreadUrl(rawUrl: string): ParsedThreadUrlIdentity | null {
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.toLowerCase();
+    const pathSegments = url.pathname.split('/').filter((segment) => segment.length > 0);
+
+    if (
+      (hostname.includes('jbbs.shitaraba') || hostname.includes('jbbs.livedoor')) &&
+      pathSegments[0] === 'bbs' &&
+      pathSegments[1] === 'read.cgi' &&
+      pathSegments.length >= 5
+    ) {
+      const dir = pathSegments[2];
+      const boardId = pathSegments[3];
+      const threadId = pathSegments[4];
+      if (dir !== undefined && boardId !== undefined && /^\d+$/.test(threadId ?? '')) {
+        return {
+          kind: 'jbbs',
+          boardKey: `${dir}/${boardId}`,
+          originalUrl: rawUrl,
+        };
+      }
+      return null;
+    }
+
+    if (
+      hostname.includes('machi.to') &&
+      pathSegments[0] === 'bbs' &&
+      pathSegments[1] === 'read.cgi' &&
+      pathSegments.length >= 4
+    ) {
+      const boardId = pathSegments[2];
+      const threadId = pathSegments[3];
+      if (boardId !== undefined && /^\d+$/.test(threadId ?? '')) {
+        return {
+          kind: 'machi',
+          boardKey: boardId,
+          originalUrl: rawUrl,
+        };
+      }
+      return null;
+    }
+
+    if (
+      pathSegments[0] === 'test' &&
+      pathSegments[1] === 'read.cgi' &&
+      pathSegments.length >= 4
+    ) {
+      const boardId = pathSegments[2];
+      const threadId = pathSegments[3];
+      if (boardId !== undefined && /^\d+$/.test(threadId ?? '')) {
+        return {
+          kind: '5ch',
+          boardKey: boardId,
+          originalUrl: rawUrl,
+        };
+      }
+      return null;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 /**
