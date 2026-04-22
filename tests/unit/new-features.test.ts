@@ -94,6 +94,15 @@ describe('F4: 次スレ作成支援ボタン（findNextThread の動作）', () 
     expect(result?.num).toBe(3);
   });
 
+  it('extractRightmostNumber ignores a trailing related-thread similarity suffix', () => {
+    const result = extractRightmostNumber('【IP】トリッカル・もちもちほっぺ大作戦50【あり】 (78%)');
+    expect(result).toEqual({
+      before: '【IP】トリッカル・もちもちほっぺ大作戦',
+      num: 50,
+      after: '【あり】',
+    });
+  });
+
   it('extractRightmostNumber returns null for titles without numbers', () => {
     expect(extractRightmostNumber('ナンバーなしのスレタイ')).toBeNull();
   });

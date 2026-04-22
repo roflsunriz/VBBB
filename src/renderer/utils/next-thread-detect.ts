@@ -18,6 +18,11 @@ export const NEXT_THREAD_RESPONSE_THRESHOLD = 1000;
 /** Minimum threshold for the "次スレを探す" toolbar button to appear. */
 export const NEXT_THREAD_BUTTON_THRESHOLD = 950;
 
+/** Strip UI-only similarity suffixes accidentally mixed into thread titles. */
+function stripUiTitleSuffix(title: string): string {
+  return title.replace(/\s*\(\d{1,3}%\)\s*$/, '');
+}
+
 /**
  * Find the rightmost number in a title and split the title around it.
  *
@@ -29,10 +34,11 @@ export const NEXT_THREAD_BUTTON_THRESHOLD = 950;
 export function extractRightmostNumber(
   title: string,
 ): { before: string; num: number; after: string } | null {
+  const normalizedTitle = stripUiTitleSuffix(title);
   let lastMatch: RegExpExecArray | null = null;
   const pattern = /(\d+)/g;
   let m: RegExpExecArray | null;
-  while ((m = pattern.exec(title)) !== null) {
+  while ((m = pattern.exec(normalizedTitle)) !== null) {
     lastMatch = m;
   }
 
@@ -40,8 +46,8 @@ export function extractRightmostNumber(
   const num = parseInt(lastMatch[1], 10);
   if (isNaN(num) || num <= 0) return null;
 
-  const before = title.slice(0, lastMatch.index);
-  const after = title.slice(lastMatch.index + lastMatch[1].length);
+  const before = normalizedTitle.slice(0, lastMatch.index);
+  const after = normalizedTitle.slice(lastMatch.index + lastMatch[1].length);
   return { before, num, after };
 }
 

@@ -446,6 +446,7 @@ export function ShellApp(): React.JSX.Element {
         const isFavorite = favoriteUrlToId.has(threadUrl);
 
         const relatedItems: NativeContextMenuItem[] = [];
+        const relatedTitleById = new Map<string, string>();
         try {
           const threshold = relatedThreadSimilarity / 100;
           const result = await api.invoke('bbs:fetch-subject', tab.boardUrl);
@@ -473,8 +474,10 @@ export function ShellApp(): React.JSX.Element {
             }
             matches.sort((a, b) => b.similarity - a.similarity);
             for (const m of matches.slice(0, 12)) {
+              const actionId = `related:${m.threadId}`;
+              relatedTitleById.set(actionId, m.title);
               relatedItems.push({
-                id: `related:${m.threadId}`,
+                id: actionId,
                 label: `${m.title} (${String(Math.round(m.similarity * 100))}%)`,
               });
             }
@@ -560,7 +563,7 @@ export function ShellApp(): React.JSX.Element {
           default:
             if (action.startsWith('related:')) {
               const relThreadId = action.slice('related:'.length);
-              const relTitle = relatedItems.find((r) => r.id === action)?.label ?? '';
+              const relTitle = relatedTitleById.get(action) ?? '';
               void api.invoke('view:create-thread-tab', tab.boardUrl, relThreadId, relTitle);
             }
         }

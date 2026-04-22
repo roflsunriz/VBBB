@@ -70,6 +70,12 @@ describe('incrementTitleNumber', () => {
   it('handles large numbers', () => {
     expect(incrementTitleNumber('スレ999')).toBe('スレ1000');
   });
+
+  it('ignores related-thread similarity suffix when incrementing title number', () => {
+    expect(incrementTitleNumber('【IP】トリッカル・もちもちほっぺ大作戦50【あり】 (78%)')).toBe(
+      '【IP】トリッカル・もちもちほっぺ大作戦51【あり】',
+    );
+  });
 });
 
 describe('incrementPrevThreadReferences', () => {
