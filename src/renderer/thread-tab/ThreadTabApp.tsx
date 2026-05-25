@@ -89,6 +89,8 @@ type SearchField = 'all' | 'name' | 'id' | 'body' | 'watchoi';
 
 const DATE_PATTERN = /(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]*\)\s*(\d{1,2}):(\d{2}):(\d{2})/;
 const BE_PATTERN = /BE:(\d+)-(\d+)/;
+const ID_DISPLAY_PATTERN = /(?:^|\s)(?:ID|発信元):[^\s]+/;
+const MACHI_HOST_ID_PATTERN = /^[0-9a-fA-F]{4}(?::[0-9a-fA-F]{4}){3}$/;
 const INLINE_VIDEO_INITIAL_VOLUME_PERCENT_KEY = 'vbbb-inline-video-initial-volume-percent';
 const DEFAULT_INLINE_VIDEO_INITIAL_VOLUME_PERCENT = 10;
 const HEADER_REFRESH_INTERVAL_KEY = 'vbbb-header-refresh-interval-min';
@@ -156,7 +158,7 @@ function computeIkioiFromFileName(fileName: string, count: number): number {
   return count / elapsedDays;
 }
 
-function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.ReactNode {
+function renderDateTime(dateTime: string, showRelative: boolean): React.ReactNode {
   const relativeNode = showRelative
     ? (() => {
         const parsed = parseResDateTime(dateTime);
@@ -170,17 +172,18 @@ function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.Re
     : null;
 
   const match = BE_PATTERN.exec(dateTime);
+  const dateWithoutId = dateTime.replace(ID_DISPLAY_PATTERN, '').replace(/\s+/g, ' ').trim();
   if (match?.[1] === undefined || match[2] === undefined) {
     return (
       <>
-        {dateTime}
+        {dateWithoutId}
         {relativeNode}
       </>
     );
   }
 
   const beId = match[1];
-  const dateOnly = dateTime.replace(BE_PATTERN, '').trim();
+  const dateOnly = dateWithoutId.replace(BE_PATTERN, '').trim();
   return (
     <>
       {dateOnly}
@@ -188,6 +191,10 @@ function renderDateTimeWithBe(dateTime: string, showRelative: boolean): React.Re
       {relativeNode}
     </>
   );
+}
+
+function getIpDisplayLabel(ip: string): 'HOST:' | 'IP:' {
+  return MACHI_HOST_ID_PATTERN.test(ip) ? 'HOST:' : 'IP:';
 }
 
 function FilterLink({
@@ -303,6 +310,7 @@ function renderNameField(
                       onLeave={onLeave}
                       className="text-[var(--color-warning)]"
                     >
+                      {getIpDisplayLabel(ip)}
                       {ip}
                     </FilterLink>
                     <button
@@ -343,6 +351,7 @@ function renderNameField(
                   onLeave={onLeave}
                   className="text-[var(--color-warning)]"
                 >
+                  {getIpDisplayLabel(ip)}
                   {ip}
                 </FilterLink>
                 <button
@@ -1269,7 +1278,7 @@ export function ThreadTabApp(): React.JSX.Element {
               handleIpLookup,
             )}
             <span className="inline-flex items-baseline gap-0.5 text-[var(--color-text-muted)]">
-              {renderDateTimeWithBe(res.dateTime, showRelativeTime)}
+              {renderDateTime(res.dateTime, showRelativeTime)}
               {resId !== null && (
                 <FilterLink
                   count={idNums.length}

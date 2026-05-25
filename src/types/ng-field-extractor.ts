@@ -9,9 +9,8 @@ import { NgStringField as NgStringFieldEnum } from '@shared/ng';
 
 /* ---------- Regex patterns ---------- */
 
-/** Extract ID from dateTime: ID:xxx or 発信元:xxx */
+/** Extract ID from dateTime: ID:xxx */
 const ID_PATTERN = /ID:([^\s(]+)/;
-const SHINMOTSU_PATTERN = /発信元:([^\s]+)/;
 
 /** Extract trip (◆xxx) from name */
 const TRIP_PATTERN = /◆([^\s]+)/;
@@ -82,8 +81,9 @@ export function parseDateTimeField(dateTimeStr: string): Date | null {
  */
 export function extractStringFields(res: Res, threadTitle: string): Record<NgStringField, string> {
   const idMatch =
-    res.id !== undefined && res.id.length > 0 ? res.id : ID_PATTERN.exec(res.dateTime)?.[1];
-  const id = idMatch ?? SHINMOTSU_PATTERN.exec(res.dateTime)?.[1] ?? '';
+    ID_PATTERN.exec(res.dateTime)?.[1] ??
+    (res.id !== undefined && res.id.length > 0 ? res.id : undefined);
+  const id = idMatch ?? '';
 
   const trip = TRIP_PATTERN.exec(res.name)?.[1] ?? '';
 
@@ -129,8 +129,7 @@ export function countAnchors(body: string): number {
 export function buildIdCountMap(responses: readonly Res[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const res of responses) {
-    const id =
-      res.id ?? ID_PATTERN.exec(res.dateTime)?.[1] ?? SHINMOTSU_PATTERN.exec(res.dateTime)?.[1];
+    const id = ID_PATTERN.exec(res.dateTime)?.[1] ?? res.id;
     if (id !== undefined && id.length > 0) {
       map.set(id, (map.get(id) ?? 0) + 1);
     }
@@ -172,8 +171,7 @@ export function buildNumericValuesForRes(
   const bodyPlain = stripHtmlTags(res.body);
   const lineCount = bodyPlain.split('\n').length;
   const charCount = bodyPlain.replace(/\n/g, '').length;
-  const id =
-    res.id ?? ID_PATTERN.exec(res.dateTime)?.[1] ?? SHINMOTSU_PATTERN.exec(res.dateTime)?.[1] ?? '';
+  const id = ID_PATTERN.exec(res.dateTime)?.[1] ?? res.id ?? '';
   const idCount = id.length > 0 ? (idCountMap.get(id) ?? 0) : 0;
   const replyCount = countAnchors(res.body);
   const repliedCount = repliedCountMap.get(res.number) ?? 0;

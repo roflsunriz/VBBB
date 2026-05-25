@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Res } from '../../src/types/domain';
-import { extractWatchoi } from '../../src/renderer/utils/thread-analysis';
+import { extractId, extractWatchoi } from '../../src/renderer/utils/thread-analysis';
 
 const makeRes = (name: string): Res => ({
   number: 1,
@@ -36,5 +36,17 @@ describe('extractWatchoi', () => {
     const info = extractWatchoi(makeRes('名無しさん ﾜｯﾁｮｲ Zz9+-/AbC'));
     expect(info).not.toBeNull();
     expect(info?.label).toBe('ﾜｯﾁｮｲ Zz9+-/AbC');
+  });
+});
+
+describe('extractId', () => {
+  it('prefers the visible dateTime ID over the auxiliary id field', () => {
+    expect(extractId({ ...makeRes('名無しさん'), id: 'FFEA:209B:7EF2:43B1' })).toBe('AbCdEfGh');
+  });
+
+  it('does not extract 発信元 as ID', () => {
+    expect(
+      extractId({ ...makeRes('名無しさん'), dateTime: '2026/01/08(木) 15:24:22 発信元:abc123' }),
+    ).toBeNull();
   });
 });

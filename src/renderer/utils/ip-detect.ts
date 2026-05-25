@@ -47,6 +47,9 @@ const IPV6_PATTERN = new RegExp(
  */
 const IPV6_MASKED_PATTERN = /([0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4})+:\*)/g;
 
+/** Machi BBS offlaw host identifier (4 colon-separated hex groups). */
+const MACHI_IP_ID_PATTERN = /\b([0-9a-fA-F]{4}(?::[0-9a-fA-F]{4}){3})\b/g;
+
 /** Validate that an IPv4 address has octets in 0-255 range */
 function isValidIpv4(ip: string): boolean {
   const parts = ip.split('.');
@@ -65,11 +68,13 @@ function isValidIpv4(ip: string): boolean {
  */
 export function threadHasExposedIps(responses: readonly Res[]): boolean {
   for (const res of responses) {
-    for (const src of [res.name, res.dateTime]) {
+    for (const src of [res.name, res.dateTime, res.id ?? '']) {
       IPV4_PATTERN.lastIndex = 0;
       if (IPV4_PATTERN.test(src)) return true;
       IPV6_MASKED_PATTERN.lastIndex = 0;
       if (IPV6_MASKED_PATTERN.test(src)) return true;
+      MACHI_IP_ID_PATTERN.lastIndex = 0;
+      if (MACHI_IP_ID_PATTERN.test(src)) return true;
       IPV6_PATTERN.lastIndex = 0;
       if (IPV6_PATTERN.test(src)) return true;
     }
@@ -83,7 +88,7 @@ export function threadHasExposedIps(responses: readonly Res[]): boolean {
 export function extractIps(res: Res): readonly string[] {
   const ips: string[] = [];
   const seen = new Set<string>();
-  const sources = [res.name, res.dateTime];
+  const sources = [res.name, res.dateTime, res.id ?? ''];
 
   for (const src of sources) {
     let match: RegExpExecArray | null;
@@ -101,6 +106,16 @@ export function extractIps(res: Res): readonly string[] {
     // BBS masked IPv6 (e.g. 240b:11:442:d510:*) — check before standard IPv6
     IPV6_MASKED_PATTERN.lastIndex = 0;
     while ((match = IPV6_MASKED_PATTERN.exec(src)) !== null) {
+      const ip = match[1];
+      if (ip !== undefined && !seen.has(ip)) {
+        seen.add(ip);
+        ips.push(ip);
+      }
+    }
+
+    // Machi BBS offlaw host identifier (e.g. FFEA:209B:7EF2:43B1)
+    MACHI_IP_ID_PATTERN.lastIndex = 0;
+    while ((match = MACHI_IP_ID_PATTERN.exec(src)) !== null) {
       const ip = match[1];
       if (ip !== undefined && !seen.has(ip)) {
         seen.add(ip);

@@ -534,6 +534,15 @@ describe('ng-field-extractor', () => {
     expect(fields.id).toBe('AbCdEfGh0');
   });
 
+  it('prefers dateTime ID over auxiliary id field', () => {
+    const res = makeRes({
+      dateTime: '2024/01/15(月) 12:34:56 ID:RealId',
+      id: 'FFEA:209B:7EF2:43B1',
+    });
+    const fields = extractStringFields(res, '');
+    expect(fields.id).toBe('RealId');
+  });
+
   it('extracts trip from name', () => {
     const res = makeRes({ name: '名無しさん◆abc123' });
     const fields = extractStringFields(res, '');
@@ -609,6 +618,16 @@ describe('ng-field-extractor', () => {
     const map = buildIdCountMap(responses);
     expect(map.get('same')).toBe(2);
     expect(map.get('other')).toBe(1);
+  });
+
+  it('buildIdCountMap counts dateTime ID when auxiliary id exists', () => {
+    const responses: Res[] = [
+      makeRes({ number: 1, dateTime: '2024/01/15(月) 12:00:00 ID:same', id: 'ip1' }),
+      makeRes({ number: 2, dateTime: '2024/01/15(月) 12:01:00 ID:same', id: 'ip2' }),
+    ];
+    const map = buildIdCountMap(responses);
+    expect(map.get('same')).toBe(2);
+    expect(map.has('ip1')).toBe(false);
   });
 
   it('buildRepliedCountMap counts replies per res', () => {
@@ -1089,10 +1108,13 @@ describe('stripHtmlTags and extractStringFields', () => {
     expect(fields.id).toBe('');
   });
 
-  it('extractStringFields with 発信元 pattern instead of ID', () => {
-    const res = makeRes({ dateTime: '2024/01/15(月) 12:34:56 発信元:abc123', body: 'x' });
+  it('extractStringFields with 発信元 pattern (not treated as ID)', () => {
+    const res = makeRes({
+      dateTime: '2024/01/15(月) 12:34:56 発信元:240a:61:326c:1539:*',
+      body: 'x',
+    });
     const fields = extractStringFields(res, '');
-    expect(fields.id).toBe('abc123');
+    expect(fields.id).toBe('');
   });
 
   it('threadTitle is correctly passed through', () => {
