@@ -5,6 +5,33 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-05-25
+
+### Added
+
+- **まちBBSのIP識別子表示に対応**
+  - まちBBS offlaw末尾の `FFFF:FFFF:FFFF:FFFF` 形式をIPとして検出・表示
+  - `extractIps` のスキャン対象に `res.id` を追加し、まちBBSのホスト識別子も抽出可能に
+  - IP表示ラベルを分離: まちBBS識別子は `HOST:`、通常IPは `IP:` と区別して表示
+- **READMEにメイン画像を追加**
+
+### Changed
+
+- **ID表示の改善**
+  - 日時欄の `ID:xxx` / `発信元:xxx` の生表示を除去し、ポップアップ付きID表示に統一
+  - `renderDateTimeWithBe` → `renderDateTime` に改名し、ID除去済みの日時を表示
+- **発信元をID扱いしないよう変更**
+  - `extractId` から SHINMOTSU_PATTERN フォールバックを削除
+  - `extractStringFields`, `buildIdCountMap`, `buildNumericValuesForRes` から発信元フォールバックを削除
+  - 発信元はIPとしてのみ扱われ、NG-IDやID集計の対象外に
+- **ID抽出の優先順位を変更**
+  - `extractId`: dateTimeの `ID:xxx` → `res.id` → null の順に判定
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.8.0` に更新
+
+### Fixed
+
+- **未使用のSHINMOTSU_PATTERN定義を削除し、lint エラーを解消**
+
 ## [3.7.0] - 2026-04-22
 
 ### Added
@@ -740,6 +767,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.8.0]: https://github.com/roflsunriz/VBBB/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/roflsunriz/VBBB/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/roflsunriz/VBBB/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/roflsunriz/VBBB/compare/v3.5.1...v3.6.0
