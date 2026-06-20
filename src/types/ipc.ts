@@ -32,6 +32,7 @@ import type {
 import type { UpdateCheckResult } from './update';
 import type { RemoteSearchResult } from './remote-search';
 import type {
+  LayoutDebugInfo,
   MediaViewerPayload,
   ModalWindowInitData,
   ModalWindowType,
@@ -442,6 +443,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
   'dsl:save-file': {
     args: [content: string, suggestedName: string];
     result: { saved: boolean; path: string };
+  };
+  /** Dump Electron WebContentsView layout bounds for diagnostics */
+  'debug:get-layout': {
+    args: [];
+    result: LayoutDebugInfo | null;
   };
   /** Check for a new version via GitHub Releases API */
   'update:check': {

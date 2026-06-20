@@ -47,6 +47,73 @@ export interface ContentBounds {
   readonly threadTabArea: RectBounds;
 }
 
+export interface LayoutDebugViewBounds {
+  readonly id?: string | undefined;
+  readonly bounds: RectBounds | null;
+}
+
+export interface LayoutDebugOverflowElement {
+  readonly tag: string;
+  readonly className: string;
+  readonly text: string;
+  readonly rect: RectBounds;
+  readonly scrollWidth: number;
+  readonly clientWidth: number;
+}
+
+export interface LayoutDebugRendererInfo {
+  readonly innerWidth: number;
+  readonly innerHeight: number;
+  readonly devicePixelRatio: number;
+  readonly documentElement: {
+    readonly clientWidth: number;
+    readonly clientHeight: number;
+    readonly scrollWidth: number;
+    readonly scrollHeight: number;
+  };
+  readonly body: {
+    readonly clientWidth: number;
+    readonly clientHeight: number;
+    readonly scrollWidth: number;
+    readonly scrollHeight: number;
+  };
+  readonly overflowElements: readonly LayoutDebugOverflowElement[];
+}
+
+export interface LayoutDebugInfo {
+  readonly windowContentSize: {
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly shellRenderer: {
+    readonly innerWidth: number;
+    readonly innerHeight: number;
+    readonly devicePixelRatio: number;
+    readonly documentElement: {
+      readonly clientWidth: number;
+      readonly clientHeight: number;
+      readonly scrollWidth: number;
+      readonly scrollHeight: number;
+    };
+    readonly body: {
+      readonly clientWidth: number;
+      readonly clientHeight: number;
+      readonly scrollWidth: number;
+      readonly scrollHeight: number;
+    };
+    readonly boardTabAreaRect: RectBounds | null;
+    readonly threadTabAreaRect: RectBounds | null;
+  } | null;
+  readonly shellView: LayoutDebugViewBounds;
+  readonly layoutBounds: ContentBounds | null;
+  readonly activeBoardView: LayoutDebugViewBounds;
+  readonly activeThreadView: LayoutDebugViewBounds;
+  readonly activeBoardRenderer: LayoutDebugRendererInfo | null;
+  readonly activeThreadRenderer: LayoutDebugRendererInfo | null;
+  readonly boardPoolViews: readonly LayoutDebugViewBounds[];
+  readonly threadPoolViews: readonly LayoutDebugViewBounds[];
+}
+
 // ---------------------------------------------------------------------------
 // Init data sent to tab views when they become ready
 // ---------------------------------------------------------------------------

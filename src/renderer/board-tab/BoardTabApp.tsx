@@ -181,6 +181,8 @@ export function BoardTabApp(): React.JSX.Element {
   const deferredFilter = useDeferredValue(filter);
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [edgeRefreshing, setEdgeRefreshing] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const rootRef = useRef<HTMLElement>(null);
   const listScrollRef = useRef<HTMLDivElement>(null);
   const handleScrollKeyboard = useScrollKeyboard(listScrollRef);
   const edgeRefreshUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -253,6 +255,20 @@ export function BoardTabApp(): React.JSX.Element {
       document.removeEventListener('click', handler);
     };
   }, [ctxMenu]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (root === null) return;
+    const updateWidth = (): void => {
+      setContainerWidth(Math.round(root.getBoundingClientRect().width));
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const indexMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -549,8 +565,16 @@ export function BoardTabApp(): React.JSX.Element {
     [handleSort, sortKey, sortDir],
   );
 
+  const showIkioiColumn = containerWidth >= 460;
+  const showCompletionColumn = containerWidth >= 540;
+  const showDateColumn = containerWidth >= 620;
+
   return (
-    <section className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
+    <section
+      ref={rootRef}
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+      onKeyDown={handleScrollKeyboard}
+    >
       {/* Header */}
       <div className="flex h-8 items-center gap-2 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-3">
         <span
@@ -654,15 +678,21 @@ export function BoardTabApp(): React.JSX.Element {
         <div className="min-w-0 flex-1">
           <SortHeader label="タイトル" field="title" />
         </div>
-        <div className="w-12 text-right">
-          <SortHeader label="勢い" field="ikioi" />
-        </div>
-        <div className="w-10 text-right">
-          <SortHeader label="完走" field="completionRate" />
-        </div>
-        <div className="w-16 text-right">
-          <SortHeader label="作成日" field="firstPostDate" />
-        </div>
+        {showIkioiColumn && (
+          <div className="w-12 text-right">
+            <SortHeader label="勢い" field="ikioi" />
+          </div>
+        )}
+        {showCompletionColumn && (
+          <div className="w-10 text-right">
+            <SortHeader label="完走" field="completionRate" />
+          </div>
+        )}
+        {showDateColumn && (
+          <div className="w-16 text-right">
+            <SortHeader label="作成日" field="firstPostDate" />
+          </div>
+        )}
         <div className="w-12 text-right">
           <SortHeader label="レス" field="count" />
         </div>
@@ -672,7 +702,7 @@ export function BoardTabApp(): React.JSX.Element {
       {/* Thread rows — no virtual scrolling */}
       <div
         ref={listScrollRef}
-        className="relative flex-1 overflow-y-auto"
+        className="relative min-h-0 min-w-0 flex-1 overflow-y-auto"
         onWheel={handleListWheel}
       >
         {board === null && (
@@ -719,15 +749,21 @@ export function BoardTabApp(): React.JSX.Element {
               <div className="min-w-0 flex-1 truncate text-[var(--color-text-primary)]">
                 {subject.title}
               </div>
-              <div className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
-                {subject.ikioi > 0 ? subject.ikioi.toFixed(1) : ''}
-              </div>
-              <div className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
-                {Math.round(subject.completionRate)}%
-              </div>
-              <div className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
-                {formatTimestamp(firstPostTs)}
-              </div>
+              {showIkioiColumn && (
+                <div className="w-12 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {subject.ikioi > 0 ? subject.ikioi.toFixed(1) : ''}
+                </div>
+              )}
+              {showCompletionColumn && (
+                <div className="w-10 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {Math.round(subject.completionRate)}%
+                </div>
+              )}
+              {showDateColumn && (
+                <div className="w-16 shrink-0 text-right text-[var(--color-text-muted)]">
+                  {formatTimestamp(firstPostTs)}
+                </div>
+              )}
               <div className="w-12 shrink-0 text-right text-[var(--color-text-primary)]">
                 {subject.count}
               </div>

@@ -60,8 +60,9 @@ type LeftPaneTab = 'boards' | 'favorites' | 'search' | 'history';
 const LEFT_PANE_MIN = 160;
 const LEFT_PANE_MAX = 500;
 const LEFT_PANE_DEFAULT = 256;
-const CENTER_PANE_MIN = 200;
+const CENTER_PANE_MIN = 360;
 const CENTER_PANE_DEFAULT = 400;
+const RIGHT_PANE_MIN = 320;
 const STORAGE_KEY_LEFT = 'vbbb-left-pane-width';
 const STORAGE_KEY_CENTER = 'vbbb-center-pane-width';
 const _TOOLBAR_HEIGHT = 36;
@@ -119,6 +120,7 @@ export function ShellApp(): React.JSX.Element {
   const [centerWidth, setCenterWidth] = useState(() =>
     loadPaneWidth(STORAGE_KEY_CENTER, CENTER_PANE_DEFAULT),
   );
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
 
   // Tab orientations
   const [isVerticalBoardTabs, toggleBoardTabOrientation] = useTabOrientation(
@@ -145,6 +147,32 @@ export function ShellApp(): React.JSX.Element {
     applyTheme(theme);
   }, [theme]);
 
+  useEffect(() => {
+    const handleResize = (): void => {
+      setViewportWidth(window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const effectiveLeftWidth = useMemo(() => {
+    const maxLeft = Math.max(
+      LEFT_PANE_MIN,
+      viewportWidth - CENTER_PANE_MIN - RIGHT_PANE_MIN - _RESIZE_HANDLE_WIDTH * 2,
+    );
+    return Math.min(leftWidth, maxLeft);
+  }, [leftWidth, viewportWidth]);
+
+  const effectiveCenterWidth = useMemo(() => {
+    const maxCenter = Math.max(
+      CENTER_PANE_MIN,
+      viewportWidth - effectiveLeftWidth - RIGHT_PANE_MIN - _RESIZE_HANDLE_WIDTH * 2,
+    );
+    return Math.min(centerWidth, maxCenter);
+  }, [centerWidth, effectiveLeftWidth, viewportWidth]);
+
   // Report layout bounds to main process whenever pane sizes change
   const boardTabAreaRef = useRef<HTMLDivElement>(null);
   const threadTabAreaRef = useRef<HTMLDivElement>(null);
@@ -156,20 +184,18 @@ export function ShellApp(): React.JSX.Element {
 
     const boardRect = boardEl.getBoundingClientRect();
     const threadRect = threadEl.getBoundingClientRect();
-    const dpr = window.devicePixelRatio;
-
     const bounds: ContentBounds = {
       boardTabArea: {
-        x: Math.round(boardRect.x * dpr),
-        y: Math.round(boardRect.y * dpr),
-        width: Math.round(boardRect.width * dpr),
-        height: Math.round(boardRect.height * dpr),
+        x: Math.round(boardRect.x),
+        y: Math.round(boardRect.y),
+        width: Math.round(boardRect.width),
+        height: Math.round(boardRect.height),
       },
       threadTabArea: {
-        x: Math.round(threadRect.x * dpr),
-        y: Math.round(threadRect.y * dpr),
-        width: Math.round(threadRect.width * dpr),
-        height: Math.round(threadRect.height * dpr),
+        x: Math.round(threadRect.x),
+        y: Math.round(threadRect.y),
+        width: Math.round(threadRect.width),
+        height: Math.round(threadRect.height),
       },
     };
     void window.electronApi.invoke('view:layout-update', bounds);
@@ -177,7 +203,7 @@ export function ShellApp(): React.JSX.Element {
 
   useEffect(() => {
     reportLayout();
-  }, [leftWidth, centerWidth, reportLayout]);
+  }, [effectiveLeftWidth, effectiveCenterWidth, reportLayout]);
 
   useEffect(() => {
     const observer = new ResizeObserver(reportLayout);
@@ -186,6 +212,14 @@ export function ShellApp(): React.JSX.Element {
     return () => {
       observer.disconnect();
     };
+  }, [reportLayout]);
+
+  useEffect(() => {
+    return window.electronApi.on('view:request-layout-report', () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(reportLayout);
+      });
+    });
   }, [reportLayout]);
 
   // Subscribe to tab registry updates from main
@@ -369,7 +403,16 @@ export function ShellApp(): React.JSX.Element {
   }, []);
 
   const handleLeftResize = useCallback((delta: number) => {
-    setLeftWidth((w) => Math.max(LEFT_PANE_MIN, Math.min(LEFT_PANE_MAX, w + delta)));
+    setLeftWidth((w) => {
+      const maxLeft = Math.min(
+        LEFT_PANE_MAX,
+        Math.max(
+          LEFT_PANE_MIN,
+          window.innerWidth - CENTER_PANE_MIN - RIGHT_PANE_MIN - _RESIZE_HANDLE_WIDTH * 2,
+        ),
+      );
+      return Math.max(LEFT_PANE_MIN, Math.min(maxLeft, w + delta));
+    });
   }, []);
   const handleLeftResizeEnd = useCallback(() => {
     setLeftWidth((w) => {
@@ -378,9 +421,18 @@ export function ShellApp(): React.JSX.Element {
     });
     reportLayout();
   }, [reportLayout]);
-  const handleCenterResize = useCallback((delta: number) => {
-    setCenterWidth((w) => Math.max(CENTER_PANE_MIN, w + delta));
-  }, []);
+  const handleCenterResize = useCallback(
+    (delta: number) => {
+      setCenterWidth((w) => {
+        const maxCenter = Math.max(
+          CENTER_PANE_MIN,
+          window.innerWidth - effectiveLeftWidth - RIGHT_PANE_MIN - _RESIZE_HANDLE_WIDTH * 2,
+        );
+        return Math.max(CENTER_PANE_MIN, Math.min(maxCenter, w + delta));
+      });
+    },
+    [effectiveLeftWidth],
+  );
   const handleCenterResizeEnd = useCallback(() => {
     setCenterWidth((w) => {
       localStorage.setItem(STORAGE_KEY_CENTER, String(w));
@@ -776,9 +828,9 @@ export function ShellApp(): React.JSX.Element {
       </header>
 
       {/* Main 3-pane layout */}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
         {/* Left pane */}
-        <aside className="flex h-full shrink-0 flex-col" style={{ width: leftWidth }}>
+        <aside className="flex h-full shrink-0 flex-col" style={{ width: effectiveLeftWidth }}>
           <div className="flex h-8 shrink-0 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)]">
             {(['boards', 'favorites', 'search', 'history'] as const).map((tab) => {
               const icons = {
@@ -837,8 +889,8 @@ export function ShellApp(): React.JSX.Element {
 
         {/* Center pane: Board tab bar + content placeholder */}
         <div
-          className={`flex shrink-0 ${isVerticalBoardTabs === 'vertical' ? 'flex-row' : 'flex-col'}`}
-          style={{ width: centerWidth }}
+          className={`flex min-w-0 shrink-0 ${isVerticalBoardTabs === 'vertical' ? 'flex-row' : 'flex-col'}`}
+          style={{ width: effectiveCenterWidth }}
         >
           {/* Board tab bar */}
           {boardTabs.length > 0 && (
@@ -903,7 +955,11 @@ export function ShellApp(): React.JSX.Element {
             </div>
           )}
           {/* Board tab content placeholder — WebContentsView is positioned here */}
-          <div ref={boardTabAreaRef} className="min-h-0 flex-1 bg-[var(--color-bg-primary)]" />
+          <div
+            ref={boardTabAreaRef}
+            data-debug-layout-area="board"
+            className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--color-bg-primary)]"
+          />
         </div>
 
         <ResizeHandle onResize={handleCenterResize} onResizeEnd={handleCenterResizeEnd} />
@@ -973,7 +1029,11 @@ export function ShellApp(): React.JSX.Element {
             </button>
           </div>
           {/* Thread tab content placeholder — WebContentsView is positioned here */}
-          <div ref={threadTabAreaRef} className="min-h-0 flex-1 bg-[var(--color-bg-primary)]" />
+          <div
+            ref={threadTabAreaRef}
+            data-debug-layout-area="thread"
+            className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--color-bg-primary)]"
+          />
         </div>
       </div>
 

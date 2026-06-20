@@ -35,9 +35,9 @@ export function InlineVideo({
   return (
     <span
       ref={ref}
-      className="my-1 inline-block"
+      className="my-1 inline-block max-w-full"
       style={{
-        minWidth: `${String(VIDEO_MAX_WIDTH)}px`,
+        width: `min(100%, ${String(VIDEO_MAX_WIDTH)}px)`,
         minHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
       }}
     >
@@ -54,7 +54,7 @@ export function InlineVideo({
           }}
           className="flex h-full w-full flex-col items-center justify-center rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-3 text-center focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
           style={{
-            maxWidth: `${String(VIDEO_MAX_WIDTH)}px`,
+            maxWidth: '100%',
             maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
           }}
         >

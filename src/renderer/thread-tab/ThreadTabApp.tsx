@@ -1206,7 +1206,7 @@ export function ThreadTabApp(): React.JSX.Element {
         <div
           key={res.number}
           id={`res-${String(res.number)}`}
-          className={`border-b border-[var(--color-border-secondary)] px-4 py-2 ${
+          className={`min-w-0 overflow-hidden border-b border-[var(--color-border-secondary)] px-4 py-2 ${
             isOwnPost ? 'bg-[var(--color-own-post-bg)]' : ''
           } ${ngResult !== undefined && revealAbon ? 'opacity-50' : ''}`}
           onContextMenu={(e) => {
@@ -1298,7 +1298,7 @@ export function ThreadTabApp(): React.JSX.Element {
 
           {/* Response body */}
           <div
-            className={`text-sm leading-relaxed text-[var(--color-text-primary)] ${isAA ? 'aa-font' : ''}`}
+            className={`w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden text-sm leading-relaxed text-[var(--color-text-primary)] ${isAA ? 'aa-font' : 'break-words'}`}
             dangerouslySetInnerHTML={{ __html: withUrls }}
             onMouseOver={handleBodyMouseOver}
             onMouseOut={handleBodyMouseOut}
@@ -1327,7 +1327,7 @@ export function ThreadTabApp(): React.JSX.Element {
 
           {/* Inline media */}
           {imageUrls.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex max-w-full flex-wrap gap-2 overflow-hidden">
               {imageUrls.map((img) => (
                 <ImageThumbnail
                   key={img.url}
@@ -1339,7 +1339,7 @@ export function ThreadTabApp(): React.JSX.Element {
             </div>
           )}
           {videoUrls.length > 0 && (
-            <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-2 flex max-w-full flex-col gap-2 overflow-hidden">
               {videoUrls.map((vid) => (
                 <InlineVideo
                   key={vid.url}
@@ -1351,7 +1351,7 @@ export function ThreadTabApp(): React.JSX.Element {
             </div>
           )}
           {audioUrls.length > 0 && (
-            <div className="mt-2 flex flex-col gap-1">
+            <div className="mt-2 flex max-w-full flex-col gap-1 overflow-hidden">
               {audioUrls.map((aud) => (
                 <InlineAudio
                   key={aud.url}
@@ -1392,7 +1392,10 @@ export function ThreadTabApp(): React.JSX.Element {
   );
 
   return (
-    <section className="flex h-full flex-col" onKeyDown={handleScrollKeyboard}>
+    <section
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+      onKeyDown={handleScrollKeyboard}
+    >
       {/* Action bar */}
       <div className="flex h-8 items-center gap-0.5 border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-2">
         <button
@@ -1769,7 +1772,7 @@ export function ThreadTabApp(): React.JSX.Element {
       {/* Responses — no virtual scrolling */}
       <div
         ref={scrollRef}
-        className="relative flex-1 overflow-y-auto"
+        className="relative min-h-0 min-w-0 flex-1 overflow-y-auto"
         onWheel={handleThreadWheel}
         onScroll={handleScroll}
       >
@@ -1792,7 +1795,7 @@ export function ThreadTabApp(): React.JSX.Element {
 
       {/* Thread analysis (still inline — read-only viewer) */}
       {analysisOpen && (
-        <div className="border-t border-[var(--color-border-primary)]">
+        <div className="min-h-0 shrink overflow-hidden border-t border-[var(--color-border-primary)]">
           <Suspense fallback={null}>
             <ThreadAnalysis
               responses={responses}

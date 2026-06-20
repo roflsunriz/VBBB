@@ -5,6 +5,30 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-06-20
+
+### Added
+
+- **レイアウト診断用の数値ダンプを追加**
+  - `debug:get-layout` IPC でウィンドウ、Shell、Board/Thread view、各 renderer の bounds と overflow 情報を取得できるように変更
+  - `VBBB_LAYOUT_DEBUG=1` 指定時に起動後のレイアウト情報をログへ出力し、スクリーンショットに頼らずズレの原因を追跡可能に
+  - `VBBB_USER_DATA_DIR` による診断用 userData 差し替えに対応し、実データのコピーで dev 起動を検証可能に
+
+### Changed
+
+- **スレッド一覧の狭幅レイアウトを改善**
+  - スレッド一覧の幅が狭い場合は「勢い」「完走」「作成日」列を段階的に隠し、タイトル列が極端に潰れないよう変更
+  - スレッド一覧、スレッドビュー、インライン画像/動画、レスポップアップに `min-w-0` / `overflow` 制御を追加し、横方向のはみ出しを抑制
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.8.1` に更新
+
+### Fixed
+
+- **`bun run dev` でスレッドリストとスレッドビューがズレる問題を修正**
+  - Electron の dev origin に保存されたページズームが原因で、`BrowserView` の bounds と renderer の CSS ピクセル幅が食い違う問題を修正
+  - Shell/Board/Thread の全 `WebContentsView` を `zoomLevel=0` / `zoomFactor=1` に固定し、保存済みズームやズーム変更によるレイアウト崩れを防止
+  - 起動時や maximize 後に Shell view と tab view の bounds を再同期し、ウィンドウ content size と view bounds の高さズレを解消
+- 1920x1280 などの解像度環境で pane 幅が合計幅を超え、スレッドリスト/スレッドビューが画面外へ押し出される問題を修正
+
 ## [3.8.0] - 2026-05-25
 
 ### Added
@@ -767,6 +791,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.8.1]: https://github.com/roflsunriz/VBBB/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/roflsunriz/VBBB/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/roflsunriz/VBBB/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/roflsunriz/VBBB/compare/v3.6.0...v3.6.1

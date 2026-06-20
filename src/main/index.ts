@@ -24,9 +24,36 @@ import { setModalWindowManager } from './modal-window-ref';
 
 const startupLogger = createLogger('startup');
 const rendererLogger = createLogger('renderer');
+const layoutDebugLogger = createLogger('layout-debug');
 
 function getDataDir(): string {
   return join(app.getPath('userData'), 'vbbb-data');
+}
+
+function scheduleLayoutDebugDumps(vm: ViewManager): void {
+  if (process.env['VBBB_LAYOUT_DEBUG'] !== '1') return;
+
+  for (const delayMs of [100, 500, 1500, 3000]) {
+    setTimeout(() => {
+      void vm
+        .getLayoutDebugInfo()
+        .then((info) => {
+          layoutDebugLogger.info(`after ${String(delayMs)}ms ${JSON.stringify(info)}`);
+        })
+        .catch((error: unknown) => {
+          layoutDebugLogger.warn(
+            `after ${String(delayMs)}ms failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    }, delayMs);
+  }
+}
+
+const userDataDir = process.env['VBBB_USER_DATA_DIR'];
+if (userDataDir !== undefined && userDataDir.length > 0) {
+  app.setPath('userData', userDataDir);
 }
 
 function createWindow(): BaseWindow {
@@ -90,7 +117,9 @@ function createWindow(): BaseWindow {
     if (windowState.isMaximized) {
       mainWindow.maximize();
     }
+    vm.handleWindowResize();
     mainWindow.show();
+    scheduleLayoutDebugDumps(vm);
   });
 
   mainWindow.on('close', () => {

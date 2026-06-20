@@ -1012,6 +1012,11 @@ export async function registerIpcHandlers(): Promise<void> {
     });
   });
 
+  handle('debug:get-layout', async () => {
+    const vm = getViewManagerOrNull();
+    return (await vm?.getLayoutDebugInfo()) ?? null;
+  });
+
   // Ensure data directory exists before loading startup data
   await ensureDirAsync(dataDir);
 

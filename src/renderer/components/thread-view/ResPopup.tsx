@@ -317,7 +317,7 @@ export function ResPopup({
             <span className="text-[var(--color-res-datetime)]">{res.dateTime}</span>
           </div>
           <div
-            className={`${bodyIsAa ? 'aa-font' : 'text-xs leading-relaxed'} text-[var(--color-res-body)]`}
+            className={`w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden ${bodyIsAa ? 'aa-font' : 'break-words text-xs leading-relaxed'} text-[var(--color-res-body)]`}
             dangerouslySetInnerHTML={{ __html: bodyHtml }}
             onMouseOver={canNest ? handleBodyMouseOver : undefined}
             onMouseOut={canNest ? handleBodyMouseOut : undefined}

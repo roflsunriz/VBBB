@@ -73,9 +73,9 @@ export function ImageThumbnail({
     <>
       <span
         ref={ref}
-        className="my-1 inline-block"
+        className="my-1 inline-block max-w-full"
         style={{
-          minWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`,
+          width: `min(100%, ${String(THUMBNAIL_MAX_WIDTH)}px)`,
           minHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px`,
         }}
       >
@@ -85,6 +85,7 @@ export function ImageThumbnail({
             onClick={handleClick}
             onKeyDown={handleKeyDown}
             className="cursor-pointer border-none bg-transparent p-0"
+            style={{ maxWidth: '100%' }}
             title="クリックで画像ビューアを開く"
             aria-label="画像ビューアを開く"
           >
@@ -95,7 +96,7 @@ export function ImageThumbnail({
               onError={handleError}
               className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"
               style={{
-                maxWidth: `${String(THUMBNAIL_MAX_WIDTH)}px`,
+                maxWidth: '100%',
                 maxHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px`,
               }}
               referrerPolicy="no-referrer"

@@ -18,6 +18,8 @@ import type {
   BoardTabInitData,
   ThreadTabInitData,
   RectBounds,
+  LayoutDebugInfo,
+  LayoutDebugViewBounds,
 } from '@shared/view-ipc';
 import type { Board } from '@shared/domain';
 import type { SavedTab, SessionState } from '@shared/history';
@@ -92,6 +94,7 @@ export class ViewManager {
 
     this.window.contentView.addChildView(view);
     this.shellView = view;
+    this.configureViewZoom(view);
 
     const contentSize = this.window.getContentSize();
     view.setBounds({ x: 0, y: 0, width: contentSize[0] ?? 800, height: contentSize[1] ?? 600 });
@@ -417,7 +420,7 @@ export class ViewManager {
   // ---------------------------------------------------------------------------
 
   updateLayout(bounds: ContentBounds): void {
-    this.layoutBounds = bounds;
+    this.layoutBounds = this.clampContentBounds(bounds);
     this.updateAllTabBounds();
   }
 
@@ -430,6 +433,31 @@ export class ViewManager {
       width: contentSize[0] ?? 800,
       height: contentSize[1] ?? 600,
     });
+    if (this.layoutBounds !== null) {
+      this.layoutBounds = this.clampContentBounds(this.layoutBounds);
+      this.updateAllTabBounds();
+    }
+    this.broadcastToShell('view:request-layout-report');
+  }
+
+  async getLayoutDebugInfo(): Promise<LayoutDebugInfo> {
+    const [width = 800, height = 600] = this.window.getContentSize();
+    return {
+      windowContentSize: { width, height },
+      shellRenderer: await this.getShellRendererDebugInfo(),
+      shellView: this.toDebugBounds(this.shellView),
+      layoutBounds: this.layoutBounds,
+      activeBoardView: this.toDebugBounds(this.getActiveBoardView(), this.activeBoardTabId),
+      activeThreadView: this.toDebugBounds(this.getActiveThreadView(), this.activeThreadTabId),
+      activeBoardRenderer: await this.getRendererDebugInfo(this.getActiveBoardView()),
+      activeThreadRenderer: await this.getRendererDebugInfo(this.getActiveThreadView()),
+      boardPoolViews: this.boardTabPool.map((view, index) =>
+        this.toDebugBounds(view, `pool-board-${String(index)}`),
+      ),
+      threadPoolViews: this.threadTabPool.map((view, index) =>
+        this.toDebugBounds(view, `pool-thread-${String(index)}`),
+      ),
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -621,9 +649,25 @@ export class ViewManager {
     });
 
     view.setBackgroundColor('#171717');
+    this.configureViewZoom(view);
     this.window.contentView.addChildView(view);
     view.setBounds({ x: 0, y: ViewManager.OFFSCREEN_Y, width: 0, height: 0 });
     return view;
+  }
+
+  private configureViewZoom(view: WebContentsView): void {
+    const resetZoom = (): void => {
+      if (view.webContents.isDestroyed()) return;
+      view.webContents.setZoomLevel(0);
+      view.webContents.setZoomFactor(1);
+    };
+
+    resetZoom();
+    view.webContents.on('did-finish-load', resetZoom);
+    view.webContents.on('zoom-changed', (event) => {
+      event.preventDefault();
+      resetZoom();
+    });
   }
 
   private loadPage(view: WebContentsView, page: string): void {
@@ -777,13 +821,165 @@ export class ViewManager {
     this.applyBounds(entry.view, this.layoutBounds.threadTabArea);
   }
 
+  private getActiveBoardView(): WebContentsView | null {
+    if (this.activeBoardTabId === null) return null;
+    return this.boardTabs.get(this.activeBoardTabId)?.view ?? null;
+  }
+
+  private getActiveThreadView(): WebContentsView | null {
+    if (this.activeThreadTabId === null) return null;
+    return this.threadTabs.get(this.activeThreadTabId)?.view ?? null;
+  }
+
   private applyBounds(view: WebContentsView, bounds: RectBounds): void {
+    const clipped = this.clampRect(bounds);
     view.setBounds({
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-      width: Math.round(bounds.width),
-      height: Math.round(bounds.height),
+      x: clipped.x,
+      y: clipped.y,
+      width: clipped.width,
+      height: clipped.height,
     });
+  }
+
+  private clampContentBounds(bounds: ContentBounds): ContentBounds {
+    return {
+      boardTabArea: this.clampRect(bounds.boardTabArea),
+      threadTabArea: this.clampRect(bounds.threadTabArea),
+    };
+  }
+
+  private clampRect(bounds: RectBounds): Electron.Rectangle {
+    const shellBounds = this.shellView?.getBounds();
+    const [fallbackWidth = 800, fallbackHeight = 600] = this.window.getContentSize();
+    const contentWidth = shellBounds?.width ?? fallbackWidth;
+    const contentHeight = shellBounds?.height ?? fallbackHeight;
+    const x = Math.max(0, Math.min(Math.round(bounds.x), contentWidth));
+    const y = Math.max(0, Math.min(Math.round(bounds.y), contentHeight));
+    const maxWidth = Math.max(0, contentWidth - x);
+    const maxHeight = Math.max(0, contentHeight - y);
+    return {
+      x,
+      y,
+      width: Math.max(0, Math.min(Math.round(bounds.width), maxWidth)),
+      height: Math.max(0, Math.min(Math.round(bounds.height), maxHeight)),
+    };
+  }
+
+  private toDebugBounds(
+    view: WebContentsView | null,
+    id?: string | null | undefined,
+  ): LayoutDebugViewBounds {
+    const hasId = id !== null && id !== undefined;
+    if (view === null || view.webContents.isDestroyed()) {
+      return { ...(hasId ? { id } : {}), bounds: null };
+    }
+    const bounds = view.getBounds();
+    return {
+      ...(hasId ? { id } : {}),
+      bounds: {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+      },
+    };
+  }
+
+  private async getShellRendererDebugInfo(): Promise<LayoutDebugInfo['shellRenderer']> {
+    if (this.shellView === null || this.shellView.webContents.isDestroyed()) return null;
+    try {
+      return (await this.shellView.webContents.executeJavaScript(`
+        (() => {
+          const rectToObj = (rect) => rect == null ? null : ({
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          });
+          const boardEl = document.querySelector('[data-debug-layout-area="board"]');
+          const threadEl = document.querySelector('[data-debug-layout-area="thread"]');
+          return {
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+            documentElement: {
+              clientWidth: document.documentElement.clientWidth,
+              clientHeight: document.documentElement.clientHeight,
+              scrollWidth: document.documentElement.scrollWidth,
+              scrollHeight: document.documentElement.scrollHeight,
+            },
+            body: {
+              clientWidth: document.body.clientWidth,
+              clientHeight: document.body.clientHeight,
+              scrollWidth: document.body.scrollWidth,
+              scrollHeight: document.body.scrollHeight,
+            },
+            boardTabAreaRect: rectToObj(boardEl?.getBoundingClientRect()),
+            threadTabAreaRect: rectToObj(threadEl?.getBoundingClientRect()),
+          };
+        })()
+      `)) as LayoutDebugInfo['shellRenderer'];
+    } catch {
+      return null;
+    }
+  }
+
+  private async getRendererDebugInfo(
+    view: WebContentsView | null,
+  ): Promise<LayoutDebugInfo['activeBoardRenderer']> {
+    if (view === null || view.webContents.isDestroyed()) return null;
+    try {
+      return (await view.webContents.executeJavaScript(`
+        (() => {
+          const rectToObj = (rect) => ({
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          });
+          const overflowElements = Array.from(document.querySelectorAll('*'))
+            .map((el) => {
+              const rect = el.getBoundingClientRect();
+              const scrollWidth = Math.round(el.scrollWidth || 0);
+              const clientWidth = Math.round(el.clientWidth || 0);
+              const rightOverflow = Math.round(rect.right) - window.innerWidth;
+              const selfOverflow = scrollWidth - clientWidth;
+              if (rightOverflow <= 0 && selfOverflow <= 0) return null;
+              return {
+                tag: el.tagName.toLowerCase(),
+                className: typeof el.className === 'string' ? el.className.slice(0, 160) : '',
+                text: (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 160),
+                rect: rectToObj(rect),
+                scrollWidth,
+                clientWidth,
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => Math.max(b.scrollWidth - b.clientWidth, b.rect.x + b.rect.width - window.innerWidth) - Math.max(a.scrollWidth - a.clientWidth, a.rect.x + a.rect.width - window.innerWidth))
+            .slice(0, 20);
+          return {
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+            documentElement: {
+              clientWidth: document.documentElement.clientWidth,
+              clientHeight: document.documentElement.clientHeight,
+              scrollWidth: document.documentElement.scrollWidth,
+              scrollHeight: document.documentElement.scrollHeight,
+            },
+            body: {
+              clientWidth: document.body.clientWidth,
+              clientHeight: document.body.clientHeight,
+              scrollWidth: document.body.scrollWidth,
+              scrollHeight: document.body.scrollHeight,
+            },
+            overflowElements,
+          };
+        })()
+      `)) as LayoutDebugInfo['activeBoardRenderer'];
+    } catch {
+      return null;
+    }
   }
 
   private broadcastTabRegistry(): void {
