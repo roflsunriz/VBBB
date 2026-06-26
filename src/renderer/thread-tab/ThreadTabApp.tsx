@@ -37,8 +37,11 @@ import {
   type NgRule,
   type NgFilterResult,
   type NgMatchContext,
+  type NgNumericTarget,
   type NgStringField,
+  type NgTimeTarget,
   AbonType,
+  NgNumericOp,
   NgStringField as NgStringFieldEnum,
   NgStringMatchMode,
   NgTarget,
@@ -102,6 +105,105 @@ interface PopupState {
   readonly x: number;
   readonly y: number;
   readonly expandReplies: boolean;
+}
+
+interface NgFilterMatch {
+  readonly result: NgFilterResult;
+  readonly rules: readonly NgRule[];
+}
+
+function summarizeNgRule(rule: NgRule): string {
+  if (rule.label !== undefined && rule.label.length > 0) {
+    return rule.label;
+  }
+
+  const condition = rule.condition;
+  if (condition.type === 'string') {
+    const fieldLabel = condition.fields.includes(NgStringFieldEnum.All as NgStringField)
+      ? '全体'
+      : condition.fields.map(stringFieldLabel).join('+');
+    const negation = condition.negate ? '否定 ' : '';
+    return `[文字] ${negation}${fieldLabel} ${stringMatchModeLabel(condition.matchMode)}: "${condition.tokens.join(' ')}"`;
+  }
+
+  if (condition.type === 'numeric') {
+    const negation = condition.negate ? '否定 ' : '';
+    const secondValue =
+      condition.op === NgNumericOp.Between && condition.value2 !== undefined
+        ? `～${String(condition.value2)}`
+        : '';
+    return `[数値] ${negation}${numericTargetLabel(condition.target)} ${numericOpLabel(condition.op)} ${String(condition.value)}${secondValue}`;
+  }
+
+  const negation = condition.negate ? '否定 ' : '';
+  return `[時間] ${negation}${timeTargetLabel(condition.target)}`;
+}
+
+function stringFieldLabel(field: NgStringField): string {
+  const labels: Record<NgStringField, string> = {
+    name: '名前',
+    body: '本文',
+    mail: 'メール',
+    id: 'ID',
+    trip: 'トリップ',
+    watchoi: 'ﾜｯﾁｮｲ',
+    ip: 'IP',
+    be: 'BE',
+    url: 'URL',
+    threadTitle: 'スレタイ',
+    all: '全体',
+  };
+  return labels[field];
+}
+
+function stringMatchModeLabel(mode: NgStringMatchMode): string {
+  const labels: Record<NgStringMatchMode, string> = {
+    plain: '単純比較',
+    regexp: '正規表現',
+    regexp_nocase: '正規表現(大小無視)',
+    fuzzy: 'あいまい',
+  };
+  return labels[mode];
+}
+
+function numericTargetLabel(target: NgNumericTarget): string {
+  const labels: Record<NgNumericTarget, string> = {
+    resNumber: 'レス番号',
+    lineCount: '改行数',
+    charCount: '文字数',
+    idCount: 'ID数',
+    replyCount: '返信数',
+    repliedCount: '被返信数',
+    threadMomentum: '勢い',
+    threadResCount: 'レス数',
+  };
+  return labels[target];
+}
+
+function numericOpLabel(op: NgNumericOp): string {
+  const labels: Record<NgNumericOp, string> = {
+    eq: '=',
+    gte: '≧',
+    lte: '≦',
+    lt: '<',
+    gt: '>',
+    between: '範囲',
+  };
+  return labels[op];
+}
+
+function timeTargetLabel(target: NgTimeTarget): string {
+  const labels: Record<NgTimeTarget, string> = {
+    weekday: '曜日',
+    hour: '時刻',
+    relativeTime: '相対時間',
+    datetime: '日時',
+  };
+  return labels[target];
+}
+
+function ngAbonTypeLabel(result: NgFilterResult): string {
+  return result === NgFilterResultEnum.TransparentAbon ? '透明あぼーん' : '通常あぼーん';
 }
 
 function parseResDateTime(dateTime: string): Date | null {
@@ -683,8 +785,8 @@ export function ThreadTabApp(): React.JSX.Element {
     return matched;
   }, [postHistory, boardUrl, threadId, highlightSettings.highlightOwnPosts, responses]);
 
-  const ngFilterResults = useMemo((): ReadonlyMap<number, NgFilterResult> => {
-    const results = new Map<number, NgFilterResult>();
+  const ngFilterResults = useMemo((): ReadonlyMap<number, NgFilterMatch> => {
+    const results = new Map<number, NgFilterMatch>();
     const resNgRules = ngRules.filter((r) => r.target === NgTarget.Response && r.enabled);
     if (resNgRules.length === 0) return results;
 
@@ -729,18 +831,16 @@ export function ThreadTabApp(): React.JSX.Element {
 
         if (matchNgCondition(rule.condition, context)) {
           const current = results.get(res.number);
-          if (
-            current === undefined ||
-            (rule.abonType === AbonType.Transparent &&
-              current !== NgFilterResultEnum.TransparentAbon)
-          ) {
-            results.set(
-              res.number,
-              rule.abonType === AbonType.Transparent
-                ? NgFilterResultEnum.TransparentAbon
-                : NgFilterResultEnum.NormalAbon,
-            );
-          }
+          const result =
+            rule.abonType === AbonType.Transparent
+              ? NgFilterResultEnum.TransparentAbon
+              : NgFilterResultEnum.NormalAbon;
+          const currentRules = current?.rules ?? [];
+          const nextResult =
+            current !== undefined && current.result === NgFilterResultEnum.TransparentAbon
+              ? current.result
+              : result;
+          results.set(res.number, { result: nextResult, rules: [...currentRules, rule] });
         }
       }
     }
@@ -1164,10 +1264,12 @@ export function ThreadTabApp(): React.JSX.Element {
   // Render a single response
   const renderResponse = useCallback(
     (res: Res) => {
-      const ngResult = ngFilterResults.get(res.number);
+      const ngMatch = ngFilterResults.get(res.number);
+      const ngResult = ngMatch?.result;
       if (ngResult === NgFilterResultEnum.TransparentAbon && !revealAbon) return null;
 
       const isNormalAbon = ngResult === NgFilterResultEnum.NormalAbon && !revealAbon;
+      const ngRuleSummaries = ngMatch?.rules.map(summarizeNgRule) ?? [];
       const isOwnPost = postedResNumbers.has(res.number);
       const replies = replyMap.get(res.number);
       const replyCount = replies?.length ?? 0;
@@ -1195,9 +1297,17 @@ export function ThreadTabApp(): React.JSX.Element {
         return (
           <div
             key={res.number}
-            className="border-b border-[var(--color-border-secondary)] px-4 py-2 text-xs opacity-40"
+            className="border-b border-[var(--color-border-secondary)] px-4 py-2 text-xs opacity-60"
           >
             <span className="text-[var(--color-text-muted)]">{res.number}: あぼーん</span>
+            {ngRuleSummaries.length > 0 && (
+              <span
+                className="ml-2 text-[var(--color-text-muted)]"
+                title={`該当ルール:\n${ngRuleSummaries.join('\n')}`}
+              >
+                該当ルール: {ngRuleSummaries.join(' / ')}
+              </span>
+            )}
           </div>
         );
       }
@@ -1295,6 +1405,24 @@ export function ThreadTabApp(): React.JSX.Element {
               )}
             </span>
           </div>
+
+          {ngMatch !== undefined && revealAbon && ngRuleSummaries.length > 0 && (
+            <div className="mb-2 max-w-full rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-2 py-1 text-xs text-[var(--color-text-muted)]">
+              <div className="mb-1 flex flex-wrap items-center gap-1">
+                <span className="font-semibold text-[var(--color-error)]">
+                  {ngAbonTypeLabel(ngMatch.result)}
+                </span>
+                <span>該当ルール: {String(ngRuleSummaries.length)}件</span>
+              </div>
+              <ul className="m-0 list-none space-y-0.5 p-0">
+                {ngRuleSummaries.map((summary, index) => (
+                  <li key={`${String(res.number)}-ng-rule-${String(index)}`} className="break-all">
+                    {summary}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Response body */}
           <div
