@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useStatusLogStore } from '../../stores/status-log-store';
+import {
+  buildMediaErrorDetail,
+  getMediaElementErrorDetail,
+  type MediaErrorDetail,
+} from '../../utils/media-error-detail';
 
 interface InlineAudioProps {
   readonly url: string;
@@ -15,7 +20,7 @@ export function InlineAudio({
 }: InlineAudioProps): React.JSX.Element {
   const { ref, isVisible } = useLazyLoad<HTMLDivElement>({ rootMargin: '1200px 0px' });
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [hasError, setHasError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<MediaErrorDetail | null>(null);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -38,8 +43,19 @@ export function InlineAudio({
 
   const handleError = useCallback(() => {
     console.warn(`[InlineAudio] 音声読み込みエラー — url: ${url}`);
-    setHasError(true);
     useStatusLogStore.getState().pushLog('media', 'error', `音声読み込みエラー: ${url}`);
+    setErrorDetail({
+      title: '音声読み込みエラー',
+      reason: '原因を確認中です',
+      detail: 'URLへ到達できるか、サーバー応答を確認しています。',
+      url,
+    });
+    void buildMediaErrorDetail(
+      '音声読み込みエラー',
+      url,
+      'audio',
+      getMediaElementErrorDetail(audioRef.current),
+    ).then(setErrorDetail);
   }, [url]);
 
   return (
@@ -49,11 +65,17 @@ export function InlineAudio({
       title={originalUrl}
     >
       {isVisible ? (
-        hasError ? (
+        errorDetail !== null ? (
           <div className="flex flex-col gap-2">
-            <div className="text-xs text-[var(--color-text-muted)]">音声読み込みエラー</div>
+            <div className="text-xs font-semibold text-[var(--color-text-primary)]">
+              {errorDetail.title}
+            </div>
+            <div className="text-xs text-[var(--color-text-muted)]">{errorDetail.reason}</div>
+            <div className="break-words text-[10px] text-[var(--color-text-muted)]">
+              {errorDetail.detail}
+            </div>
             <div className="break-all text-[10px] text-[var(--color-text-muted)]">
-              {originalUrl}
+              {errorDetail.url}
             </div>
             <div className="flex flex-wrap gap-2">
               <button

@@ -177,6 +177,180 @@ function handleWithEvent<K extends keyof IpcChannelMap>(
   });
 }
 
+function classifyMediaHttpStatus(status: number): { reason: string; detail: string } {
+  if (status === 404 || status === 410) {
+    return {
+      reason: 'ファイルが見つかりません',
+      detail: `サーバーは HTTP ${String(status)} を返しました。URL先のファイルが削除済み、移動済み、またはURLが間違っている可能性があります。`,
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      reason: 'アクセスが拒否されました',
+      detail: `サーバーは HTTP ${String(status)} を返しました。認証、Referer、Cookie、地域制限、または直リンク制限が必要な可能性があります。`,
+    };
+  }
+  if (status === 429) {
+    return {
+      reason: 'アクセス制限中です',
+      detail:
+        'サーバーが HTTP 429 を返しました。短時間のアクセス過多として制限されている可能性があります。',
+    };
+  }
+  if (status >= 500) {
+    return {
+      reason: 'サーバー側でエラーが発生しています',
+      detail: `サーバーは HTTP ${String(status)} を返しました。相手側の一時障害の可能性があります。`,
+    };
+  }
+  if (status >= 300 && status < 400) {
+    return {
+      reason: 'リダイレクトを解決できませんでした',
+      detail: `HTTP ${String(status)} のリダイレクト応答です。転送先が無効、または循環している可能性があります。`,
+    };
+  }
+  if (status >= 400) {
+    return {
+      reason: 'サーバーがエラーを返しました',
+      detail: `サーバーは HTTP ${String(status)} を返しました。`,
+    };
+  }
+  return {
+    reason: 'メディアとして読み込めませんでした',
+    detail: `HTTP ${String(status)} は成功扱いですが、ブラウザがこの形式またはレスポンスをメディアとして扱えませんでした。`,
+  };
+}
+
+function getErrorCode(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = err.cause;
+    if (typeof cause === 'object' && cause !== null && 'code' in cause) {
+      const code = (cause as { code?: unknown }).code;
+      if (typeof code === 'string') return code;
+    }
+    if ('code' in err) {
+      const code = (err as { code?: unknown }).code;
+      if (typeof code === 'string') return code;
+    }
+  }
+  return '';
+}
+
+function classifyMediaNetworkError(err: unknown): { reason: string; detail: string } {
+  const code = getErrorCode(err);
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
+    return {
+      reason: 'サーバーが存在しないか名前解決に失敗しました',
+      detail: `DNSでホスト名を解決できませんでした${code.length > 0 ? ` (${code})` : ''}。URLのドメインが間違っているか、一時的にDNSへ到達できない可能性があります。`,
+    };
+  }
+  if (code === 'ECONNREFUSED') {
+    return {
+      reason: 'サーバーが接続を拒否しました',
+      detail: '接続先ホストは見つかりましたが、ポートが閉じているかサービスが応答していません。',
+    };
+  }
+  if (code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT') {
+    return {
+      reason: 'ネットワークがタイムアウトしました',
+      detail:
+        'サーバーから時間内に応答がありませんでした。回線状態、プロキシ、または相手サーバーの混雑が原因の可能性があります。',
+    };
+  }
+  if (code === 'ECONNRESET' || code === 'UND_ERR_SOCKET') {
+    return {
+      reason: '通信が途中で切断されました',
+      detail: '接続中にサーバーまたはネットワークが通信を切断しました。',
+    };
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    reason: 'ネットワークエラーが発生しました',
+    detail: message.length > 0 ? message : '原因不明の通信エラーです。',
+  };
+}
+
+function contentTypeMatchesMedia(contentType: string | undefined, expectedType: string): boolean {
+  if (contentType === undefined) return true;
+  const normalized = contentType.toLowerCase();
+  if (expectedType === 'image') return normalized.startsWith('image/');
+  if (expectedType === 'video') return normalized.startsWith('video/');
+  if (expectedType === 'audio') return normalized.startsWith('audio/');
+  return true;
+}
+
+async function probeMediaUrl(
+  url: string,
+  expectedType: 'image' | 'video' | 'audio',
+): Promise<IpcChannelMap['media:probe-url']['result']> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, 10_000);
+
+  try {
+    let response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+
+    if (response.status === 405 || response.status === 501) {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+    }
+
+    const contentType = response.headers.get('content-type') ?? undefined;
+    if (response.ok || response.status === 206) {
+      if (!contentTypeMatchesMedia(contentType, expectedType)) {
+        return {
+          ok: false,
+          reason: 'メディアファイルではない応答です',
+          detail:
+            contentType !== undefined
+              ? `HTTP ${String(response.status)} は成功ですが、Content-Type が ${contentType} です。エラーページ、認証ページ、HTMLページ、または直リンク拒否ページを受け取っている可能性があります。`
+              : `HTTP ${String(response.status)} は成功ですが、Content-Type を確認できませんでした。`,
+          status: response.status,
+          contentType,
+        };
+      }
+      return {
+        ok: true,
+        reason: 'URLには到達できました',
+        detail:
+          contentType !== undefined
+            ? `HTTP ${String(response.status)}。Content-Type: ${contentType}`
+            : `HTTP ${String(response.status)}。ただしContent-Typeは取得できませんでした。`,
+        status: response.status,
+        contentType,
+      };
+    }
+
+    const classified = classifyMediaHttpStatus(response.status);
+    return {
+      ok: false,
+      ...classified,
+      status: response.status,
+      contentType,
+    };
+  } catch (err) {
+    const classified =
+      err instanceof Error && err.name === 'AbortError'
+        ? {
+            reason: 'ネットワークがタイムアウトしました',
+            detail: '10秒以内にサーバーから応答がありませんでした。',
+          }
+        : classifyMediaNetworkError(err);
+    return { ok: false, ...classified };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Board URL -> Board object cache (populated from BBS menu) */
 const boardCache = new Map<string, Board>();
 let bbsMenuUrls: readonly string[] = [...DEFAULT_BBS_MENU_URLS];
@@ -886,6 +1060,10 @@ export async function registerIpcHandlers(): Promise<void> {
     const mgr = getModalWindowManagerOrNull();
     if (mgr === null) return;
     mgr.openMediaViewer(payload);
+  });
+
+  handle('media:probe-url', (url, expectedType) => {
+    return probeMediaUrl(url, expectedType);
   });
 
   handleWithEvent('window:set-fullscreen', (event, fullscreen) => {

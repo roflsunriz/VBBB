@@ -7,6 +7,7 @@ import { useCallback, useState } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useStatusLogStore } from '../../stores/status-log-store';
+import { buildMediaErrorDetail, type MediaErrorDetail } from '../../utils/media-error-detail';
 
 interface ImageThumbnailProps {
   readonly url: string;
@@ -24,7 +25,7 @@ export function ImageThumbnail({
   displayUrl,
   allImageUrls,
 }: ImageThumbnailProps): React.JSX.Element {
-  const [hasError, setHasError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<MediaErrorDetail | null>(null);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({
     rootMargin: MEDIA_PRELOAD_ROOT_MARGIN,
   });
@@ -45,8 +46,14 @@ export function ImageThumbnail({
 
   const handleError = useCallback(() => {
     console.warn(`[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${displayUrl}`);
-    setHasError(true);
     useStatusLogStore.getState().pushLog('media', 'error', `画像読み込みエラー: ${displayUrl}`);
+    setErrorDetail({
+      title: '画像読み込みエラー',
+      reason: '原因を確認中です',
+      detail: 'URLへ到達できるか、サーバー応答を確認しています。',
+      url: displayUrl,
+    });
+    void buildMediaErrorDetail('画像読み込みエラー', displayUrl, 'image').then(setErrorDetail);
   }, [url, displayUrl]);
 
   const handleKeyDown = useCallback(
@@ -64,10 +71,13 @@ export function ImageThumbnail({
     [allImageUrls, displayUrl, url],
   );
 
-  if (hasError) {
+  if (errorDetail !== null) {
     return (
-      <span className="inline-block rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-muted)]">
-        [画像読み込みエラー]
+      <span className="inline-flex max-w-full flex-col gap-1 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-muted)]">
+        <span className="font-semibold text-[var(--color-text-primary)]">{errorDetail.title}</span>
+        <span>{errorDetail.reason}</span>
+        <span className="break-words text-[10px]">{errorDetail.detail}</span>
+        <span className="break-all text-[10px] opacity-75">{errorDetail.url}</span>
       </span>
     );
   }

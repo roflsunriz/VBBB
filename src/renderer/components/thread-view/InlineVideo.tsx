@@ -8,6 +8,11 @@ import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
 import { useStatusLogStore } from '../../stores/status-log-store';
+import {
+  buildMediaErrorDetail,
+  getMediaElementErrorDetail,
+  type MediaErrorDetail,
+} from '../../utils/media-error-detail';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -27,7 +32,7 @@ export function InlineVideo({
     rootMargin: MEDIA_PRELOAD_ROOT_MARGIN,
   });
   const videoElRef = useRef<HTMLVideoElement | null>(null);
-  const [hasError, setHasError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<MediaErrorDetail | null>(null);
 
   useEffect(() => {
     const video = videoElRef.current;
@@ -64,8 +69,19 @@ export function InlineVideo({
 
   const handleError = useCallback(() => {
     console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url}`);
-    setHasError(true);
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${url}`);
+    setErrorDetail({
+      title: '動画読み込みエラー',
+      reason: '原因を確認中です',
+      detail: 'URLへ到達できるか、サーバー応答を確認しています。',
+      url,
+    });
+    void buildMediaErrorDetail(
+      '動画読み込みエラー',
+      url,
+      'video',
+      getMediaElementErrorDetail(videoElRef.current),
+    ).then(setErrorDetail);
   }, [url]);
 
   useEffect(() => {
@@ -95,11 +111,17 @@ export function InlineVideo({
       }}
     >
       {isVisible ? (
-        hasError ? (
+        errorDetail !== null ? (
           <span className="flex h-full w-full flex-col items-start justify-center gap-2 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-3">
-            <span className="text-xs text-[var(--color-text-muted)]">動画読み込みエラー</span>
+            <span className="text-xs font-semibold text-[var(--color-text-primary)]">
+              {errorDetail.title}
+            </span>
+            <span className="text-xs text-[var(--color-text-muted)]">{errorDetail.reason}</span>
+            <span className="max-w-full break-words text-[10px] text-[var(--color-text-muted)]">
+              {errorDetail.detail}
+            </span>
             <span className="max-w-full break-all text-[10px] text-[var(--color-text-muted)]">
-              {originalUrl}
+              {errorDetail.url}
             </span>
             <span className="flex flex-wrap gap-2">
               <button

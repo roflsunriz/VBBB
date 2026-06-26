@@ -48,6 +48,14 @@ export interface NativeContextMenuItem {
   readonly submenu?: readonly NativeContextMenuItem[];
 }
 
+export interface MediaProbeResult {
+  readonly ok: boolean;
+  readonly reason: string;
+  readonly detail: string;
+  readonly status?: number | undefined;
+  readonly contentType?: string | undefined;
+}
+
 export interface IpcChannelMap extends ViewIpcChannelMap {
   /** Fetch BBS menu (板一覧) */
   'bbs:fetch-menu': {
@@ -378,6 +386,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
   'media:open': {
     args: [payload: MediaViewerPayload];
     result: void;
+  };
+  /** Inspect a media URL after renderer load failure */
+  'media:probe-url': {
+    args: [url: string, expectedType: 'image' | 'video' | 'audio'];
+    result: MediaProbeResult;
   };
   /** Toggle OS-level fullscreen for the window hosting the sender */
   'window:set-fullscreen': {
