@@ -5,6 +5,36 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-06-27
+
+### Added
+
+- **スレッド内のメディア再生機能を拡張**
+  - 動画リンクをスレッドビュー内でサムネイルプレビューし、その場で再生できるインラインプレイヤーとして表示
+  - 音声ファイルもスレッドビュー内でインライン再生できるよう対応
+  - 画像サムネイル、動画、音声の読み込み失敗時に、HTTP ステータス、DNS/接続エラー、Content-Type 不一致、ブラウザ側 MediaError などの詳細原因を表示
+  - メディア URL を main process 側で HEAD/Range GET により検査する `media:probe-url` IPC を追加
+- **あぼーんリヴィールの診断表示を追加**
+  - あぼーんリヴィール ON 時に、該当レスへマッチした NG ルールを全件表示
+  - 通常あぼーんの省略表示でも、該当ルールを確認できるよう改善
+
+### Changed
+
+- **メディアのプリロード挙動を改善**
+  - 画像サムネイル、動画、音声の遅延読み込みをビューポート到達前に開始するよう調整
+  - 画像のブラウザ標準 `loading="lazy"` 依存を外し、独自の IntersectionObserver 制御へ統一
+- **動画プレイヤーの全画面表示を改善**
+  - スレッドビュー領域内の疑似全画面ではなく、専用メディアウィンドウを実際の全画面で開くよう変更
+  - `F` キー操作とプレイヤー標準の全画面ボタン経路の両方で、スレッドビューの UI が消えたまま残る問題を避けるよう調整
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.9.0` に更新
+
+### Fixed
+
+- **再起動後にスレッド一覧ビューの板名が URL ベースになる問題を修正**
+  - 板タブ復元データを URL のみではなく、板名と boardType を含む新形式で保存するよう変更
+  - 起動時に板一覧キャッシュを main process 側で事前ロードし、旧 URL-only データはキャッシュから復元できる場合のみ新形式へ強制リカバリ
+  - 旧形式から板名を解決できないデータは壊れた復元データとして扱い、`applism` / `siberia` のような bbsId 表示で再保存しないよう修正
+
 ## [3.8.1] - 2026-06-20
 
 ### Added
@@ -791,6 +821,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.9.0]: https://github.com/roflsunriz/VBBB/compare/v3.8.1...v3.9.0
 [3.8.1]: https://github.com/roflsunriz/VBBB/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/roflsunriz/VBBB/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/roflsunriz/VBBB/compare/v3.6.1...v3.7.0
