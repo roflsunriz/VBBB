@@ -5,6 +5,7 @@
  */
 import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { BoardType } from '@shared/domain';
 import type { SavedTab, SessionState } from '@shared/history';
 import { createLogger } from '../logger';
 import { atomicWriteFile, readFileSafe } from './file-io';
@@ -13,6 +14,8 @@ const logger = createLogger('tab-persistence');
 
 const TAB_SAV_FILE = 'tab.sav';
 const SESSION_FILE = 'session.json';
+
+const BOARD_TYPES = new Set<string>(Object.values(BoardType));
 
 /**
  * Parse tab.sav content into SavedTab array.
@@ -137,9 +140,30 @@ export function loadSessionState(dataDir: string): SessionState {
     const boardTabUrls = Array.isArray(rawBoardTabUrls)
       ? (rawBoardTabUrls as unknown[]).filter((u): u is string => typeof u === 'string')
       : undefined;
+    const rawBoardTabs = parsed['boardTabs'];
+    const boardTabs = Array.isArray(rawBoardTabs)
+      ? (rawBoardTabs as unknown[])
+          .map((entry) => {
+            if (typeof entry !== 'object' || entry === null) return null;
+            const record = entry as Record<string, unknown>;
+            const url = record['url'];
+            const title = record['title'];
+            const boardType = record['boardType'];
+            if (typeof url !== 'string' || typeof title !== 'string') return null;
+            if (typeof boardType !== 'string' || !BOARD_TYPES.has(boardType)) return null;
+            return { url, title, boardType: boardType as BoardType };
+          })
+          .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      : undefined;
     const activeBoardTabId =
       typeof parsed['activeBoardTabId'] === 'string' ? parsed['activeBoardTabId'] : undefined;
-    return { selectedBoardUrl: boardUrl, activeThreadTabId, boardTabUrls, activeBoardTabId };
+    return {
+      selectedBoardUrl: boardUrl,
+      activeThreadTabId,
+      ...(boardTabs !== undefined ? { boardTabs } : {}),
+      boardTabUrls,
+      activeBoardTabId,
+    };
   } catch {
     return { selectedBoardUrl: null };
   }

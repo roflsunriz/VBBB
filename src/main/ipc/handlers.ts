@@ -393,6 +393,10 @@ export function lookupBoard(boardUrl: string): Board {
   return board;
 }
 
+export function lookupCachedBoard(boardUrl: string): Board | null {
+  return boardCache.get(boardUrl) ?? null;
+}
+
 /**
  * Register all IPC handlers.
  * Must be awaited so that board plugins are loaded before the window is created.
@@ -1222,6 +1226,11 @@ export async function registerIpcHandlers(): Promise<void> {
     initializeBoardPlugins(),
   ]);
 
+  const cachedMenu = await loadBBSMenuCacheAsync(dataDir, fivechDomain);
+  if (cachedMenu !== null) {
+    populateBoardCache(cachedMenu);
+  }
+
   // Initialize round timer after round lists are loaded
   const timerConfig = getTimerConfig();
   startRoundTimer(timerConfig.intervalMinutes, executeRound);
@@ -1239,8 +1248,13 @@ export async function registerIpcHandlers(): Promise<void> {
     vm.updateLayout(bounds);
   });
 
-  handle('view:create-board-tab', (boardUrl: string, _boardTitle: string, _boardType) => {
-    const board = lookupBoard(boardUrl);
+  handle('view:create-board-tab', (boardUrl: string, boardTitle: string, boardType: BoardType) => {
+    const resolvedBoard = lookupBoard(boardUrl);
+    const board = {
+      ...resolvedBoard,
+      title: boardTitle.length > 0 ? boardTitle : resolvedBoard.title,
+      boardType,
+    };
     return getViewManager().createBoardTab(board);
   });
 

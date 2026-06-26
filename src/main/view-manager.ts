@@ -22,7 +22,7 @@ import type {
   LayoutDebugViewBounds,
 } from '@shared/view-ipc';
 import type { Board } from '@shared/domain';
-import type { SavedTab, SessionState } from '@shared/history';
+import type { SavedBoardTab, SavedTab, SessionState } from '@shared/history';
 import { createLogger } from './logger';
 
 const logger = createLogger('view-manager');
@@ -584,6 +584,15 @@ export class ViewManager {
     return [...this.boardTabs.values()].map((e) => e.meta.boardUrl);
   }
 
+  /** Collect board tab metadata for session persistence */
+  getSavedBoardTabs(): readonly SavedBoardTab[] {
+    return [...this.boardTabs.values()].map((e) => ({
+      url: e.board.url,
+      title: e.board.title,
+      boardType: e.board.boardType,
+    }));
+  }
+
   getActiveBoardTabId(): string | null {
     return this.activeBoardTabId;
   }
@@ -602,11 +611,28 @@ export class ViewManager {
     savedTabs: readonly SavedTab[],
     session: SessionState,
     lookupBoard: (url: string) => Board,
+    lookupCachedBoard: (url: string) => Board | null,
     lookupKokomade?: (boardUrl: string, threadId: string) => number,
   ): void {
-    const boardUrls = session.boardTabUrls ?? [];
-    for (const url of boardUrls) {
-      const board = lookupBoard(url);
+    const savedBoardTabs =
+      session.boardTabs ??
+      (session.boardTabUrls ?? [])
+        .map((url) => {
+          const board = lookupCachedBoard(url);
+          if (board === null) return null;
+          return {
+            url: board.url,
+            title: board.title,
+            boardType: board.boardType,
+          };
+        })
+        .filter((entry): entry is SavedBoardTab => entry !== null);
+    for (const savedBoardTab of savedBoardTabs) {
+      const board = {
+        ...lookupBoard(savedBoardTab.url),
+        title: savedBoardTab.title,
+        boardType: savedBoardTab.boardType,
+      };
       this.createBoardTab(board);
     }
 

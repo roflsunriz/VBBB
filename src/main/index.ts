@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { app, BaseWindow, session } from 'electron';
 import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { performance } from 'node:perf_hooks';
-import { lookupBoard, registerIpcHandlers } from './ipc/handlers';
+import { lookupBoard, lookupCachedBoard, registerIpcHandlers } from './ipc/handlers';
 import { buildAppMenu } from './menu';
 import { createLogger } from './logger';
 import { loadWindowState, saveWindowState } from './services/window-state';
@@ -111,7 +111,7 @@ function createWindow(): BaseWindow {
           return -1;
         }
       };
-      vm.restoreTabs(savedTabs, session, lookupBoard, lookupKokomade);
+      vm.restoreTabs(savedTabs, session, lookupBoard, lookupCachedBoard, lookupKokomade);
     }
     vm.warmPool();
     if (windowState.isMaximized) {
@@ -124,12 +124,14 @@ function createWindow(): BaseWindow {
 
   mainWindow.on('close', () => {
     const savedThreadTabs = vm.getSavedThreadTabs();
+    const boardTabs = vm.getSavedBoardTabs();
     const boardUrls = vm.getSavedBoardTabUrls();
     const activeBoardTabId = vm.getActiveBoardTabId();
     const activeThreadTabId = vm.getActiveThreadTabId();
     saveTabsSync(dataDir, savedThreadTabs);
     saveSessionStateSync(dataDir, {
       selectedBoardUrl: boardUrls[0] ?? null,
+      boardTabs,
       boardTabUrls: boardUrls,
       activeBoardTabId: activeBoardTabId ?? undefined,
       activeThreadTabId: activeThreadTabId ?? undefined,
@@ -193,7 +195,7 @@ void app.whenReady().then(async () => {
     },
   );
 
-  const ipcReady = registerIpcHandlers();
+  await registerIpcHandlers();
   const tHandlesRegistered = performance.now();
   startupLogger.info(`IPC handles registered in ${(tHandlesRegistered - t0).toFixed(1)}ms`);
 
@@ -202,7 +204,6 @@ void app.whenReady().then(async () => {
   const tWindowCreated = performance.now();
   startupLogger.info(`Window created in ${(tWindowCreated - tHandlesRegistered).toFixed(1)}ms`);
 
-  await ipcReady;
   const tReady = performance.now();
   startupLogger.info(`Startup complete in ${(tReady - t0).toFixed(1)}ms`);
 

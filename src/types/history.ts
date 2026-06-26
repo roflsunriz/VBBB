@@ -1,6 +1,7 @@
 /**
  * History and tab persistence types.
  */
+import type { BoardType } from './domain';
 
 /** A saved tab entry in tab.sav */
 export interface SavedTab {
@@ -19,6 +20,13 @@ export interface BrowsingHistoryEntry {
   readonly threadId: string;
   readonly title: string;
   readonly lastVisited: string;
+}
+
+/** A saved board tab entry in session.json */
+export interface SavedBoardTab {
+  readonly url: string;
+  readonly title: string;
+  readonly boardType: BoardType;
 }
 
 /** Display range mode for thread view */
@@ -40,6 +48,8 @@ export const MAX_HISTORY_ENTRIES = 200 as const;
 export interface SessionState {
   readonly selectedBoardUrl: string | null;
   readonly activeThreadTabId?: string | undefined;
+  /** Open board tabs with display metadata. Preferred over legacy boardTabUrls. */
+  readonly boardTabs?: readonly SavedBoardTab[] | undefined;
   /** URLs of open board tabs (for restoring board tabs on restart) */
   readonly boardTabUrls?: readonly string[] | undefined;
   /** Active board tab id (board URL) to restore after restart */

@@ -132,6 +132,32 @@ describe('saveSessionState', () => {
     const loaded = loadSessionState(dir);
     expect(loaded).toStrictEqual(state);
   });
+
+  it('round-trips board tab display metadata', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    const state = {
+      selectedBoardUrl: 'https://egg.5ch.net/applism/',
+      activeThreadTabId: undefined,
+      boardTabs: [
+        {
+          url: 'https://egg.5ch.net/applism/',
+          title: 'スマホアプリ',
+          boardType: '2ch' as const,
+        },
+        {
+          url: 'https://pug.5ch.net/siberia/',
+          title: 'シベリア超速報',
+          boardType: '2ch' as const,
+        },
+      ],
+      boardTabUrls: ['https://egg.5ch.net/applism/', 'https://pug.5ch.net/siberia/'],
+      activeBoardTabId: 'https://pug.5ch.net/siberia/',
+    };
+    await saveSessionState(dir, state);
+    const loaded = loadSessionState(dir);
+    expect(loaded).toStrictEqual(state);
+  });
 });
 
 describe('saveTabsSync', () => {
@@ -189,6 +215,27 @@ describe('saveSessionStateSync', () => {
       activeThreadTabId: 'https://news.5ch.net/newsplus/:1234567890',
       boardTabUrls: ['https://news.5ch.net/newsplus/', 'https://eagle.5ch.net/livejupiter/'],
       activeBoardTabId: 'https://eagle.5ch.net/livejupiter/',
+    };
+    saveSessionStateSync(dir, state);
+    const loaded = loadSessionState(dir);
+    expect(loaded).toStrictEqual(state);
+  });
+
+  it('writes board tab display metadata synchronously', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vbbb-test-'));
+    mkdirSync(dir, { recursive: true });
+    const state = {
+      selectedBoardUrl: 'https://egg.5ch.net/applism/',
+      activeThreadTabId: undefined,
+      boardTabs: [
+        {
+          url: 'https://egg.5ch.net/applism/',
+          title: 'スマホアプリ',
+          boardType: '2ch' as const,
+        },
+      ],
+      boardTabUrls: ['https://egg.5ch.net/applism/'],
+      activeBoardTabId: 'https://egg.5ch.net/applism/',
     };
     saveSessionStateSync(dir, state);
     const loaded = loadSessionState(dir);
