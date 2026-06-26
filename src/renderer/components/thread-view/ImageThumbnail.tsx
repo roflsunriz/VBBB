@@ -17,6 +17,7 @@ interface ImageThumbnailProps {
 
 const THUMBNAIL_MAX_WIDTH = 200;
 const THUMBNAIL_MAX_HEIGHT = 200;
+const MEDIA_PRELOAD_ROOT_MARGIN = '1200px 0px';
 
 export function ImageThumbnail({
   url,
@@ -24,7 +25,9 @@ export function ImageThumbnail({
   allImageUrls,
 }: ImageThumbnailProps): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
-  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
+  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({
+    rootMargin: MEDIA_PRELOAD_ROOT_MARGIN,
+  });
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -92,7 +95,6 @@ export function ImageThumbnail({
             <img
               src={displayUrl}
               alt={url}
-              loading="lazy"
               onError={handleError}
               className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"
               style={{

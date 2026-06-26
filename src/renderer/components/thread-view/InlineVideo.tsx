@@ -1,11 +1,13 @@
 /**
- * Inline video launcher component.
+ * Inline video player component.
  * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
- * to prevent layout shift. Playback itself happens in a dedicated BrowserWindow.
+ * to prevent layout shift.
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
+import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
+import { useStatusLogStore } from '../../stores/status-log-store';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -15,13 +17,24 @@ interface InlineVideoProps {
 
 const VIDEO_MAX_WIDTH = 320;
 const VIDEO_MAX_HEIGHT = 240;
+const MEDIA_PRELOAD_ROOT_MARGIN = '1200px 0px';
 export function InlineVideo({
   url,
   originalUrl,
   initialVolume,
 }: InlineVideoProps): React.JSX.Element {
-  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({ rootMargin: '300px' });
-  const videoElRef = useRef<HTMLButtonElement | null>(null);
+  const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({
+    rootMargin: MEDIA_PRELOAD_ROOT_MARGIN,
+  });
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const [hasError, setHasError] = useState(false);
+  const handleVideoKeyDown = useVideoKeyboard(videoElRef);
+
+  useEffect(() => {
+    const video = videoElRef.current;
+    if (video === null) return;
+    video.volume = Math.min(1, Math.max(0, initialVolume));
+  }, [initialVolume, isVisible]);
 
   const handleOpenPlayer = useCallback(() => {
     void window.electronApi.invoke('media:open', {
@@ -31,6 +44,16 @@ export function InlineVideo({
       initialVolume,
     });
   }, [initialVolume, originalUrl, url]);
+
+  const handleOpenExternal = useCallback(() => {
+    void window.electronApi.invoke('shell:open-external', originalUrl);
+  }, [originalUrl]);
+
+  const handleError = useCallback(() => {
+    console.warn(`[InlineVideo] 動画読み込みエラー — url: ${url}`);
+    setHasError(true);
+    useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${url}`);
+  }, [url]);
 
   return (
     <span
@@ -42,29 +65,51 @@ export function InlineVideo({
       }}
     >
       {isVisible ? (
-        <button
-          ref={videoElRef}
-          type="button"
-          onClick={handleOpenPlayer}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleOpenPlayer();
-            }
-          }}
-          className="flex h-full w-full flex-col items-center justify-center rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-3 text-center focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] hover:bg-[var(--color-bg-hover)]"
-          style={{
-            maxWidth: '100%',
-            maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
-          }}
-        >
-          <span className="mb-2 text-sm text-[var(--color-text-primary)]">
-            動画プレイヤーで開く
+        hasError ? (
+          <span className="flex h-full w-full flex-col items-start justify-center gap-2 rounded border border-[var(--color-border-secondary)] bg-[var(--color-bg-secondary)] px-3 py-3">
+            <span className="text-xs text-[var(--color-text-muted)]">動画読み込みエラー</span>
+            <span className="max-w-full break-all text-[10px] text-[var(--color-text-muted)]">
+              {originalUrl}
+            </span>
+            <span className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleOpenPlayer}
+                className="rounded border border-[var(--color-border-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              >
+                プレイヤーで開く
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenExternal}
+                className="rounded border border-[var(--color-border-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+              >
+                外部で開く
+              </button>
+            </span>
           </span>
-          <span className="break-all text-[10px] text-[var(--color-text-muted)]">
-            {originalUrl}
+        ) : (
+          <span className="inline-flex max-w-full flex-col gap-1">
+            <video
+              ref={videoElRef}
+              src={url}
+              controls
+              preload="metadata"
+              onError={handleError}
+              onKeyDown={handleVideoKeyDown}
+              className="rounded border border-[var(--color-border-secondary)] bg-black"
+              style={{
+                maxWidth: '100%',
+                maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
+              }}
+            />
+            {originalUrl !== url && (
+              <span className="max-w-full break-all text-[10px] text-[var(--color-text-muted)]">
+                {originalUrl}
+              </span>
+            )}
           </span>
-        </button>
+        )
       ) : (
         <MediaPlaceholder width={VIDEO_MAX_WIDTH} height={VIDEO_MAX_HEIGHT} mediaType="video" />
       )}
