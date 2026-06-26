@@ -36,8 +36,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+interface UseVideoKeyboardOptions {
+  readonly onFullscreen?: (() => void) | undefined;
+}
+
 export function useVideoKeyboard(
   videoRef: RefObject<HTMLVideoElement | null>,
+  options?: UseVideoKeyboardOptions,
 ): (e: React.KeyboardEvent<HTMLVideoElement>) => void {
   return useCallback(
     (e: React.KeyboardEvent<HTMLVideoElement>): void => {
@@ -65,6 +70,10 @@ export function useVideoKeyboard(
         case 'f':
         case 'F': {
           e.preventDefault();
+          if (options?.onFullscreen !== undefined) {
+            options.onFullscreen();
+            break;
+          }
           if (document.fullscreenElement === video) {
             void document.exitFullscreen();
           } else {
@@ -195,6 +204,6 @@ export function useVideoKeyboard(
           break;
       }
     },
-    [videoRef],
+    [options, videoRef],
   );
 }

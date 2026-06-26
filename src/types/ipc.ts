@@ -379,6 +379,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
     args: [payload: MediaViewerPayload];
     result: void;
   };
+  /** Toggle OS-level fullscreen for the window hosting the sender */
+  'window:set-fullscreen': {
+    args: [fullscreen: boolean];
+    result: { fullScreen: boolean };
+  };
   /** Get all cookies grouped by domain */
   'cookie:get-all': {
     args: [];

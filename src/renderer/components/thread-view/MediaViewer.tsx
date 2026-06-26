@@ -43,11 +43,32 @@ export function MediaViewer({
   useEffect(() => {
     if (payload.mediaType === 'video' && videoRef.current !== null) {
       videoRef.current.volume = Math.min(1, Math.max(0, payload.initialVolume));
+      if (payload.startFullscreen === true) {
+        void window.electronApi.invoke('window:set-fullscreen', true);
+        window.setTimeout(() => {
+          void videoRef.current?.requestFullscreen();
+        }, 100);
+      }
     }
     if (payload.mediaType === 'audio' && audioRef.current !== null) {
       audioRef.current.volume = Math.min(1, Math.max(0, payload.initialVolume));
     }
   }, [payload]);
+
+  const handleVideoFullscreenChange = useCallback(() => {
+    void window.electronApi.invoke(
+      'window:set-fullscreen',
+      document.fullscreenElement === videoRef.current,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (payload.mediaType !== 'video') return;
+    document.addEventListener('fullscreenchange', handleVideoFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleVideoFullscreenChange);
+    };
+  }, [handleVideoFullscreenChange, payload.mediaType]);
 
   const handleImageLoad = useCallback(() => {
     const img = imgRef.current;

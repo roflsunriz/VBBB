@@ -163,6 +163,7 @@ export interface MediaViewerVideoPayload {
   readonly url: string;
   readonly originalUrl: string;
   readonly initialVolume: number;
+  readonly startFullscreen?: boolean | undefined;
 }
 
 export interface MediaViewerAudioPayload {

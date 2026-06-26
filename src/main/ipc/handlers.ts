@@ -888,6 +888,18 @@ export async function registerIpcHandlers(): Promise<void> {
     mgr.openMediaViewer(payload);
   });
 
+  handleWithEvent('window:set-fullscreen', (event, fullscreen) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win !== null && !win.isDestroyed()) {
+      if (win.isFullScreen() !== fullscreen) {
+        win.setFullScreen(fullscreen);
+      }
+      return { fullScreen: win.isFullScreen() };
+    }
+
+    return { fullScreen: false };
+  });
+
   // User-Agent management (persisted via user-agent-store)
   handle('config:get-user-agent', () => {
     return Promise.resolve(getCurrentUserAgent());

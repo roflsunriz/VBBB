@@ -28,7 +28,6 @@ export function InlineVideo({
   });
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const [hasError, setHasError] = useState(false);
-  const handleVideoKeyDown = useVideoKeyboard(videoElRef);
 
   useEffect(() => {
     const video = videoElRef.current;
@@ -45,6 +44,20 @@ export function InlineVideo({
     });
   }, [initialVolume, originalUrl, url]);
 
+  const handleOpenFullscreenPlayer = useCallback(() => {
+    void window.electronApi.invoke('media:open', {
+      mediaType: 'video',
+      url,
+      originalUrl,
+      initialVolume,
+      startFullscreen: true,
+    });
+  }, [initialVolume, originalUrl, url]);
+
+  const handleVideoKeyDown = useVideoKeyboard(videoElRef, {
+    onFullscreen: handleOpenFullscreenPlayer,
+  });
+
   const handleOpenExternal = useCallback(() => {
     void window.electronApi.invoke('shell:open-external', originalUrl);
   }, [originalUrl]);
@@ -54,6 +67,23 @@ export function InlineVideo({
     setHasError(true);
     useStatusLogStore.getState().pushLog('media', 'error', `動画読み込みエラー: ${url}`);
   }, [url]);
+
+  useEffect(() => {
+    const handleFullscreenChange = (): void => {
+      if (document.fullscreenElement !== videoElRef.current) return;
+
+      const openFullscreenPlayer = (): void => {
+        handleOpenFullscreenPlayer();
+      };
+
+      void document.exitFullscreen().then(openFullscreenPlayer, openFullscreenPlayer);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [handleOpenFullscreenPlayer]);
 
   return (
     <span
