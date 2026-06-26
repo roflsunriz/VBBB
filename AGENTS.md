@@ -1,5 +1,12 @@
-- ユーザーは日本語話者なのであなた（コーディングエージェント）は常に日本語で応答します
-- パッケージマネージャはbunを使用しています。npmではありません。
-- bun lint, bun type-check, bun test, bun format, bun run build を実行してください。
-- コミットメッセージは日本語で作成し、コンベンショナルコミッツの規約に従ってください。
-- 単に「アップデート」や"/update"と指示されたときは"how-to-update.md"の指示に従いアップデート作業を行います。
+# AGENTS.md
+
+共通ルールは `COMMON-AGENTS.md` を必ず確認し、上位方針として扱う。
+このファイルでは `VBBB` 固有の補足だけを記載する。
+
+## パッケージ管理
+
+- パッケージマネージャは Bun を使用する。npm ではない。
+
+## 品質確認
+
+- このリポジトリでは `bun lint`、`bun type-check`、`bun test`、`bun format`、`bun run build` を使用する。
