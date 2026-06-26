@@ -5,6 +5,21 @@ All notable changes to VBBB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.1] - 2026-06-27
+
+### Changed
+
+- **インライン動画プレイヤーの全画面操作を安定化**
+  - スレッドビュー内の動画 controls にあるネイティブ全画面ボタンを使わず、専用の「全画面」ボタンからメディアプレイヤーを開く形に統一
+  - `F` キー操作と全画面ボタン操作のどちらでも、専用メディアウィンドウの全画面表示へ同じ経路で遷移するよう調整
+- `DEFAULT_USER_AGENT` のバージョン番号を `3.9.1` に更新
+
+### Fixed
+
+- **インライン動画の全画面切り替え不具合を修正**
+  - プレイヤー標準の全画面ボタン経由では正しく全画面表示にならない問題を修正
+  - インライン動画から専用プレイヤーを開く際に元の動画を停止し、背景で動画が再生され続ける問題と二重再生を防止
+
 ## [3.9.0] - 2026-06-27
 
 ### Added
@@ -821,6 +836,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.9.1]: https://github.com/roflsunriz/VBBB/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/roflsunriz/VBBB/compare/v3.8.1...v3.9.0
 [3.8.1]: https://github.com/roflsunriz/VBBB/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/roflsunriz/VBBB/compare/v3.7.0...v3.8.0

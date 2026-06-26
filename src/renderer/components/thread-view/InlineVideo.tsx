@@ -4,6 +4,7 @@
  * to prevent layout shift.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { mdiFullscreen, mdiOpenInNew } from '@mdi/js';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useVideoKeyboard } from '../../hooks/use-video-keyboard';
@@ -13,6 +14,7 @@ import {
   getMediaElementErrorDetail,
   type MediaErrorDetail,
 } from '../../utils/media-error-detail';
+import { MdiIcon } from '../common/MdiIcon';
 
 interface InlineVideoProps {
   readonly url: string;
@@ -40,24 +42,33 @@ export function InlineVideo({
     video.volume = Math.min(1, Math.max(0, initialVolume));
   }, [initialVolume, isVisible]);
 
+  const pauseInlineVideo = useCallback((): number => {
+    const video = videoElRef.current;
+    if (video === null) return initialVolume;
+    video.pause();
+    return video.volume;
+  }, [initialVolume]);
+
   const handleOpenPlayer = useCallback(() => {
+    const volume = pauseInlineVideo();
     void window.electronApi.invoke('media:open', {
       mediaType: 'video',
       url,
       originalUrl,
-      initialVolume,
+      initialVolume: volume,
     });
-  }, [initialVolume, originalUrl, url]);
+  }, [originalUrl, pauseInlineVideo, url]);
 
   const handleOpenFullscreenPlayer = useCallback(() => {
+    const volume = pauseInlineVideo();
     void window.electronApi.invoke('media:open', {
       mediaType: 'video',
       url,
       originalUrl,
-      initialVolume,
+      initialVolume: volume,
       startFullscreen: true,
     });
-  }, [initialVolume, originalUrl, url]);
+  }, [originalUrl, pauseInlineVideo, url]);
 
   const handleVideoKeyDown = useVideoKeyboard(videoElRef, {
     onFullscreen: handleOpenFullscreenPlayer,
@@ -146,15 +157,38 @@ export function InlineVideo({
               ref={videoElRef}
               src={url}
               controls
+              controlsList="nofullscreen"
               preload="metadata"
               onError={handleError}
               onKeyDown={handleVideoKeyDown}
-              className="rounded border border-[var(--color-border-secondary)] bg-black"
+              className="inline-video-native-player rounded border border-[var(--color-border-secondary)] bg-black"
               style={{
                 maxWidth: '100%',
                 maxHeight: `${String(VIDEO_MAX_HEIGHT)}px`,
               }}
             />
+            <span className="flex max-w-full items-center gap-1">
+              <button
+                type="button"
+                onClick={handleOpenFullscreenPlayer}
+                className="inline-flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                title="全画面プレイヤーで開く"
+                aria-label="全画面プレイヤーで開く"
+              >
+                <MdiIcon path={mdiFullscreen} size={14} />
+                全画面
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenPlayer}
+                className="inline-flex items-center gap-1 rounded border border-[var(--color-border-primary)] px-2 py-1 text-xs text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)]"
+                title="プレイヤーで開く"
+                aria-label="プレイヤーで開く"
+              >
+                <MdiIcon path={mdiOpenInNew} size={14} />
+                プレイヤー
+              </button>
+            </span>
             {originalUrl !== url && (
               <span className="max-w-full break-all text-[10px] text-[var(--color-text-muted)]">
                 {originalUrl}

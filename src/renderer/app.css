@@ -48,3 +48,7 @@ body,
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-scrollbar-thumb-hover);
 }
+
+.inline-video-native-player::-webkit-media-controls-fullscreen-button {
+  display: none;
+}
