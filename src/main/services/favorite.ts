@@ -4,7 +4,12 @@
  * Uses @xmldom/xmldom for XML parsing/serialization.
  */
 import { join } from 'node:path';
-import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
+import {
+  DOMParser,
+  XMLSerializer,
+  type Document,
+  type Element,
+} from '@xmldom/xmldom';
 import type { FavFolder, FavItem, FavNode, FavSeparator, FavTree } from '@shared/favorite';
 import { FavItemType } from '@shared/favorite';
 import type { BoardType } from '@shared/domain';
