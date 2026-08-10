@@ -174,9 +174,7 @@ export interface MediaViewerAudioPayload {
 }
 
 export type MediaViewerPayload =
-  | MediaViewerImagePayload
-  | MediaViewerVideoPayload
-  | MediaViewerAudioPayload;
+  MediaViewerImagePayload | MediaViewerVideoPayload | MediaViewerAudioPayload;
 
 export type ModalWindowInitData =
   | {

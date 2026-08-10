@@ -16,13 +16,7 @@ import { MdiIcon } from '../common/MdiIcon';
 import type { UpdateProgress } from '@shared/update';
 
 type UpdateStatus =
-  | 'idle'
-  | 'checking'
-  | 'up-to-date'
-  | 'update-available'
-  | 'downloading'
-  | 'complete'
-  | 'error';
+  'idle' | 'checking' | 'up-to-date' | 'update-available' | 'downloading' | 'complete' | 'error';
 
 interface Props {
   readonly onClose: () => void;
