@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - push前監査で検出された既知の依存脆弱性を解消するため、安全版へ依存関係とロックファイルを更新した。
+- URL検証後の接続先がすり替わる可能性を防ぐため、間接依存の `fast-uri` を修正版の3.1.5へ固定し、Bunの実行依存ツリーを更新した。
+- 依存監査で検出されたXSS、サンドボックス制限回避、サービス拒否の既知脆弱性を解消するため、`dompurify`、`electron`、`brace-expansion`、`nanoid` を各修正版へ更新した。
+- DOMPurifyの安全版を実ブラウザ互換のDOMで検証するため、Bun単体テストのDOM実装をHappy DOMからJSDOMへ統一した。
 
 ### Changed
 
 - 作業開始時の共通指針見落としを防ぐため、調査やコマンド実行より前に `COMMON-AGENTS.md` を先頭から末尾まで読み、EOFを確認する必須ゲートを追加した。
+- 実際の依存解決方法とDependabotの監視対象を一致させるため、未使用のnpmロックファイルを廃止し、Bunの依存関係を毎週確認する設定へ移行した。
 
 ## [3.9.1] - 2026-06-27
 
