@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- 開発基盤とプロキシ通信を最新環境へ追従させるため、`https-proxy-agent`、`@vitejs/plugin-react`、`@testing-library/jest-dom` をメジャー更新し、PlaywrightとReact DOM型定義も更新した。
 - GitHub ActionsのNode.js 20非推奨警告を解消するため、全JavaScriptアクションをNode.js 24対応版へ更新し、暫定的な強制実行設定を削除した。
 - 作業開始時の共通指針見落としを防ぐため、調査やコマンド実行より前に `COMMON-AGENTS.md` を先頭から末尾まで読み、EOFを確認する必須ゲートを追加した。
 - 実際の依存解決方法とDependabotの監視対象を一致させるため、未使用のnpmロックファイルを廃止し、Bunの依存関係を毎週確認する設定へ移行した。
