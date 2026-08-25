@@ -39,6 +39,7 @@ import {
 import { loadKotehan, saveKotehan } from '../services/kotehan';
 import { httpFetch } from '../services/http-client';
 import { openExternalUrl } from '../services/open-external';
+import { resolveImageThumbnail } from '../services/image-preview';
 import { searchLocal, searchLocalAll } from '../services/local-search';
 import { getSambaInfo, recordSambaTime } from '../services/samba';
 import { loadNgRules, saveNgRules, addNgRule, removeNgRule } from '../services/ng-abon';
@@ -1053,6 +1054,10 @@ export async function registerIpcHandlers(): Promise<void> {
     }
 
     return { saved, folder };
+  });
+
+  handle('image:resolve-thumbnail', (pageUrl) => {
+    return resolveImageThumbnail(pageUrl);
   });
 
   // Open URL in external browser

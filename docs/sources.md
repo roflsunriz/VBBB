@@ -2,4 +2,4 @@
 
 - gikoNaviG2
 - Slevo
-- chMate 0.8.10.241 / 0.8.10.243（`chmate-apks/` のAPKを静的解析し、DAT落ち時の公開 `oyster` 取得経路を確認）
+- chMate 0.8.10.241 / 0.8.10.243（`chmate-apks/` のAPKを静的解析し、DAT落ち時の公開 `oyster` 取得経路とImgurアルバムのサムネイル抽出方式を確認）

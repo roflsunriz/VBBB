@@ -3,7 +3,7 @@
  * Uses IntersectionObserver-based lazy loading with a fixed-size placeholder
  * to prevent layout shift. Click opens a dedicated media BrowserWindow.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MediaPlaceholder } from './MediaPlaceholder';
 import { useLazyLoad } from '../../hooks/use-lazy-load';
 import { useStatusLogStore } from '../../stores/status-log-store';
@@ -12,6 +12,7 @@ import { buildMediaErrorDetail, type MediaErrorDetail } from '../../utils/media-
 interface ImageThumbnailProps {
   readonly url: string;
   readonly displayUrl: string;
+  readonly requiresThumbnailResolution?: boolean | undefined;
   /** All image URLs in the context (for keyboard navigation in modal) */
   readonly allImageUrls?: readonly string[] | undefined;
 }
@@ -23,52 +24,104 @@ const MEDIA_PRELOAD_ROOT_MARGIN = '1200px 0px';
 export function ImageThumbnail({
   url,
   displayUrl,
+  requiresThumbnailResolution = false,
   allImageUrls,
 }: ImageThumbnailProps): React.JSX.Element {
+  const [resolvedDisplayUrl, setResolvedDisplayUrl] = useState<string | null>(
+    requiresThumbnailResolution ? null : displayUrl,
+  );
   const [errorDetail, setErrorDetail] = useState<MediaErrorDetail | null>(null);
   const { ref, isVisible } = useLazyLoad<HTMLSpanElement>({
     rootMargin: MEDIA_PRELOAD_ROOT_MARGIN,
   });
 
+  useEffect(() => {
+    if (!requiresThumbnailResolution || !isVisible) return;
+
+    let cancelled = false;
+    void window.electronApi
+      .invoke('image:resolve-thumbnail', url)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setResolvedDisplayUrl(result.thumbnailUrl);
+          return;
+        }
+        setErrorDetail({
+          title: '画像読み込みエラー',
+          reason: 'Imgurアルバムのサムネイルを取得できませんでした',
+          detail: result.errorMessage,
+          url,
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setErrorDetail({
+          title: '画像読み込みエラー',
+          reason: 'Imgurアルバムのサムネイルを取得できませんでした',
+          detail: err instanceof Error ? err.message : String(err),
+          url,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isVisible, requiresThumbnailResolution, url]);
+
+  const viewerImageUrls = useMemo(() => {
+    if (allImageUrls === undefined || resolvedDisplayUrl === null) return allImageUrls;
+    return allImageUrls.map((candidate) => (candidate === url ? resolvedDisplayUrl : candidate));
+  }, [allImageUrls, resolvedDisplayUrl, url]);
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (resolvedDisplayUrl === null) return;
       void window.electronApi.invoke('media:open', {
         mediaType: 'image',
-        url: displayUrl,
+        url: resolvedDisplayUrl,
         pageUrl: url,
-        allImageUrls,
+        allImageUrls: viewerImageUrls,
       });
     },
-    [allImageUrls, displayUrl, url],
+    [resolvedDisplayUrl, url, viewerImageUrls],
   );
 
   const handleError = useCallback(() => {
-    console.warn(`[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${displayUrl}`);
-    useStatusLogStore.getState().pushLog('media', 'error', `画像読み込みエラー: ${displayUrl}`);
+    if (resolvedDisplayUrl === null) return;
+    console.warn(
+      `[ImageThumbnail] 画像読み込みエラー — url: ${url} / displayUrl: ${resolvedDisplayUrl}`,
+    );
+    useStatusLogStore
+      .getState()
+      .pushLog('media', 'error', `画像読み込みエラー: ${resolvedDisplayUrl}`);
     setErrorDetail({
       title: '画像読み込みエラー',
       reason: '原因を確認中です',
       detail: 'URLへ到達できるか、サーバー応答を確認しています。',
-      url: displayUrl,
+      url: resolvedDisplayUrl,
     });
-    void buildMediaErrorDetail('画像読み込みエラー', displayUrl, 'image').then(setErrorDetail);
-  }, [url, displayUrl]);
+    void buildMediaErrorDetail('画像読み込みエラー', resolvedDisplayUrl, 'image').then(
+      setErrorDetail,
+    );
+  }, [url, resolvedDisplayUrl]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
+        if (resolvedDisplayUrl === null) return;
         void window.electronApi.invoke('media:open', {
           mediaType: 'image',
-          url: displayUrl,
+          url: resolvedDisplayUrl,
           pageUrl: url,
-          allImageUrls,
+          allImageUrls: viewerImageUrls,
         });
       }
     },
-    [allImageUrls, displayUrl, url],
+    [resolvedDisplayUrl, url, viewerImageUrls],
   );
 
   if (errorDetail !== null) {
@@ -92,7 +145,7 @@ export function ImageThumbnail({
           minHeight: `${String(THUMBNAIL_MAX_HEIGHT)}px`,
         }}
       >
-        {isVisible ? (
+        {isVisible && resolvedDisplayUrl !== null ? (
           <button
             type="button"
             onClick={handleClick}
@@ -103,7 +156,7 @@ export function ImageThumbnail({
             aria-label="画像ビューアを開く"
           >
             <img
-              src={displayUrl}
+              src={resolvedDisplayUrl}
               alt={url}
               onError={handleError}
               className="rounded border border-[var(--color-border-secondary)] transition-opacity hover:opacity-80"

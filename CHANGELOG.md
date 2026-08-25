@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - 5chで通常datが404になるDAT落ちスレッドも最新の過去ログまで読めるように、chMateと同じ公開 `oyster` エンドポイントをUPLIFTログイン状態にかかわらず最優先で取得するよう修正した。
+- Imgurのアルバムリンク (`imgur.com/a/...`) でも画像を確認できるように、アルバムHTMLから先頭の直画像URLを安全に解決してインラインサムネイルへ表示する処理を追加した。
 
 ## [3.9.1] - 2026-06-27
 

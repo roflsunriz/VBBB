@@ -733,6 +733,8 @@
           return { saved: true, path: 'C:/tmp/vbbb-console.log' };
         case 'image:save-bulk':
           return { saved: ensureArray(args[0]).length, folder: 'C:/tmp/images' };
+        case 'image:resolve-thumbnail':
+          return { ok: false, errorMessage: 'Mock thumbnail is not configured' };
         case 'ip:lookup':
           return {
             ip: String(args[0]),

@@ -2,6 +2,7 @@
  * Client-side media URL detection for inline thumbnails and video players.
  */
 import type { DetectedAudio, DetectedImage, DetectedVideo } from '@shared/preview';
+import { getImgurAlbumId } from '@shared/imgur';
 
 const IMAGE_EXTENSIONS =
   /\.(jpe?g|gif|png|webp|bmp|avif)(?::(?:large|orig|small|thumb|medium))?(?:\?[^\s"'<>]*)?$/i;
@@ -123,6 +124,16 @@ export function detectImageUrls(bodyHtml: string): DetectedImage[] {
     if (isImageUrl(cleaned)) {
       seen.add(cleaned);
       results.push({ url: cleaned, displayUrl: normalizeImageUrl(cleaned) });
+      continue;
+    }
+
+    if (getImgurAlbumId(cleaned) !== null) {
+      seen.add(cleaned);
+      results.push({
+        url: cleaned,
+        displayUrl: cleaned,
+        requiresThumbnailResolution: true,
+      });
       continue;
     }
 

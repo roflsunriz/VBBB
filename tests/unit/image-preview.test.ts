@@ -1,13 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   detectImageUrls,
   isImageUrl,
   parseExtPreviewIni,
   clearExtPreviewCache,
+  clearImageThumbnailCache,
+  resolveImageThumbnail,
 } from '../../src/main/services/image-preview';
+import { detectImageUrls as detectRendererImageUrls } from '../../src/renderer/utils/image-detect';
+import { extractImgurAlbumThumbnail, getImgurAlbumId } from '../../src/types/imgur';
+
+const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
   clearExtPreviewCache();
+  clearImageThumbnailCache();
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 describe('isImageUrl', () => {
@@ -77,6 +88,75 @@ describe('detectImageUrls', () => {
     const images = detectImageUrls(body);
     expect(images).toHaveLength(1);
     expect(images[0]?.displayUrl).toBe('https://pbs.twimg.com/media/abc.jpg?name=large');
+  });
+
+  it('marks Imgur album pages for main-process thumbnail resolution', () => {
+    const images = detectImageUrls('https://imgur.com/a/3Txs1fv');
+    expect(images).toEqual([
+      {
+        url: 'https://imgur.com/a/3Txs1fv',
+        displayUrl: 'https://imgur.com/a/3Txs1fv',
+        requiresThumbnailResolution: true,
+      },
+    ]);
+  });
+});
+
+describe('Imgur album thumbnail resolution', () => {
+  it('recognizes /a/ links with query strings and rejects other hosts', () => {
+    expect(getImgurAlbumId('https://www.imgur.com/a/3Txs1fv/?foo=bar')).toBe('3Txs1fv');
+    expect(getImgurAlbumId('https://example.com/a/3Txs1fv')).toBeNull();
+    expect(getImgurAlbumId('https://imgur.com/gallery/3Txs1fv')).toBeNull();
+  });
+
+  it('extracts the first direct image using the chMate rule', () => {
+    const html = [
+      '<meta property="og:image" content="https://i.imgur.com/ZU1CFcJh.jpg">',
+      '<script>"https:\\/\\/i.imgur.com\\/idgYxxh.png"</script>',
+    ].join('');
+    expect(extractImgurAlbumThumbnail(html)).toBe('https://i.imgur.com/ZU1CFcJh.jpg');
+  });
+
+  it('detects Imgur albums in the renderer media path', () => {
+    expect(detectRendererImageUrls('album https://imgur.com/a/3Txs1fv end')).toEqual([
+      {
+        url: 'https://imgur.com/a/3Txs1fv',
+        displayUrl: 'https://imgur.com/a/3Txs1fv',
+        requiresThumbnailResolution: true,
+      },
+    ]);
+  });
+
+  it('fetches the album HTML and caches the resolved thumbnail', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response('<meta property="og:image" content="https://i.imgur.com/ZU1CFcJh.jpg">', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+      );
+    globalThis.fetch = fetchMock;
+
+    await expect(resolveImageThumbnail('https://imgur.com/a/3Txs1fv')).resolves.toEqual({
+      ok: true,
+      thumbnailUrl: 'https://i.imgur.com/ZU1CFcJh.jpg',
+    });
+    await expect(resolveImageThumbnail('http://www.imgur.com/a/3Txs1fv/')).resolves.toEqual({
+      ok: true,
+      thumbnailUrl: 'https://i.imgur.com/ZU1CFcJh.jpg',
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://imgur.com/a/3Txs1fv');
+  });
+
+  it('rejects unsupported URLs without making a request', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    globalThis.fetch = fetchMock;
+
+    const result = await resolveImageThumbnail('https://example.com/a/3Txs1fv');
+    expect(result.ok).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

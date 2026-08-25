@@ -8,7 +8,14 @@ export interface DetectedImage {
   readonly url: string;
   /** Display-ready URL (may be cleaned up for direct image access) */
   readonly displayUrl: string;
+  /** The page must be resolved by the main process before it can be shown. */
+  readonly requiresThumbnailResolution?: true;
 }
+
+/** Result of resolving a page URL to an image thumbnail. */
+export type ImageThumbnailResolveResult =
+  | { readonly ok: true; readonly thumbnailUrl: string }
+  | { readonly ok: false; readonly errorMessage: string };
 
 /** A detected video URL in thread body */
 export interface DetectedVideo {

@@ -330,6 +330,7 @@ export function ResPopup({
                   key={img.url}
                   url={img.url}
                   displayUrl={img.displayUrl}
+                  requiresThumbnailResolution={img.requiresThumbnailResolution}
                   allImageUrls={allThreadImageUrls}
                 />
               ))}

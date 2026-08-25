@@ -20,6 +20,7 @@ import type { FavNode, FavTree } from './favorite';
 import type { BrowsingHistoryEntry, SavedTab, SessionState } from './history';
 import type { NgRule } from './ng';
 import type { PostHistoryEntry } from './post-history';
+import type { ImageThumbnailResolveResult } from './preview';
 import type { ProxyConfig } from './proxy';
 import type { RoundBoardEntry, RoundItemEntry, RoundTimerConfig } from './round';
 import type { MenuAction } from './menu';
@@ -376,6 +377,11 @@ export interface IpcChannelMap extends ViewIpcChannelMap {
   'image:save-bulk': {
     args: [urls: readonly string[]];
     result: { saved: number; folder: string };
+  };
+  /** Resolve a supported image page (such as an Imgur album) to a thumbnail URL */
+  'image:resolve-thumbnail': {
+    args: [pageUrl: string];
+    result: ImageThumbnailResolveResult;
   };
   /** Open URL in external browser */
   'shell:open-external': {
