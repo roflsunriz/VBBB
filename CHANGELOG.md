@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 今後のリリースで同一タグのDraftが重複生成されないように、electron-builderのビルド工程から公開用トークンを外し、GitHub Releaseへのアップロードを専用工程へ一本化した。
+
 ## [3.10.0] - 2026-08-26
 
 ### Security
