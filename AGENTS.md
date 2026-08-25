@@ -20,3 +20,8 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 ## 品質確認
 
 - このリポジトリでは `bun lint`、`bun type-check`、`bun test`、`bun format`、`bun run build` を使用する。
+
+## 環境
+- `chmate-apks`にアンドロイドアプリの`chmate`がある。apkとxapk。
+- 必要に応じてSlevoとgikoNavi G2のソースコードもGithubからクローンして利用するする（/Slevo, /gikoNaviG2）
+- 実装のお手本として解析して利用する。
