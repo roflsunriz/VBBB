@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 作業開始時の共通指針見落としを防ぐため、調査やコマンド実行より前に `COMMON-AGENTS.md` を先頭から末尾まで読み、EOFを確認する必須ゲートを追加した。
 - 実際の依存解決方法とDependabotの監視対象を一致させるため、未使用のnpmロックファイルを廃止し、Bunの依存関係を毎週確認する設定へ移行した。
 
+### Fixed
+
+- 5chで通常datが404になるDAT落ちスレッドも最新の過去ログまで読めるように、chMateと同じ公開 `oyster` エンドポイントをUPLIFTログイン状態にかかわらず最優先で取得するよう修正した。
+
 ## [3.9.1] - 2026-06-27
 
 ### Changed

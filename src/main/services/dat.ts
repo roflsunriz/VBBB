@@ -185,29 +185,41 @@ function loadLocalDatResponses(
   };
 }
 
+function supportsOyster(board: Board): boolean {
+  try {
+    const hostname = new URL(board.url).hostname.toLowerCase();
+    return ['5ch.net', '5ch.io', 'bbspink.com'].some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Get the oyster URL for UPLIFT past-log access.
- * Returns undefined if not logged in.
+ * Get the 5ch oyster URLs used for fallen-thread DAT retrieval.
+ *
+ * chMate 0.8.10.241/243 tries the bare oyster URL even without an UPLIFT
+ * session. 5ch currently serves fallen DATs from that public endpoint while
+ * the normal /dat/ URL returns 404. Keep the SID variant first when available,
+ * then always try the public variant.
  */
-function getOysterUrl(board: Board, threadId: string): string | undefined {
-  const sid = getUpliftSid();
-  if (sid.length === 0) return undefined;
+function getOysterUrls(board: Board, threadId: string): string[] {
+  if (!supportsOyster(board)) return [];
+
   const prefix4 = threadId.substring(0, 4);
-  return `${board.url}oyster/${prefix4}/${threadId}.dat?sid=${encodeURIComponent(sid)}`;
+  const publicUrl = `${board.url}oyster/${prefix4}/${threadId}.dat`;
+  const sid = getUpliftSid();
+  return sid.length > 0 ? [`${publicUrl}?sid=${encodeURIComponent(sid)}`, publicUrl] : [publicUrl];
 }
 
 /**
  * Get the kako (archive) URLs for a thread.
- * Includes oyster URL (UPLIFT) at the front if logged in.
+ * Tries oyster before legacy kako, with the authenticated oyster variant
+ * ahead of the public variant when an UPLIFT SID is available.
  */
 function getKakoUrls(board: Board, threadId: string): string[] {
-  const urls: string[] = [];
-
-  // UPLIFT oyster URL gets priority if available
-  const oysterUrl = getOysterUrl(board, threadId);
-  if (oysterUrl !== undefined) {
-    urls.push(oysterUrl);
-  }
+  const urls = getOysterUrls(board, threadId);
 
   if (threadId.length <= 9) {
     // 9 digits or less

@@ -180,6 +180,8 @@ describe('fetchDat', () => {
 
     // First call (full fetch): 302 dat fallen
     mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 302, body: Buffer.from('') }));
+    // public oyster: 404
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 404, body: Buffer.from('') }));
     // kako .dat.gz: 404
     mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 404, body: Buffer.from('') }));
     // kako .dat: 200 with archived content
@@ -188,6 +190,27 @@ describe('fetchDat', () => {
     const result = await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
     expect(result.status).toBe(DatFetchStatus.Archived);
     expect(result.responses[0]?.title).toBe('Archived Thread');
+  });
+
+  it('retrieves a fallen 5ch thread from public oyster without UPLIFT', async () => {
+    const oysterDatText = [
+      'Nanashi<>sage<>2025/01/01<>Archived body<>Oyster Thread',
+      'Nanashi<>sage<>2025/01/02<>Post-DAT-fall progress<>',
+    ].join('\n');
+    const oysterDat = encodeString(`${oysterDatText}\n`, 'Shift_JIS');
+
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 404, body: Buffer.from('') }));
+    mockHttpFetch.mockResolvedValueOnce(makeResponse({ status: 200, body: oysterDat }));
+
+    const result = await fetchDat(TEST_BOARD, TEST_THREAD_ID, tmpDir);
+
+    expect(result.status).toBe(DatFetchStatus.Archived);
+    expect(result.responses).toHaveLength(2);
+    expect(result.responses[1]?.body).toBe('Post-DAT-fall progress');
+    expect(mockHttpFetch).toHaveBeenNthCalledWith(2, {
+      url: 'https://test.5ch.io/board/oyster/1234/1234567890.dat',
+      method: 'GET',
+    });
   });
 
   it('returns DatFallen status when kako also fails and no local cache', async () => {
