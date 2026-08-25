@@ -14,7 +14,7 @@
 
 最新リリースは [Releases](../../releases) からダウンロードできます。
 
-- **Windows 10/11 (x64)** — `VBBB Setup x.x.x.exe`
+- **Windows 10/11 (x64)** — `VBBB-Setup-x.x.x.exe`
 
 > Linux / macOS 向けバイナリは公式には提供していません。
 > 自前ビルドについては下記「[自前ビルド](#自前ビルド)」を参照してください。
@@ -32,7 +32,7 @@
 
 ### 前提条件
 
-- Node.js >= 22
+- Node.js >= 24
 - bun >= 1.0
 
 ### セットアップ

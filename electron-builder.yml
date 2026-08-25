@@ -24,6 +24,7 @@ win:
       arch:
         - x64
 nsis:
+  artifactName: VBBB-Setup-${version}.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false

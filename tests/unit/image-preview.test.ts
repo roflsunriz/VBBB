@@ -128,14 +128,12 @@ describe('Imgur album thumbnail resolution', () => {
   });
 
   it('fetches the album HTML and caches the resolved thumbnail', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response('<meta property="og:image" content="https://i.imgur.com/ZU1CFcJh.jpg">', {
-          status: 200,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }),
-      );
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('<meta property="og:image" content="https://i.imgur.com/ZU1CFcJh.jpg">', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      }),
+    );
     globalThis.fetch = fetchMock;
 
     await expect(resolveImageThumbnail('https://imgur.com/a/3Txs1fv')).resolves.toEqual({

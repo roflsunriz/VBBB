@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-08-26
+
 ### Security
 
 - push前監査で検出された既知の依存脆弱性を解消するため、安全版へ依存関係とロックファイルを更新した。
 - URL検証後の接続先がすり替わる可能性を防ぐため、間接依存の `fast-uri` を修正版の3.1.5へ固定し、Bunの実行依存ツリーを更新した。
-- 依存監査で検出されたXSS、サンドボックス制限回避、サービス拒否の既知脆弱性を解消するため、`dompurify`、`electron`、`brace-expansion`、`nanoid` を各修正版へ更新した。
+- 依存監査で検出されたXSS、サンドボックス制限回避、サービス拒否の既知脆弱性を解消するため、`dompurify`、`electron`、`brace-expansion` を各修正版へ更新した。
 - DOMPurifyの安全版を実ブラウザ互換のDOMで検証するため、Bun単体テストのDOM実装をHappy DOMからJSDOMへ統一した。
+- サービス拒否につながる既知脆弱性を解消するため、間接依存の `nanoid` を3.3.18へ更新し、依存監査が0件になるようロックファイルを再生成した。
 
 ### Changed
 
@@ -20,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub ActionsのNode.js 20非推奨警告を解消するため、全JavaScriptアクションをNode.js 24対応版へ更新し、暫定的な強制実行設定を削除した。
 - 作業開始時の共通指針見落としを防ぐため、調査やコマンド実行より前に `COMMON-AGENTS.md` を先頭から末尾まで読み、EOFを確認する必須ゲートを追加した。
 - 実際の依存解決方法とDependabotの監視対象を一致させるため、未使用のnpmロックファイルを廃止し、Bunの依存関係を毎週確認する設定へ移行した。
+- 対応ランタイムをNode.js 24以降へ更新し、開発・ビルド環境の最低要件をREADMEとpackage metadataで統一した。
+- Chromium/Node.jsの更新を製品へ取り込むためElectron 44へ更新し、JSDOM 30、ESLint 10.9、Vitest 4.1.11などTypeScript 5.9と互換性のある依存を各最新版へ更新した。
+- 5chへ送信する既定User-Agentのアプリバージョンを `VBBB/3.10.0` へ更新した。
 
 ### Fixed
 
@@ -857,6 +863,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows 10/11 x64 用 NSIS インストーラー
 - ライセンスを MIT に変更
 
+[3.10.0]: https://github.com/roflsunriz/VBBB/compare/v3.9.1...v3.10.0
 [3.9.1]: https://github.com/roflsunriz/VBBB/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/roflsunriz/VBBB/compare/v3.8.1...v3.9.0
 [3.8.1]: https://github.com/roflsunriz/VBBB/compare/v3.8.0...v3.8.1
