@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CI と Dependabot の分類の実行順が前後しても更新を取りこぼさないよう、同じ PR 番号と head SHA を再照合する経路を追加した。
 - 今後のリリースで同一タグのDraftが重複生成されないように、electron-builderのビルド工程から公開用トークンを外し、GitHub Releaseへのアップロードを専用工程へ一本化した。
 
 ## [3.10.0] - 2026-08-26
