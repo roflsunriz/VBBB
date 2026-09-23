@@ -22,6 +22,15 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 - このリポジトリでは `bun lint`、`bun type-check`、`bun test`、`bun format`、`bun run build` を使用する。
 
 ## 環境
+
 - `chmate-apks`にアンドロイドアプリの`chmate`がある。apkとxapk。
 - 必要に応じてSlevoとgikoNavi G2のソースコードもGithubからクローンして利用するする（/Slevo, /gikoNaviG2）
 - 実装のお手本として解析して利用する。
+
+## 依存監査で確定した事項（2026-09-23）
+
+- `bun audit fix` だけでは fast-uri の脆弱版が上流の厳密な依存範囲で残る。`package.json` の既存 `overrides` と `bun.lock` を同時に更新し、`bun audit` と関連テスト・ビルドで確認する。上流が安全版を取り込んだ場合は override の必要性を再評価する。
+
+## Dependabot の限定修復（2026-09-23）
+
+- CI 再失敗後の自動修復は `bun.lock` だけをパッチとして適用する。修復後は `workflow_dispatch` で `.github/workflows/ci.yml` を再実行するため、この CI の `contents: read` と checkout の `persist-credentials: false` を維持し、PR コードを実行するジョブへ書き込み権限や秘密情報を渡さない。根拠は `.github/workflows/dependabot-automation.yml` と共通ワークフローの権限分離。
