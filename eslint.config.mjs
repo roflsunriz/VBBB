@@ -25,7 +25,7 @@ export default [
     settings: {
       'import-x/resolver': {
         typescript: {
-          project: ['tsconfig.node.json', 'tsconfig.web.json'],
+          project: 'tsconfig.json',
         },
       },
     },

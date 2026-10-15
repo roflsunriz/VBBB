@@ -21,4 +21,8 @@
 
 `package.json` の `overrides` は、上流パッケージが fast-uri の旧版を固定している間に安全な patch 版を選ぶために使う。上流が安全版を採用したら override を減らせるか確認する。更新時は `bun install --lockfile-only --ignore-scripts`、`bun install --frozen-lockfile`、`bun audit` を実行し、該当する lint・型・テスト・ビルドを確認する。問題があれば更新コミットを revert し、lockfile と package.json を同じ版へ戻す。
 
+他の推移依存にも安全版を選ぶoverrideがあるため、更新時は既存の固定版も再監査する。`global-agent` は4系へ更新することで、旧ダウンローダーが引く修正版のない `sprintf-js` を除いている。上流が安全な依存へ移行したらこの指定を見直す。
+
+ReactとReact DOMは完全に同じバージョンへ更新し、両方の型定義も対応する版へ揃える。TypeScript ESLintのparserとpluginも一緒に更新する。TypeScriptはparserの対応範囲を確認して選ぶ。2026-10-15時点ではTypeScript 6.0.3を使用し、parser 8.71.2が対応していない7系は採用しない。TypeScript 6ではNode型の自動取り込みに依存せず、`@types/node` と両tsconfigの `types` を明示する。
+
 CI 完了より Dependabot の分類が遅れる場合は、`callback_workflow_file` が指す呼び出し側 workflow を `workflow_dispatch` し、同じ PR 番号・head SHA・全チェックを再確認する。呼び出し側のファイル名を変える際はこの入力も一緒に更新する。

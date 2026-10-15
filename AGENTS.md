@@ -34,3 +34,9 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 ## Dependabot の限定修復（2026-09-23）
 
 - CI 再失敗後の自動修復は `bun.lock` だけをパッチとして適用する。修復後は `workflow_dispatch` で `.github/workflows/ci.yml` を再実行するため、この CI の `contents: read` と checkout の `persist-credentials: false` を維持し、PR コードを実行するジョブへ書き込み権限や秘密情報を渡さない。根拠は `.github/workflows/dependabot-automation.yml` と共通ワークフローの権限分離。
+
+## 関連依存の更新（2026-10-15）
+
+- React と React DOM は解決後の完全なバージョンを揃える。PR #19 は React DOM だけが更新され、`image-thumbnail.test.ts` の読み込み時点で失敗した。`.github/dependabot.yml` では両本体と両型定義を同じグループにし、更新時は既存の描画テストとE2Eを実行する。
+- TypeScript 6 は既定で `@types` を自動取り込みしない。共有HTTP型がNode型を使うため、`@types/node` を直接依存として宣言し、両tsconfigの `types: ["node"]` を維持する。`@typescript-eslint/parser` 8.71.2の対応範囲は `<6.1.0` のため、TypeScript 7へ上げる前に上流の対応を確認する。
+- `global-agent` 4.1.3のoverrideは、旧 `@electron/get` が引く未修正の `sprintf-js` を依存経路から除くために必要。公開APIの `bootstrap()` を使うプロキシ経路も更新時に確認し、上流が安全版へ移行したらoverrideを再評価する。
