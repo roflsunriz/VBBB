@@ -1,5 +1,14 @@
 # 検証手順
 
+## 2026-10-15: PR #19の依存更新修復
+
+- CIの `image-thumbnail.test.ts` はReact 19.2.8とReact DOM 19.3.0の不一致で読み込みに失敗していた。両方を19.3.1へ揃え、型定義と関連ツールを更新した。
+- Bun 1.4.0 / Node.js 26.4.0 / Windowsで、固定インストール、lint（警告なし）、型チェック、フォーマット、ビルド、単体テスト725件、ヘッドレスE2E32件が成功。初回の単体テストはサンドボックス内の一時ファイルrename権限で失敗したため、通常権限で全件を再実行した。
+- E2Eはビルド済みrendererとモックIPCを使用する既存の操作テスト。別プロジェクトが4173番を使用していたため、一時設定で4179番へ分離して実行した。実掲示板への通信・投稿やインストーラーの操作はこの検証に含まない。
+- `bun audit` の20件を解消し、537パッケージの監査で既知脆弱性0件。`global-agent` 4のoverrideは、旧 `@electron/get` の `initializeProxy()` から実際に初期化し、ローカルHTTPプロキシ経由と `NO_PROXY` の直接接続が動作することを確認した。
+- `bun outdated` で残るのはTypeScript 7とNode 26用型定義。TypeScriptはparserの対応範囲内の6.0.3、Node型定義はサポートする最小Node.js 24に合わせた24系を維持する。
+- DependabotではReact本体・React DOM・両型定義、およびTypeScript ESLintのparser・pluginをそれぞれグループ化する。更新時は解決されたバージョンも確認し、既存の描画テストとE2Eを実行する。
+
 ## Dependabot 自動処理（2026-09-23）
 
 `.github/workflows/dependabot-automation.yml` を actionlint で検査し、PR 用 workflow 名（CI）と一致することを確認する。Dependabot の patch／minor かつ全 PR チェック成功の場合だけ取り込み、major・古い SHA・限定修復後も失敗した PR は残す。

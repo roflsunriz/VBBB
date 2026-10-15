@@ -1,25 +1,27 @@
-# Changelog
+# 変更履歴
 
-All notable changes to VBBB will be documented in this file.
+VBBBの主な変更をこのファイルに記録します。
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+書式は[Keep a Changelog](https://keepachangelog.com/en/1.1.0/)、
+バージョンは[Semantic Versioning](https://semver.org/spec/v2.0.0.html)に従います。
 
 ## [Unreleased]
 
 ### Security
 
+- 依存監査で検出されたサービス拒否や通信処理の既知脆弱性を解消するため、推移依存の安全版を指定し、未修正の `sprintf-js` を引くプロキシ依存を更新した。
 - 既知の脆弱性を解消するため、上流依存が旧版へ固定する fast-uri を安全な patch 版へ更新し、Bun のロックファイルを再生成した。
 
 ### Changed
 
-
+- 描画基盤と開発ツールを対応版へ揃えるため、React関連、Electron、electron-vite、Playwrightなどの依存を更新し、TypeScript 6向けにNode型定義を明示した。
 - 不具合・機能提案などの受付とPRの記入形式を揃え、プロジェクト固有の確認項目を残した。
 
 - 依存更新を安全に省力化するため、Dependabot の patch／minor PR を既存 CI の全チェック成功後に自動取り込みし、失敗ジョブを一度再実行し、必要なら `bun.lock` を限定して再生成する設定を追加した。
 
 ### Fixed
 
+- React DOMだけが更新されると描画とテストが失敗するため、React本体と同じ19.3.1へ揃え、Dependabotで両本体・両型定義をまとめて更新するようにした。TypeScript ESLintのparserとpluginも同じPRで更新する。
 - CI と Dependabot の分類の実行順が前後しても更新を取りこぼさないよう、同じ PR 番号と head SHA を再照合する経路を追加した。
 - 今後のリリースで同一タグのDraftが重複生成されないように、electron-builderのビルド工程から公開用トークンを外し、GitHub Releaseへのアップロードを専用工程へ一本化した。
 
