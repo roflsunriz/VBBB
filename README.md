@@ -19,71 +19,6 @@
 > Linux / macOS 向けバイナリは公式には提供していません。
 > 自前ビルドについては下記「[自前ビルド](#自前ビルド)」を参照してください。
 
-## 技術スタック
-
-- Electron + Node.js
-- TypeScript (strict)
-- Vite (electron-vite)
-- React + TailwindCSS
-- Zod (ランタイムバリデーション)
-- Vitest + Playwright (テスト)
-
-## 環境構築
-
-### 前提条件
-
-- Node.js >= 24
-- Bun >= 1.4（Bun形式のロックファイルを使用）
-
-### セットアップ
-
-```bash
-# 依存パッケージのインストール
-bun install
-
-# 環境変数ファイルの準備
-cp .env.example .env
-```
-
-## 開発
-
-```bash
-# 開発サーバー起動 (ホットリロード対応)
-bun run dev
-
-# ビルド (トランスパイルのみ)
-bun run build
-
-# 配布用ビルド (Windows インストーラー生成)
-bun run build:dist
-```
-
-## コード品質
-
-```bash
-# リンター
-bun run lint
-bun run lint:fix
-
-# 型チェック
-bun run type-check
-
-# フォーマット
-bun run format
-bun run format:check
-```
-
-## テスト
-
-```bash
-# ユニットテスト
-bun run test
-bun run test:watch
-
-# E2E テスト
-bun run test:e2e
-```
-
 ## 自前ビルド
 
 ### Windows (推奨・動作確認済み)
@@ -117,26 +52,11 @@ bun run build:mac
 # → release/ に .dmg が生成されます
 ```
 
-## ディレクトリ構成
-
-```
-src/
-  main/           # Electron メインプロセス
-  preload/        # プリロードスクリプト (contextBridge)
-  renderer/       # React フロントエンド
-  types/          # TypeScript 型定義 (一元管理)
-docs/             # 仕様ドキュメント
-tests/
-  unit/           # ユニットテスト (Vitest)
-  e2e/            # E2E テスト (Playwright)
-```
-
 ## ライセンス
 
 [MIT](LICENSE)
 
-## 依存更新の自動処理
 
-Dependabot は対象の依存関係を毎週確認します。patch／minor 更新は PR のチェック（CI）が成功した後に自動で squash merge されます。CI の失敗ジョブは 1 回だけ再実行します。再失敗時は読み取り権限のジョブで `bun.lock` を再生成し、限定した修正コミットで CI を再実行します。修復できない PR は残します。major 更新は手動で確認します。
+## 開発・運用の知見
 
-React・React DOMと両方の型定義、およびTypeScript ESLintの関連パッケージは、それぞれ同じPRで更新します。ReactとReact DOMは実際にインストールされるバージョンを揃えて検証します。
+開発環境、内部構成、検証コマンドと運用上の注意は [findings.md](findings.md) を参照してください。更新・復旧の手順と検証記録は、同ファイルから案内しています。
