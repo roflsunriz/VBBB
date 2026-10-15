@@ -34,6 +34,7 @@ Get-Content -Raw -LiteralPath .\COMMON-AGENTS.md
 ## Dependabot の限定修復（2026-09-23）
 
 - CI 再失敗後の自動修復は `bun.lock` だけをパッチとして適用する。修復後は `workflow_dispatch` で `.github/workflows/ci.yml` を再実行するため、この CI の `contents: read` と checkout の `persist-credentials: false` を維持し、PR コードを実行するジョブへ書き込み権限や秘密情報を渡さない。根拠は `.github/workflows/dependabot-automation.yml` と共通ワークフローの権限分離。
+- 2026-10-15のPR #19・#23では、自動マージ後のmainにpush起因CIが作成されなかった。統合後の確認時は対象SHAのrunを調べ、必要なら `gh workflow run ci.yml --ref main` で実行する。詳細は `verification.md` を参照する。
 
 ## 関連依存の更新（2026-10-15）
 

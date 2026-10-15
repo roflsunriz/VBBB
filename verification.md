@@ -6,8 +6,9 @@
 - Bun 1.4.0 / Node.js 26.4.0 / Windowsで、固定インストール、lint（警告なし）、型チェック、フォーマット、ビルド、単体テスト725件、ヘッドレスE2E32件が成功。初回の単体テストはサンドボックス内の一時ファイルrename権限で失敗したため、通常権限で全件を再実行した。
 - E2Eはビルド済みrendererとモックIPCを使用する既存の操作テスト。別プロジェクトが4173番を使用していたため、一時設定で4179番へ分離して実行した。実掲示板への通信・投稿やインストーラーの操作はこの検証に含まない。
 - `bun audit` の20件を解消し、537パッケージの監査で既知脆弱性0件。`global-agent` 4のoverrideは、旧 `@electron/get` の `initializeProxy()` から実際に初期化し、ローカルHTTPプロキシ経由と `NO_PROXY` の直接接続が動作することを確認した。
-- `bun outdated` で残るのはTypeScript 7とNode 26用型定義。TypeScriptはparserの対応範囲内の6.0.3、Node型定義はサポートする最小Node.js 24に合わせた24系を維持する。
+- TypeScriptはparserの対応範囲内の6.0.3を使用する。Node型定義は当初24系を選んだが、続いて作成されたPR #23で26.6.5への更新が全CIに成功し、自動マージされた。更新後の固定インストールと監査も成功し、`bun outdated` で残るのは非対応のTypeScript 7のみ。
 - DependabotではReact本体・React DOM・両型定義、およびTypeScript ESLintのparser・pluginをそれぞれグループ化する。更新時は解決されたバージョンも確認し、既存の描画テストとE2Eを実行する。
+- PR #19の統合後mainでも、手動実行した[CI](https://github.com/roflsunriz/VBBB/actions/runs/38674616271)の全ジョブが成功した。GitHub Actionsによる自動マージ後はpush起因のCIが起動していない場合があるため、統合コミットのCIが必要なら `gh workflow run ci.yml --ref main` で実行する。
 
 ## Dependabot 自動処理（2026-09-23）
 
