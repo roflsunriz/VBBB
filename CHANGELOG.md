@@ -7,6 +7,10 @@ VBBBの主な変更をこのファイルに記録します。
 
 ## [Unreleased]
 
+### Changed
+
+- workflow名を含むconcurrency groupへ統一し、別workflowを誤って取り消さずに古いCIだけを中止するようにした。
+
 ### Security
 
 - 依存監査で検出されたサービス拒否や通信処理の既知脆弱性を解消するため、推移依存の安全版を指定し、未修正の `sprintf-js` を引くプロキシ依存を更新した。
