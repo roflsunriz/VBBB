@@ -9,6 +9,7 @@ VBBBの主な変更をこのファイルに記録します。
 
 ### Changed
 
+- GitHub Actions の月間利用時間を抑えるため、Dependabot version update と自動マージを毎週・即時処理から毎月28日（Asia/Tokyo）の月末一括処理へ変更した。
 - workflow名を含むconcurrency groupへ統一し、別workflowを誤って取り消さずに古いCIだけを中止するようにした。
 
 ### Security

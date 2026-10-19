@@ -3,7 +3,9 @@ updates:
   - package-ecosystem: bun
     directory: /
     schedule:
-      interval: weekly
+      interval: cron
+      cronjob: "0 0 28 * *"
+      timezone: "Asia/Tokyo"
     groups:
       react:
         patterns:
@@ -18,4 +20,6 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: cron
+      cronjob: "0 0 28 * *"
+      timezone: "Asia/Tokyo"
