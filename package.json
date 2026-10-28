@@ -57,7 +57,7 @@
     "@typescript-eslint/parser": "^8.72.0",
     "@vitejs/plugin-react": "^6.1.2",
     "dompurify": "^3.4.17",
-    "electron": "^44.7.2",
+    "electron": "^45.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^6.0.0",
     "eslint": "^10.12.0",
