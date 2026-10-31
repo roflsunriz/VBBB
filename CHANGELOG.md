@@ -14,11 +14,11 @@ VBBBの主な変更をこのファイルに記録します。
 
 ### Security
 
+- 依存監査で検出された通信処理や開発ツールの脆弱性を解消するため、fast-uri、minimatch、undici、Viteの固定版を更新した。
 - 依存監査で検出されたサービス拒否や通信処理の既知脆弱性を解消するため、推移依存の安全版を指定し、未修正の `sprintf-js` を引くプロキシ依存を更新した。
 - 既知の脆弱性を解消するため、上流依存が旧版へ固定する fast-uri を安全な patch 版へ更新し、Bun のロックファイルを再生成した。
 
 ### Changed
-
 
 - 共通指針と固有の知見を区別して参照できるよう、AGENTS・READMEなどの実現手段、例外と調査知見を `findings.md` へ分離し、着手前の全文確認と更新先を統一した。
 - 描画基盤と開発ツールを対応版へ揃えるため、React関連、Electron、electron-vite、Playwrightなどの依存を更新し、TypeScript 6向けにNode型定義を明示した。
@@ -29,6 +29,7 @@ VBBBの主な変更をこのファイルに記録します。
 
 ### Fixed
 
+- Windows配布ビルドに更新後のelectron-builderが反映されるよう、app-builder-libの固定版を揃えた。minimatch 11のAPI変更に合わせ、lintプラグインの互換性を修正した。
 - React DOMだけが更新されると描画とテストが失敗するため、React本体と同じ19.3.1へ揃え、Dependabotで両本体・両型定義をまとめて更新するようにした。TypeScript ESLintのparserとpluginも同じPRで更新する。
 - CI と Dependabot の分類の実行順が前後しても更新を取りこぼさないよう、同じ PR 番号と head SHA を再照合する経路を追加した。
 - 今後のリリースで同一タグのDraftが重複生成されないように、electron-builderのビルド工程から公開用トークンを外し、GitHub Releaseへのアップロードを専用工程へ一本化した。

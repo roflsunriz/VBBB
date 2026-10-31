@@ -5,3 +5,5 @@
 - `global-agent` overrideは旧 `@electron/get` 経由の未修正依存を除くために必要。公開 `bootstrap()` proxy経路も確認し、上流解消後にoverrideを再評価する。
 - 自動merge後にmain CIが作成されないことがある。対象SHAのrunを確認し、なければmainへworkflowを明示起動する。
 - Dependabot自動修復は読取り権限でlockfileだけを扱い、PRコードへ書込み権限や秘密を渡さない。
+- `electron-builder` の更新時は、`app-builder-lib` の override と `electron-builder-squirrel-windows` の解決版も要求版に合わせ、Windows配布ビルドのログに表示される版を確認する。
+- minimatch 11 は `makeRe` を提供しないため、`eslint-plugin-import-x` 4.17.1 に glob 判定を `minimatch()` へ置き換えるパッチを適用する。旧正規表現とは `**` に続く隠しパスの判定が異なる。このルールは現在の設定では無効だが、将来有効化するときは差を確認し、プラグインの上流対応後はパッチを再評価する。

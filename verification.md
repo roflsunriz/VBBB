@@ -1,5 +1,11 @@
 # 検証手順
 
+## 2026-10-31: Dependabot PR #31
+
+- electron-builder 26.18.0 のPRで app-builder-lib が 26.15.3 に固定され、配布ビルドのログも旧版を示すことを確認した。overrideを26.18.0へ揃え、Windows x64 NSISインストーラーを `--publish never` で生成した。公開やインストールは行っていない。
+- fast-uri、minimatch、undici、Viteの固定版を更新し、Bun 1.4.0で固定インストールと依存監査を実施した。監査は535パッケージで既知脆弱性0件。lint、型、書式、アプリのビルド、単体テスト729件、ヘッドレスE2E 32件が成功した。
+- minimatch 11にない `makeRe` の使用をプラグイン内で置換し、許可・禁止パターン、ブレース展開、隠しパスの判定をテストした。旧 `makeRe` は `react-dom/**` で `react-dom/.hidden` に一致するが、新しい `minimatch()` は既定で一致しない。該当ルールは現在有効にしておらず、今後有効にする場合はこの差を考慮する。
+
 ## 2026-10-19: CI高速化
 
 - 変更したGitHub Actionsをactionlint 1.7.12で検査し、エラー0件を確認した。
