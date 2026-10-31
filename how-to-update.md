@@ -16,7 +16,6 @@
 
 ## Dependabot PR の更新
 
-
 Dependabot version update は毎月28日00:00、検証済み PR の自動マージは同日18:00（いずれも `Asia/Tokyo`）にまとめます。28日より前に自動マージせず、現在の head SHA と全 PR チェックを月末処理で再確認します。
 前提は `.github/dependabot.yml` と PR 用 CI（CI）です。更新 PR の head SHA と `gh pr checks <PR番号>` の結果を確認してください。patch／minor は全チェック成功後に自動取り込みされます。初回 CI 失敗は failed jobs のみを 1 回再実行し、再失敗時は `bun.lock` の再生成を試み、修復後の CI を再実行します。変更がない場合や再度失敗した場合は PR を残します。
 
@@ -27,6 +26,8 @@ Dependabot version update は毎月28日00:00、検証済み PR の自動マー�
 `package.json` の `overrides` は、上流パッケージが fast-uri の旧版を固定している間に安全な patch 版を選ぶために使う。上流が安全版を採用したら override を減らせるか確認する。更新時は `bun install --lockfile-only --ignore-scripts`、`bun install --frozen-lockfile`、`bun audit` を実行し、該当する lint・型・テスト・ビルドを確認する。問題があれば更新コミットを revert し、lockfile と package.json を同じ版へ戻す。
 
 他の推移依存にも安全版を選ぶoverrideがあるため、更新時は既存の固定版も再監査する。`global-agent` は4系へ更新することで、旧ダウンローダーが引く修正版のない `sprintf-js` を除いている。上流が安全な依存へ移行したらこの指定を見直す。
+
+electron-builder を更新するときは `app-builder-lib` の override と `electron-builder-squirrel-windows` の解決版も要求版に揃え、Windows配布ビルドの表示版を確認する。`eslint-plugin-import-x` 4.17.1 は minimatch 11 に存在しない `makeRe` を使うため、`patches/` 内のパッチで `minimatch()` に置き換えている。旧正規表現と異なり、`**` に続く隠しパスは既定では一致しない。該当ルールの有効化やプラグイン更新時は回帰テストを実行し、上流対応後にパッチを削除できるか確認する。
 
 ReactとReact DOMは完全に同じバージョンへ更新し、両方の型定義も対応する版へ揃える。TypeScript ESLintのparserとpluginも一緒に更新する。TypeScriptはparserの対応範囲を確認して選ぶ。2026-10-15時点ではTypeScript 6.0.3を使用し、parser 8.71.2が対応していない7系は採用しない。TypeScript 6ではNode型の自動取り込みに依存せず、`@types/node` と両tsconfigの `types` を明示する。
 

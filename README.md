@@ -56,7 +56,6 @@ bun run build:mac
 
 [MIT](LICENSE)
 
-
 ## 開発・運用の知見
 
 開発環境、内部構成、検証コマンドと運用上の注意は [findings.md](findings.md) を参照してください。更新・復旧の手順と検証記録は、同ファイルから案内しています。
